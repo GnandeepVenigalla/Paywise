@@ -1,10 +1,11 @@
 import { useEffect, useState, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, UserPlus, Receipt, CreditCard, Camera, Trash2, X, Edit2 } from 'lucide-react';
+import { ArrowLeft, UserPlus, Receipt, CreditCard, Camera, Trash2, X, Edit2, LogOut, Check } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 export default function GroupDetails() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const { api, user } = useContext(AuthContext);
     const [group, setGroup] = useState(null);
     const [expenses, setExpenses] = useState([]);
@@ -18,6 +19,31 @@ export default function GroupDetails() {
     const [editDescription, setEditDescription] = useState('');
     const [editAmount, setEditAmount] = useState('');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+    const [isEditingGroupName, setIsEditingGroupName] = useState(false);
+    const [newGroupName, setNewGroupName] = useState('');
+
+    const handleUpdateGroupName = async () => {
+        if (!newGroupName.trim()) return;
+        try {
+            await api.put(`/groups/${id}`, { name: newGroupName });
+            setIsEditingGroupName(false);
+            fetchGroup();
+        } catch (err) {
+            alert('Failed to update group name');
+        }
+    };
+
+    const handleLeaveGroup = async () => {
+        if (window.confirm('Are you sure you want to leave this group? Your history will remain if you have any outstanding balances.')) {
+            try {
+                await api.post(`/groups/${id}/leave`);
+                navigate('/dashboard');
+            } catch (err) {
+                alert(err.response?.data?.msg || 'Failed to leave group');
+            }
+        }
+    };
 
     const handleUpdateExpense = async (e) => {
         e.preventDefault();
@@ -100,16 +126,56 @@ export default function GroupDetails() {
                         <span className="text-xl font-bold">Paywise</span>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button onClick={() => setShowInvite(!showInvite)} className="p-2 -mr-1 rounded-full hover:bg-teal-700 transition bg-teal-700/50 shadow-sm" aria-label="Invite member">
-                            <UserPlus className="w-5 h-5" />
-                        </button>
+                        {(group.members || []).some(m => m._id === user.id) && (
+                            <>
+                                <button onClick={handleLeaveGroup} className="p-2 -mr-1 rounded-full hover:bg-teal-700 transition bg-teal-700/50 shadow-sm" aria-label="Leave group" title="Leave Group">
+                                    <LogOut className="w-5 h-5 text-rose-100" />
+                                </button>
+                                <button onClick={() => setShowInvite(!showInvite)} className="p-2 -mr-1 rounded-full hover:bg-teal-700 transition bg-teal-700/50 shadow-sm" aria-label="Invite member">
+                                    <UserPlus className="w-5 h-5" />
+                                </button>
+                            </>
+                        )}
                         <Link to="/account" className="w-9 h-9 ml-1 rounded-full bg-teal-100 border-2 border-teal-50 text-teal-700 flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-teal-200 transition">
                             {user?.username?.charAt(0) || 'U'}
                         </Link>
                     </div>
                 </div>
-                <h1 className="text-3xl font-bold mb-1 tracking-tight">{group.name}</h1>
-                <p className="text-teal-100 font-medium opacity-90">{group.members.length} members</p>
+
+                {isEditingGroupName ? (
+                    <div className="flex items-center gap-2 mb-1">
+                        <input
+                            type="text"
+                            value={newGroupName}
+                            onChange={(e) => setNewGroupName(e.target.value)}
+                            className="text-3xl font-bold tracking-tight bg-teal-700/50 text-white rounded px-2 py-1 outline-none border border-teal-400 w-full focus:ring-2 focus:ring-white"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && handleUpdateGroupName()}
+                        />
+                        <button onClick={handleUpdateGroupName} className="p-2 bg-white text-teal-600 rounded-full hover:bg-teal-50 transition drop-shadow-sm flex-shrink-0">
+                            <Check className="w-5 h-5" />
+                        </button>
+                        <button onClick={() => setIsEditingGroupName(false)} className="p-2 bg-teal-700/50 text-white rounded-full hover:bg-teal-700 transition drop-shadow-sm flex-shrink-0">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                ) : (
+                    <div className={`flex items-center gap-2 mb-1 ${(group.members || []).some(m => m._id === user.id) ? 'group cursor-pointer' : ''}`} onClick={() => {
+                        if ((group.members || []).some(m => m._id === user.id)) {
+                            setNewGroupName(group.name); setIsEditingGroupName(true);
+                        }
+                    }}>
+                        <h1 className="text-3xl font-bold tracking-tight break-all">{group.name}</h1>
+                        {(group.members || []).some(m => m._id === user.id) && (
+                            <Edit2 className="w-5 h-5 opacity-50 group-hover:opacity-100 transition flex-shrink-0" />
+                        )}
+                    </div>
+                )}
+
+                <p className="text-teal-100 font-medium opacity-90">
+                    {group.members?.length || 0} active members
+                    {(group.pastMembers && group.pastMembers.length > 0) ? ` · ${group.pastMembers.length} past members` : ''}
+                </p>
             </header>
 
             <main className="px-4 max-w-lg mx-auto -mt-6">
@@ -124,12 +190,17 @@ export default function GroupDetails() {
                     </div>
 
                     <div className="mt-6 pt-5 border-t border-gray-100 flex flex-col gap-3">
-                        {group.members.filter(m => m._id !== user.id).map(member => {
+                        {[...(group.members || []), ...(group.pastMembers || [])].filter(m => m._id !== user.id).map(member => {
                             const b = balances[member._id] || 0;
+                            const isPastMember = group.pastMembers && group.pastMembers.some(pm => pm._id === member._id);
+
                             return (
-                                <div key={member._id} className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-100 transition-all hover:bg-gray-100 hover:shadow-sm">
+                                <div key={member._id} className={`flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-100 transition-all hover:bg-gray-100 hover:shadow-sm ${isPastMember ? 'opacity-80' : ''}`}>
                                     <div className="flex flex-col overflow-hidden mr-3">
-                                        <span className="text-base font-bold text-gray-800 truncate">{member.username}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-base font-bold text-gray-800 truncate">{member.username}</span>
+                                            {isPastMember && <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md uppercase tracking-wide">Exited</span>}
+                                        </div>
                                         <span className={`text-sm font-semibold mt-0.5 whitespace-nowrap ${b < 0 ? 'text-rose-500' : b > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
                                             {b > 0 ? 'owes you $' + b.toFixed(2) : b < 0 ? 'you owe $' + Math.abs(b).toFixed(2) : 'settled up'}
                                         </span>
@@ -243,22 +314,24 @@ export default function GroupDetails() {
             </main>
 
             {/* Floating Action Buttons */}
-            <div className="fixed bottom-6 w-full max-w-lg left-1/2 -translate-x-1/2 px-4 flex gap-4">
-                <Link
-                    to={`/group/${id}/add`}
-                    className="flex-1 bg-gray-900 text-white rounded-2xl shadow-xl py-4 flex items-center justify-center gap-2 font-bold hover:bg-gray-800 transition transform hover:-translate-y-1"
-                >
-                    <CreditCard className="w-5 h-5" />
-                    Add Expense
-                </Link>
-                <Link
-                    to={`/group/${id}/scan`}
-                    className="flex-1 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-2xl shadow-xl py-4 flex items-center justify-center gap-2 font-bold hover:from-teal-600 hover:to-teal-700 transition transform hover:-translate-y-1"
-                >
-                    <Camera className="w-5 h-5" />
-                    Scan Bill
-                </Link>
-            </div>
+            {(group.members || []).some(m => m._id === user.id) && (
+                <div className="fixed bottom-6 w-full max-w-lg left-1/2 -translate-x-1/2 px-4 flex gap-4">
+                    <Link
+                        to={`/group/${id}/add`}
+                        className="flex-1 bg-gray-900 text-white rounded-2xl shadow-xl py-4 flex items-center justify-center gap-2 font-bold hover:bg-gray-800 transition transform hover:-translate-y-1"
+                    >
+                        <CreditCard className="w-5 h-5" />
+                        Add Expense
+                    </Link>
+                    <Link
+                        to={`/group/${id}/scan`}
+                        className="flex-1 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-2xl shadow-xl py-4 flex items-center justify-center gap-2 font-bold hover:from-teal-600 hover:to-teal-700 transition transform hover:-translate-y-1"
+                    >
+                        <Camera className="w-5 h-5" />
+                        Scan Bill
+                    </Link>
+                </div>
+            )}
 
             {/* Expense Detail Modal */}
             {selectedExpense && (
