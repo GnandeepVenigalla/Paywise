@@ -3,17 +3,17 @@
     "name": "Paywise",
     "icons": [
         {
-            "src": "/logo.png",
+            "src": "/Paywise/logo.png",
             "sizes": "192x192",
             "type": "image/png"
         },
         {
-            "src": "/logo.png",
+            "src": "/Paywise/logo.png",
             "sizes": "512x512",
             "type": "image/png"
         }
     ],
-    "start_url": "/",
+    "start_url": "/Paywise/",
     "display": "standalone",
     "theme_color": "#000000",
     "background_color": "#ffffff"
