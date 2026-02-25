@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #f9fafb;
+    color: #111827;
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+html,
+body {
+  -webkit-tap-highlight-color: transparent;
+}
