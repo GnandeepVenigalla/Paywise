@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import Tesseract from 'tesseract.js';
-import { Camera, RefreshCw, Upload, Image as ImageIcon, ArrowLeft, Loader2 } from 'lucide-react';
+import { Camera, RefreshCw, Upload, Image as ImageIcon, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 
 export default function ScanBill() {
@@ -13,10 +13,13 @@ export default function ScanBill() {
     const [imageSrc, setImageSrc] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [cameraState, setCameraState] = useState('loading'); // 'loading', 'active', 'error'
 
     const capture = useCallback(() => {
-        const imageSrc = webcamRef.current.getScreenshot();
-        setImageSrc(imageSrc);
+        if (webcamRef.current) {
+            const imageSrc = webcamRef.current.getScreenshot();
+            setImageSrc(imageSrc);
+        }
     }, [webcamRef]);
 
     const handleFileUpload = (e) => {
@@ -81,7 +84,7 @@ export default function ScanBill() {
     };
 
     return (
-        <div className="min-h-screen bg-black text-white flex flex-col font-sans">
+        <div className="h-[100dvh] w-full bg-black text-white flex flex-col font-sans overflow-hidden">
             {/* Header */}
             <div className="p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/80 to-transparent absolute top-0 w-full left-0">
                 <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition backdrop-blur-sm">
@@ -95,21 +98,46 @@ export default function ScanBill() {
             <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
                 {!imageSrc ? (
                     <>
-                        <Webcam
-                            audio={false}
-                            ref={webcamRef}
-                            screenshotFormat="image/jpeg"
-                            videoConstraints={{ facingMode: "environment" }}
-                            className="w-full h-full object-cover absolute inset-0"
-                        />
-                        {/* Overlay grid for scanning */}
-                        <div className="absolute inset-0 pointer-events-none border-[40px] border-black/50 transition-all">
-                            <div className="w-full h-full border-2 border-dashed border-teal-400/70 rounded-3xl relative">
-                                <div className="absolute top-1/2 left-0 w-full h-[2px] bg-teal-400/50 shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-scan"></div>
+                        {cameraState === 'error' ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-gray-900 absolute inset-0">
+                                <AlertCircle className="w-16 h-16 text-yellow-500 mb-4" />
+                                <h3 className="text-xl font-bold mb-2">Camera Access Unavailable</h3>
+                                <p className="text-gray-400 mb-8 max-w-xs text-sm">
+                                    We couldn't access your camera. You can still use the buttons below to upload or take a photo using your device's native camera.
+                                </p>
+                                <label className="py-4 px-8 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold hover:from-teal-600 hover:to-emerald-600 transition shadow-lg shadow-teal-500/30 cursor-pointer flex items-center gap-3">
+                                    <Camera className="w-6 h-6" />
+                                    Open Native Camera
+                                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileUpload} />
+                                </label>
                             </div>
-                        </div>
+                        ) : (
+                            <>
+                                {cameraState === 'loading' && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black z-0">
+                                        <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
+                                    </div>
+                                )}
+                                <Webcam
+                                    audio={false}
+                                    ref={webcamRef}
+                                    screenshotFormat="image/jpeg"
+                                    videoConstraints={{ facingMode: "environment" }}
+                                    className="w-full h-full object-cover absolute inset-0 z-0"
+                                    playsInline
+                                    onUserMedia={() => setCameraState('active')}
+                                    onUserMediaError={() => setCameraState('error')}
+                                />
+                                {/* Overlay grid for scanning */}
+                                <div className="absolute inset-0 pointer-events-none border-[40px] border-black/50 transition-all z-10">
+                                    <div className="w-full h-full border-2 border-dashed border-teal-400/70 rounded-3xl relative">
+                                        <div className="absolute top-1/2 left-0 w-full h-[2px] bg-teal-400/50 shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-scan"></div>
+                                    </div>
+                                </div>
 
-                        <p className="absolute bottom-32 text-center w-full font-medium text-white/90 drop-shadow-md text-sm">Align receipt securely within the frame</p>
+                                <p className="absolute bottom-32 text-center w-full font-medium text-white/90 drop-shadow-md text-sm z-10">Align receipt securely within the frame</p>
+                            </>
+                        )}
                     </>
                 ) : (
                     <div className="relative w-full h-full flex items-center justify-center p-4">
@@ -129,24 +157,28 @@ export default function ScanBill() {
             </div>
 
             {/* Controls */}
-            <div className="bg-black/90 backdrop-blur-lg pb-10 pt-6 px-8 flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10">
+            <div className="bg-black/90 backdrop-blur-lg pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-6 px-8 flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10 relative">
                 {!imageSrc ? (
                     <>
-                        <label className="p-4 rounded-full bg-white/10 hover:bg-white/20 transition cursor-pointer group">
+                        <label className="p-4 rounded-full bg-white/10 hover:bg-white/20 transition cursor-pointer group flex-shrink-0 z-20">
                             <ImageIcon className="w-7 h-7 text-white group-hover:scale-110 transition-transform" />
                             <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
                         </label>
 
-                        <button
-                            onClick={capture}
-                            className="w-20 h-20 rounded-full bg-white/20 p-2 flex items-center justify-center hover:bg-white/30 transition shadow-[0_0_20px_rgba(255,255,255,0.1)] group"
-                        >
-                            <div className="w-16 h-16 rounded-full bg-white group-hover:scale-95 transition-transform flex items-center justify-center shadow-inner">
-                                <Camera className="w-8 h-8 text-black opacity-80" />
-                            </div>
-                        </button>
+                        {cameraState !== 'error' ? (
+                            <button
+                                onClick={capture}
+                                className="w-20 h-20 rounded-full bg-white/20 p-2 flex items-center justify-center hover:bg-white/30 transition shadow-[0_0_20px_rgba(255,255,255,0.1)] group flex-shrink-0 z-20"
+                            >
+                                <div className="w-16 h-16 rounded-full bg-white group-hover:scale-95 transition-transform flex items-center justify-center shadow-inner">
+                                    <Camera className="w-8 h-8 text-black opacity-80" />
+                                </div>
+                            </button>
+                        ) : (
+                            <div className="w-20"></div> // Spacer when error is shown
+                        )}
 
-                        <div className="w-14"></div> {/* Spacer to keep capture button centered */}
+                        <div className="w-14 flex-shrink-0"></div> {/* Spacer to keep capture button centered */}
                     </>
                 ) : (
                     <div className="w-full flex justify-between gap-4">
@@ -181,3 +213,4 @@ export default function ScanBill() {
         </div>
     );
 }
+
