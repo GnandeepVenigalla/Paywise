@@ -10,6 +10,8 @@ export default function ScanBill() {
     const navigate = useNavigate();
     const { api } = useContext(AuthContext);
     const webcamRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const galleryInputRef = useRef(null);
     const [imageSrc, setImageSrc] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -26,9 +28,15 @@ export default function ScanBill() {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
+            reader.onloadstart = () => setIsProcessing(true); // show loading state while reading large files
             reader.onloadend = () => {
                 setImageSrc(reader.result);
+                setIsProcessing(false);
             };
+            reader.onerror = () => {
+                alert("Failed to read file");
+                setIsProcessing(false);
+            }
             reader.readAsDataURL(file);
         }
     };
@@ -85,6 +93,10 @@ export default function ScanBill() {
 
     return (
         <div className="h-[100dvh] w-full bg-black text-white flex flex-col font-sans overflow-hidden">
+            {/* Hidden file inputs for programmatic clicking */}
+            <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+            <input type="file" accept="image/*" className="hidden" ref={galleryInputRef} onChange={handleFileUpload} />
+
             {/* Header */}
             <div className="p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/80 to-transparent absolute top-0 w-full left-0">
                 <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-white/10 transition backdrop-blur-sm">
@@ -99,17 +111,18 @@ export default function ScanBill() {
                 {!imageSrc ? (
                     <>
                         {cameraState === 'error' ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-gray-900 absolute inset-0">
+                            <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-gray-900 absolute inset-0 z-0">
                                 <AlertCircle className="w-16 h-16 text-yellow-500 mb-4" />
                                 <h3 className="text-xl font-bold mb-2">Camera Access Unavailable</h3>
                                 <p className="text-gray-400 mb-8 max-w-xs text-sm">
                                     We couldn't access your camera. You can still use the buttons below to upload or take a photo using your device's native camera.
                                 </p>
-                                <label className="py-4 px-8 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold hover:from-teal-600 hover:to-emerald-600 transition shadow-lg shadow-teal-500/30 cursor-pointer flex items-center gap-3">
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="py-4 px-8 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold hover:from-teal-600 hover:to-emerald-600 transition shadow-lg shadow-teal-500/30 flex items-center gap-3">
                                     <Camera className="w-6 h-6" />
                                     Open Native Camera
-                                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileUpload} />
-                                </label>
+                                </button>
                             </div>
                         ) : (
                             <>
@@ -160,10 +173,11 @@ export default function ScanBill() {
             <div className="bg-black/90 backdrop-blur-lg pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-6 px-8 flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10 relative">
                 {!imageSrc ? (
                     <>
-                        <label className="p-4 rounded-full bg-white/10 hover:bg-white/20 transition cursor-pointer group flex-shrink-0 z-20">
+                        <button
+                            onClick={() => galleryInputRef.current?.click()}
+                            className="p-4 rounded-full bg-white/10 hover:bg-white/20 transition cursor-pointer group flex-shrink-0 z-20">
                             <ImageIcon className="w-7 h-7 text-white group-hover:scale-110 transition-transform" />
-                            <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-                        </label>
+                        </button>
 
                         {cameraState !== 'error' ? (
                             <button
@@ -183,7 +197,11 @@ export default function ScanBill() {
                 ) : (
                     <div className="w-full flex justify-between gap-4">
                         <button
-                            onClick={() => setImageSrc(null)}
+                            onClick={() => {
+                                setImageSrc(null);
+                                if (fileInputRef.current) fileInputRef.current.value = '';
+                                if (galleryInputRef.current) galleryInputRef.current.value = '';
+                            }}
                             disabled={isProcessing}
                             className="flex-1 py-4 px-6 rounded-2xl bg-white/10 text-white font-bold hover:bg-white/20 transition disabled:opacity-50 border border-white/5 flex items-center justify-center gap-2"
                         >
