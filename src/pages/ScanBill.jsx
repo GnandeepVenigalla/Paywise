@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useContext } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import Tesseract from 'tesseract.js';
 import { Camera, RefreshCw, Upload, Image as ImageIcon, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
@@ -8,6 +8,7 @@ import { AuthContext } from '../context/AuthContext';
 export default function ScanBill() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { api } = useContext(AuthContext);
     const webcamRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -53,7 +54,7 @@ export default function ScanBill() {
                 setProgress(100);
 
                 // If it succeeds, gracefully pass the perfectly mapped AI object
-                const isFriend = window.location.pathname.includes('/friend/');
+                const isFriend = location.pathname.includes('/friend/');
                 navigate(isFriend ? `/friend/${id}/split` : `/group/${id}/split`, { state: { aiItems: res.data.items, imageSrc } });
                 return;
             } catch (err) {
@@ -84,7 +85,7 @@ export default function ScanBill() {
             const text = result.data.text;
 
             // Navigate to split page with simple extracted text over to the regex parser
-            const isFriend = window.location.pathname.includes('/friend/');
+            const isFriend = location.pathname.includes('/friend/');
             navigate(isFriend ? `/friend/${id}/split` : `/group/${id}/split`, { state: { text, imageSrc } });
         } catch (err) {
             console.error(err);
