@@ -39,6 +39,8 @@ function App() {
             <Route path="/friends" element={<PrivateRoute><Friends /></PrivateRoute>} />
             <Route path="/friend/:id" element={<PrivateRoute><FriendDetails /></PrivateRoute>} />
             <Route path="/friend/:id/add" element={<PrivateRoute><AddFriendExpense /></PrivateRoute>} />
+            <Route path="/friend/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
+            <Route path="/friend/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
             <Route path="/activity" element={<PrivateRoute><Activity /></PrivateRoute>} />
             <Route path="/account" element={<PrivateRoute><Account /></PrivateRoute>} />
             <Route path="/account/settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />

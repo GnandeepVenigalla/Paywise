@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, CreditCard, Receipt, Folder } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, X, CreditCard, Receipt, Folder, Camera } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 export default function FriendDetails() {
     const { id } = useParams();
@@ -245,7 +245,7 @@ export default function FriendDetails() {
                 </div>
             </main>
 
-            {/* Floating Action Button */}
+            {/* Floating Action Buttons */}
             <div className="fixed bottom-6 w-full max-w-lg left-1/2 -translate-x-1/2 px-4 flex gap-4">
                 <Link
                     to={`/friend/${id}/add`}
@@ -253,6 +253,13 @@ export default function FriendDetails() {
                 >
                     <CreditCard className="w-5 h-5" />
                     Add Expense
+                </Link>
+                <Link
+                    to={`/friend/${id}/scan`}
+                    className="flex-1 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-2xl shadow-xl py-4 flex items-center justify-center gap-2 font-bold hover:from-teal-600 hover:to-teal-700 transition transform hover:-translate-y-1"
+                >
+                    <Camera className="w-5 h-5" />
+                    Scan Bill
                 </Link>
             </div>
 
