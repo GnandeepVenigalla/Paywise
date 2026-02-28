@@ -53,7 +53,8 @@ export default function ScanBill() {
                 setProgress(100);
 
                 // If it succeeds, gracefully pass the perfectly mapped AI object
-                navigate(`/group/${id}/split`, { state: { aiItems: res.data.items, imageSrc } });
+                const isFriend = window.location.pathname.includes('/friend/');
+                navigate(isFriend ? `/friend/${id}/split` : `/group/${id}/split`, { state: { aiItems: res.data.items, imageSrc } });
                 return;
             } catch (err) {
                 // If Gemini isn't configured in the .env by the developer, gracefully fallback to the basic local text parser
@@ -83,7 +84,8 @@ export default function ScanBill() {
             const text = result.data.text;
 
             // Navigate to split page with simple extracted text over to the regex parser
-            navigate(`/group/${id}/split`, { state: { text, imageSrc } });
+            const isFriend = window.location.pathname.includes('/friend/');
+            navigate(isFriend ? `/friend/${id}/split` : `/group/${id}/split`, { state: { text, imageSrc } });
         } catch (err) {
             console.error(err);
             alert('Error processing image. Please try again.');

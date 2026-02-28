@@ -41,9 +41,18 @@ export default function SplitItems() {
 
     const fetchGroup = async () => {
         try {
-            const res = await api.get(`/groups/${id}`);
-            setGroup(res.data.group);
-            setSelectedMemberIds([user.id]); // Default select current user
+            const isFriend = location.pathname.includes('/friend/');
+            if (isFriend) {
+                const res = await api.get(`/expenses/friends/${id}`);
+                // Create a mock group with just the user and friend
+                const currentUser = { ...user, _id: user.id || user._id };
+                setGroup({ members: [currentUser, res.data.friend] });
+                setSelectedMemberIds([currentUser._id]);
+            } else {
+                const res = await api.get(`/groups/${id}`);
+                setGroup(res.data.group);
+                setSelectedMemberIds([user.id]);
+            }
         } catch (err) {
             console.error(err);
         }
@@ -56,7 +65,7 @@ export default function SplitItems() {
 
         // Matches lines ending in a price (allowing an optional character at the very end like 'A' or 'E')
         const priceRegex = /(.+?)\s+[$]?(\d+\.\d{2})(?:\s*[A-Za-z%]{1,2})?$/;
-        const ignoreKeywords = ['total', 'subtotal', 'tax', 'change', 'amount', 'visa', 'mastercard', 'cash', 'due', 'balance', 'items sold', 'approved'];
+        const ignoreKeywords = ['total', 'subtotal', 'change', 'amount', 'visa', 'mastercard', 'cash', 'due', 'balance', 'items sold', 'approved'];
 
         lines.forEach(line => {
             line = line.trim();
@@ -161,15 +170,17 @@ export default function SplitItems() {
         const totalAmount = items.reduce((acc, item) => acc + item.price, 0);
         const description = "Receipt Scan " + new Date().toLocaleDateString();
 
+        const isFriend = location.pathname.includes('/friend/');
+
         try {
             await api.post('/expenses', {
                 description,
                 amount: totalAmount, // or totalAssigned? usually receipt total
-                group: id,
+                group: isFriend ? null : id,
                 paidBy: paidBy,
                 splits: splitsArray
             });
-            navigate(`/group/${id}`);
+            navigate(isFriend ? `/friend/${id}` : `/group/${id}`);
         } catch (err) {
             console.error(err);
             alert('Failed to save expense');

@@ -65,7 +65,7 @@ export default function Account() {
             <div className="text-center text-[15px] text-[#8e9092] mt-10 mb-8 pointer-events-none">
                 <p className="mb-1">Made by :) GD Enterprises</p>
                 <p className="mb-1">Copyright © 2026 Paywise, Inc.</p>
-                <p className="mt-3 text-[10px]">v1.0.0</p>
+                <p className="mt-3 text-[10px]">v1.0.1</p>
             </div>
 
             <BottomNav />
