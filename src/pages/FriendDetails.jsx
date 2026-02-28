@@ -1,11 +1,15 @@
-import { useEffect, useState, useContext } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState, useContext, useMemo } from 'react';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, CreditCard, Receipt, Folder, Camera } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, X, CreditCard, Receipt, Folder, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2 } from 'lucide-react';
+import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
+import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
 export default function FriendDetails() {
     const { id } = useParams();
     const { api, user } = useContext(AuthContext);
+    const { hideBalance } = useAppSettings();
+    const currSym = getCurrencySymbol(user?.defaultCurrency || 'USD');
     const [friend, setFriend] = useState(null);
     const [expenses, setExpenses] = useState([]);
     const [balance, setBalance] = useState(0);
@@ -15,7 +19,67 @@ export default function FriendDetails() {
     const [editDescription, setEditDescription] = useState('');
     const [editAmount, setEditAmount] = useState('');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const location = useLocation();
+    const [showSettings, setShowSettings] = useState(location.state?.openSettings || false);
+    const [showFriendTotals, setShowFriendTotals] = useState(false);
+    const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
+    const [showExportOptions, setShowExportOptions] = useState(false);
+    const [showSettleUp, setShowSettleUp] = useState(false);
+    const [settleMode, setSettleMode] = useState(null); // null | 'cash' | 'bank'
+    const [cashStep, setCashStep] = useState(1); // 1=method picker, 2=cash amount
+    const [partialAmount, setPartialAmount] = useState('');
+    const [isSettling, setIsSettling] = useState(false);
+    const [friendNote, setFriendNote] = useState('');
+    const [showNoteModal, setShowNoteModal] = useState(false);
+    const [draftNote, setDraftNote] = useState('');
+    const [showReminderModal, setShowReminderModal] = useState(false);
+    const [reminderEmailBody, setReminderEmailBody] = useState('');
     const navigate = useNavigate();
+
+    const monthlySpending = useMemo(() => {
+        if (!expenses || expenses.length === 0) return [];
+
+        const monthMap = {};
+
+        expenses.forEach(exp => {
+            if (exp.description && exp.description.toLowerCase().includes('payment')) return;
+            if (exp.isGroupSummary) return; // ignore grouped summaries for pure 1-on-1 chart logic
+
+            const d = new Date(exp.date);
+            const key = `${d.getFullYear()}-${("0" + (d.getMonth() + 1)).slice(-2)}`;
+            const monthLabel = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            const shortMonth = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+
+            if (!monthMap[key]) {
+                monthMap[key] = {
+                    key,
+                    label: monthLabel,
+                    shortMonth,
+                    totalSpent: 0,
+                    userShare: 0,
+                    timestamp: new Date(d.getFullYear(), d.getMonth(), 1).getTime(),
+                    expensesList: []
+                };
+            }
+
+            monthMap[key].totalSpent += exp.amount;
+            monthMap[key].expensesList.push(exp);
+
+            const userSplit = exp.splits.find(s => (s.user._id || s.user) === user.id || (s.user._id || s.user) === user._id);
+            if (userSplit) {
+                monthMap[key].userShare += userSplit.amount;
+            }
+        });
+
+        const sorted = Object.values(monthMap).sort((a, b) => a.timestamp - b.timestamp);
+        return sorted;
+    }, [expenses, user]);
+
+    useEffect(() => {
+        if (monthlySpending.length > 0) {
+            setSelectedMonthIndex(monthlySpending.length - 1);
+        }
+    }, [monthlySpending]);
 
     const fetchFriendDetails = async () => {
         try {
@@ -30,6 +94,8 @@ export default function FriendDetails() {
 
     useEffect(() => {
         fetchFriendDetails();
+        // Load the shared friend note from backend
+        api.get(`/auth/friend-note/${id}`).then(res => setFriendNote(res.data.note || '')).catch(() => { });
     }, [id]);
 
     const handleUpdateExpense = async (e) => {
@@ -61,7 +127,57 @@ export default function FriendDetails() {
         }
     };
 
-    if (!friend) return <div className="p-8 text-center text-gray-500 animate-pulse">Loading friend data...</div>;
+    const openSettleUp = () => {
+        if (balance === 0) {
+            alert("You and " + friend.username + " are already settled up!");
+            return;
+        }
+        setSettleMode(null);
+        setCashStep(1);
+        setPartialAmount('');
+        setShowSettleUp(true);
+    };
+
+    const handleCashSettle = async (isPartial) => {
+        const amt = isPartial ? parseFloat(partialAmount) : Math.abs(balance);
+        if (isNaN(amt) || amt <= 0) {
+            alert('Please enter a valid amount.');
+            return;
+        }
+        if (amt > Math.abs(balance)) {
+            alert(`Amount cannot exceed $${Math.abs(balance).toFixed(2)}.`);
+            return;
+        }
+        setIsSettling(true);
+        try {
+            await api.post('/expenses', {
+                description: isPartial ? `Partial cash payment of $${amt.toFixed(2)}` : 'Cash settle up',
+                amount: amt,
+                group: null,
+                paidBy: balance > 0 ? friend._id : (user.id || user._id),
+                splits: [{
+                    user: balance > 0 ? (user.id || user._id) : friend._id,
+                    amount: amt
+                }]
+            });
+            setShowSettleUp(false);
+            fetchFriendDetails();
+        } catch (err) {
+            alert('Failed to record settlement.');
+        } finally {
+            setIsSettling(false);
+        }
+    };
+
+    if (!friend) {
+        return (
+            <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+                <div className="w-[110px] h-[110px] animate-pulse">
+                    <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
+                </div>
+            </div>
+        );
+    }
 
     const displayItems = [];
     const groupBalances = {};
@@ -106,160 +222,191 @@ export default function FriendDetails() {
     displayItems.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     return (
-        <div className="min-h-screen bg-gray-50 font-sans pb-24">
-            {/* Header */}
-            <header className="bg-teal-600 text-white pt-6 pb-8 px-4 shadow-md sticky top-0 z-10 transition-all">
-                <div className="flex items-center justify-between mb-4">
+        <div className="min-h-screen bg-white font-sans pb-24">
+            {/* Header - Splitwise Style Top Dark Header */}
+            <header className="bg-[#126b70] text-white pt-6 pb-6 px-4 sticky top-0 z-10">
+                <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-teal-700 transition">
-                            <ArrowLeft className="w-6 h-6" />
+                        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
+                            <ArrowLeft className="w-5 h-5 text-white" />
                         </button>
-                        <img src={logoImg} alt="Paywise" className="w-8 h-8 object-contain bg-white rounded-lg p-0.5" />
-                        <span className="text-xl font-bold">Paywise</span>
                     </div>
                     <div className="flex gap-3 items-center">
-                        <Link to="/account" className="w-9 h-9 rounded-full bg-teal-100 border-2 border-teal-50 text-teal-700 flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-teal-200 hover:text-teal-800 transition">
-                            {user?.username?.charAt(0) || 'U'}
-                        </Link>
+                        <button onClick={() => setShowSettings(true)} className="w-9 h-9 rounded-full bg-white/20 border-2 border-white/40 text-white flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-white/30 transition">
+                            <Settings className="w-5 h-5" />
+                        </button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center text-xl font-black uppercase border-2 border-white/40 shadow-sm">
-                        {friend.username?.charAt(0)}
+                <div className="mt-4 mb-2">
+                    <h1 className="text-3xl font-black tracking-tight leading-none text-white">{friend.username}</h1>
+                    <div className="flex items-center gap-2 mt-2">
+                        <span className="bg-black/30 text-white text-xs font-bold px-2.5 py-1 rounded-full">{friend.email}</span>
+                        <button
+                            onClick={() => { setDraftNote(friendNote); setShowNoteModal(true); }}
+                            className="bg-black/20 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 border border-white/20 shadow-sm hover:bg-black/30 max-w-[200px] truncate"
+                        >
+                            <Edit2 className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">{friendNote ? friendNote : 'Add friend notes...'}</span>
+                        </button>
                     </div>
-                    <div className="flex-1 flex flex-col justify-center">
-                        <h1 className="text-2xl font-black tracking-tight leading-none">{friend.username}</h1>
-                        <p className="text-teal-100 font-medium text-xs mt-1">{friend.email}</p>
-                    </div>
-                </div>
-
-                <div className="mt-5 bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20 shadow-inner">
-                    <p className="text-teal-100 text-xs font-semibold uppercase tracking-wider mb-1">Your Total Balance</p>
-                    {balance > 0 ? (
-                        <p className="text-2xl font-black">${balance.toFixed(2)} <span className="text-xs font-semibold text-teal-100 uppercase tracking-wide opacity-90">Owes You</span></p>
-                    ) : balance < 0 ? (
-                        <p className="text-2xl font-black text-rose-300">-${Math.abs(balance).toFixed(2)} <span className="text-xs font-semibold text-rose-200 uppercase tracking-wide opacity-90">You Owe</span></p>
-                    ) : (
-                        <p className="text-2xl font-black text-white/90">Settled Up <span className="text-xs font-semibold text-teal-100 uppercase tracking-wide opacity-90 inline-block align-middle ml-2 hover:animate-spin">🎉</span></p>
-                    )}
                 </div>
             </header>
 
-            {/* Expenses List */}
-            <main className="px-4 py-6 max-w-lg mx-auto relative -mt-6">
-                <div className="bg-white rounded-3xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4 px-1 flex items-center justify-between">
-                        Shared Finances
-                        <span className="bg-gray-100 text-gray-500 text-xs py-1 px-3 rounded-full">{displayItems.length}</span>
-                    </h3>
+            <main className="bg-white max-w-lg mx-auto">
+                <div className="px-4 py-5 shadow-[0_4px_10px_rgb(0,0,0,0.03)] border-b border-gray-100 mb-2">
+                    <div className="mb-4">
+                        {balance > 0 ? (
+                            <p className="text-gray-700 text-[15px]">{friend.username} owes you <span className={`text-[#108c73] font-medium ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{balance.toFixed(2)}</span></p>
+                        ) : balance < 0 ? (
+                            <p className="text-gray-700 text-[15px]">You owe {friend.username} <span className={`text-[#e25b22] font-medium ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(balance).toFixed(2)}</span></p>
+                        ) : (
+                            <p className="text-gray-700 text-[15px]">You and {friend.username} are settled up.</p>
+                        )}
+                    </div>
 
+                    <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide items-center">
+                        <button onClick={openSettleUp} className="bg-[#e25b22] text-white px-5 py-2 rounded-lg hover:bg-[#c94d1a] font-bold shadow-sm whitespace-nowrap transition">
+                            Settle up
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (!friend) return;
+                                // Build a professional pre-filled email draft
+                                const absAmt = Math.abs(balance).toFixed(2);
+                                const draft = balance > 0
+                                    ? `Hi ${friend.username},\n\nI hope you're doing well! I just wanted to send a quick, friendly reminder that you have an outstanding balance of ${currSym}${absAmt} on Paywise.\n\nWhenever you get a chance, please settle up — you can do it directly in the app.\n\nThanks so much! 😊\n\n${user.username}`
+                                    : `Hi ${friend.username},\n\nJust a heads-up — I have a balance of ${currSym}${absAmt} that I owe you on Paywise. I'll take care of it soon!\n\nThanks,\n${user.username}`;
+                                setReminderEmailBody(draft);
+                                setShowReminderModal(true);
+                            }}
+                            className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition"
+                        >
+                            Reminders
+                        </button>
+                        <button onClick={() => setShowFriendTotals(true)} className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition">
+                            Totals
+                        </button>
+                        <button onClick={() => setShowExportOptions(true)} className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition flex items-center gap-1.5">
+                            Export
+                        </button>
+                    </div>
+                </div>
+
+                <div className="px-5 pb-8">
                     {displayItems.length === 0 ? (
-                        <div className="text-center py-12 px-4 rounded-2xl">
-                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-sm">
-                                <Receipt className="w-8 h-8 text-gray-300" />
-                            </div>
-                            <p className="text-gray-500 font-medium text-lg leading-tight">No expenses yet</p>
-                            <p className="text-gray-400 text-sm mt-2 max-w-[200px] mx-auto">Add an expense to start splitting with {friend.username}.</p>
+                        <div className="text-center py-12 px-4">
+                            <Receipt className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                            <p className="text-gray-500 font-medium text-lg">No expenses yet</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {displayItems.map(item => {
-                                if (item.isGroupSummary) {
+                        <div className="flex flex-col">
+                            {(() => {
+                                let lastMonth = '';
+                                return displayItems.map(item => {
+                                    const dateObj = new Date(item.date);
+                                    let monthYear = dateObj.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+                                    const monthShort = dateObj.toLocaleDateString("en-US", { month: "short" });
+                                    const day = ("0" + dateObj.getDate()).slice(-2);
+
+                                    if (isNaN(dateObj.getTime())) {
+                                        monthYear = 'Unknown Date';
+                                    }
+
+                                    const showHeader = monthYear !== lastMonth;
+                                    lastMonth = monthYear;
+
+                                    let amountColor, amountLabel, amountValue;
+                                    let title = item.isGroupSummary ? item.group.name : item.description;
+                                    let subtitle = "";
+                                    let paidAmount = item.isGroupSummary ? null : item.amount;
+
+                                    if (item.isGroupSummary) {
+                                        amountColor = item.balance > 0 ? "text-[#108c73]" : (item.balance < 0 ? "text-[#e25b22]" : "text-gray-500");
+                                        amountLabel = item.balance > 0 ? "you lent" : (item.balance < 0 ? "you borrowed" : "settled");
+                                        amountValue = "$" + Math.abs(item.balance).toFixed(2);
+                                        subtitle = `${item.count} Shared Group Action${item.count !== 1 ? 's' : ''}`;
+                                    } else {
+                                        const isPaidByMe = item.paidBy._id === user.id || item.paidBy._id === user._id;
+                                        subtitle = isPaidByMe ? `You paid $${paidAmount.toFixed(2)}` : `${item.paidBy.username || friend.username} paid $${paidAmount.toFixed(2)}`;
+
+                                        if (isPaidByMe) {
+                                            const fSplit = item.splits.find(s => s.user._id === friend._id || s.user === friend._id);
+                                            const splitAmt = fSplit ? fSplit.amount : 0;
+                                            amountColor = splitAmt > 0 ? "text-[#108c73]" : "text-gray-500";
+                                            amountLabel = splitAmt > 0 ? "you lent" : "not involved";
+                                            amountValue = "$" + splitAmt.toFixed(2);
+                                        } else {
+                                            const mySplit = item.splits.find(s => s.user._id === user.id || s.user === user.id || s.user._id === user._id || s.user === user._id);
+                                            const splitAmt = mySplit ? mySplit.amount : 0;
+                                            amountColor = splitAmt > 0 ? "text-[#e25b22]" : "text-gray-500";
+                                            amountLabel = splitAmt > 0 ? "you borrowed" : "not involved";
+                                            amountValue = "$" + splitAmt.toFixed(2);
+                                        }
+                                    }
+
                                     return (
-                                        <div
-                                            key={item._id}
-                                            onClick={() => navigate(`/group/${item.group._id}`)}
-                                            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between hover:bg-gray-50 active:scale-[0.99] cursor-pointer transition"
-                                        >
-                                            <div className="flex items-center gap-4 flex-1">
-                                                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold flex-shrink-0">
-                                                    <Folder className="w-6 h-6" />
+                                        <div key={item._id}>
+                                            {showHeader && <h4 className="text-[13px] font-bold text-gray-700 mt-6 mb-3">{monthYear}</h4>}
+                                            <div
+                                                onClick={() => {
+                                                    if (item.isGroupSummary) {
+                                                        navigate(`/group/${item.group._id}`);
+                                                    } else {
+                                                        setSelectedExpense(item);
+                                                        setIsEditingExpense(false);
+                                                        setEditDescription(item.description);
+                                                        setEditAmount(item.amount.toString());
+                                                    }
+                                                }}
+                                                className="flex items-center py-2.5 cursor-pointer hover:bg-gray-50 bg-white transition -mx-4 px-4 active:bg-gray-100"
+                                            >
+                                                <div className="flex flex-col items-center justify-center min-w-[32px] opacity-70">
+                                                    <span className="text-gray-500 text-[11px] font-medium leading-none mb-0.5">{monthShort}</span>
+                                                    <span className="text-gray-500 text-[17px] font-light leading-none">{day}</span>
                                                 </div>
-                                                <div className="flex-col">
-                                                    <h4 className="font-bold text-gray-900 break-all">{item.group.name}</h4>
-                                                    <p className="text-[10px] mt-0.5 text-indigo-500 font-bold uppercase tracking-wider">{item.count} Shared Expense{item.count !== 1 ? 's' : ''}</p>
+
+                                                <div className={`w-10 h-10 ml-3 ${item.isGroupSummary ? 'bg-gray-200 text-gray-500' : 'bg-[#e5f0ea] text-[#1e8b6e]'} flex items-center justify-center flex-shrink-0`}>
+                                                    {item.isGroupSummary ? <Folder className="w-5 h-5 opacity-80" /> : <Receipt className="w-5 h-5 opacity-90" />}
                                                 </div>
-                                            </div>
-                                            <div className="text-right flex flex-col items-end gap-1 flex-shrink-0 pl-3 border-l border-gray-50 ml-2">
-                                                {item.balance > 0 ? (
-                                                    <>
-                                                        <p className="font-extrabold text-teal-600 text-lg">+${item.balance.toFixed(2)}</p>
-                                                        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider text-teal-600">Owes You</p>
-                                                    </>
-                                                ) : item.balance < 0 ? (
-                                                    <>
-                                                        <p className="font-extrabold text-rose-500 text-lg">-${Math.abs(item.balance).toFixed(2)}</p>
-                                                        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider text-rose-500">You Owe</p>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <p className="font-extrabold text-gray-400 text-lg">$0.00</p>
-                                                        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Settled</p>
-                                                    </>
-                                                )}
+
+                                                <div className="flex-1 min-w-0 px-3">
+                                                    <h4 className="font-medium text-gray-800 text-[16px] leading-tight truncate">{title}</h4>
+                                                    <p className="text-[13px] text-gray-500 truncate mt-0.5">{subtitle}</p>
+                                                </div>
+
+                                                <div className="text-right flex flex-col justify-center flex-shrink-0">
+                                                    <p className={`text-[11px] font-medium opacity-80 ${amountColor}`}>{amountLabel}</p>
+                                                    <p className={`text-[16px] leading-tight font-medium ${amountColor}`}>{amountValue}</p>
+                                                </div>
                                             </div>
                                         </div>
                                     );
-                                } else {
-                                    return (
-                                        <div
-                                            key={item._id}
-                                            onClick={() => {
-                                                setSelectedExpense(item);
-                                                setIsEditingExpense(false);
-                                                setEditDescription(item.description);
-                                                setEditAmount(item.amount.toString());
-                                            }}
-                                            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between hover:bg-gray-50 active:scale-[0.99] cursor-pointer transition"
-                                        >
-                                            <div className="flex items-center gap-4 flex-1">
-                                                <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center font-bold flex-shrink-0">
-                                                    <Receipt className="w-6 h-6" />
-                                                </div>
-                                                <div className="flex-col">
-                                                    <h4 className="font-bold text-gray-900 line-clamp-1 break-all">{item.description}</h4>
-                                                    <p className="text-xs text-gray-500 font-medium mt-1">Paid by <span className={item.paidBy._id === user.id ? "text-teal-600 font-semibold" : ""}>{item.paidBy._id === user.id ? 'You' : item.paidBy.username}</span></p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right flex flex-col items-end gap-1 flex-shrink-0 pl-3 border-l border-gray-50 ml-2">
-                                                <p className="font-extrabold text-gray-900 text-lg">${item.amount.toFixed(2)}</p>
-                                                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{new Date(item.date).toLocaleDateString()}</p>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deleteExpense(item._id, item.description);
-                                                    }}
-                                                    className="text-xs font-bold text-rose-500 hover:text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded transition flex items-center gap-1 mt-1"
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                            })}
+                                });
+                            })()}
                         </div>
                     )}
                 </div>
             </main>
 
-            {/* Floating Action Buttons */}
-            <div className="fixed bottom-6 w-full max-w-lg left-1/2 -translate-x-1/2 px-4 flex gap-4">
+            {/* Custom Green Floating Action Button */}
+            <div className="fixed bottom-6 right-5">
                 <Link
                     to={`/friend/${id}/add`}
-                    className="flex-1 bg-gray-900 text-white rounded-2xl shadow-xl py-4 flex items-center justify-center gap-2 font-bold hover:bg-gray-800 transition transform hover:-translate-y-1"
+                    className="bg-[#108c73] text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-[#0c705c] transition transform hover:scale-105"
                 >
-                    <CreditCard className="w-5 h-5" />
-                    Add Expense
+                    <Receipt className="w-5 h-5" />
+                    Add expense
                 </Link>
+            </div>
+
+            {/* Camera Scan Optional Button Bottom Left */}
+            <div className="fixed bottom-6 left-5">
                 <Link
                     to={`/friend/${id}/scan`}
-                    className="flex-1 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-2xl shadow-xl py-4 flex items-center justify-center gap-2 font-bold hover:from-teal-600 hover:to-teal-700 transition transform hover:-translate-y-1"
+                    className="bg-white text-gray-600 rounded-full shadow-lg p-3 flex items-center justify-center font-bold hover:bg-gray-50 border border-gray-100 transition transform hover:scale-105"
                 >
                     <Camera className="w-5 h-5" />
-                    Scan Bill
                 </Link>
             </div>
 
@@ -365,6 +512,617 @@ export default function FriendDetails() {
                     </div>
                 )
             }
+
+            {/* Friend Settings Full-Screen Modal */}
+            {showSettings && (
+                <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-in slide-in-from-bottom-2 duration-200">
+                    {/* Header */}
+                    <div className="flex items-center p-4 border-b border-gray-100">
+                        <button onClick={() => setShowSettings(false)} className="p-2 -ml-2 text-gray-800 hover:bg-gray-100 rounded-full transition">
+                            <X className="w-6 h-6" />
+                        </button>
+                        <h2 className="text-lg font-medium text-gray-900 ml-4">Friend settings</h2>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto pb-10">
+                        {/* Profile Info */}
+                        <div className="p-6 flex items-center gap-4">
+                            <div className="w-16 h-16 bg-[#126b70] text-white rounded-full flex items-center justify-center text-3xl font-black uppercase shadow-sm">
+                                {friend.username?.charAt(0)}
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-medium text-gray-900 leading-tight">{friend.username}</h3>
+                                <p className="text-[15px] text-gray-500 mt-0.5">{friend.email}</p>
+                            </div>
+                        </div>
+
+                        {/* Manage Relationship section */}
+                        <div className="mt-4">
+                            <h4 className="px-6 py-2 text-[15px] font-bold text-gray-800">Manage relationship</h4>
+                            <div className="flex flex-col mt-2">
+                                <button onClick={() => alert('Remove from friends list functionality coming soon!')} className="px-6 py-4 text-left text-[16px] text-gray-800 hover:bg-gray-50 border-t border-b border-gray-100 transition whitespace-nowrap">
+                                    Remove from friends list
+                                </button>
+                                <button onClick={() => alert('Block user functionality coming soon!')} className="px-6 py-4 text-left hover:bg-gray-50 border-b border-gray-100 transition">
+                                    <h5 className="text-[16px] text-gray-800">Block user</h5>
+                                    <p className="text-[14px] text-gray-500 leading-snug mt-1 max-w-[95%]">Remove this user from your friends list, hide any groups you share, and suppress future expenses/notifications from them.</p>
+                                </button>
+                                <button onClick={() => alert('Report user functionality coming soon!')} className="px-6 py-4 text-left hover:bg-gray-50 border-b border-gray-100 transition">
+                                    <h5 className="text-[16px] text-gray-800">Report user</h5>
+                                    <p className="text-[14px] text-gray-500 leading-snug mt-1">Flag an abusive, suspicious, or spam account.</p>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Shared groups section */}
+                        <div className="mt-8">
+                            <h4 className="px-6 py-2 text-[15px] font-bold text-gray-800">Shared groups</h4>
+                            <div className="flex flex-col mt-2">
+                                {Object.values(groupBalances).length > 0 ? (
+                                    Object.values(groupBalances).map(g => (
+                                        <div key={g._id} onClick={() => navigate(`/group/${g.group._id}`)} className="px-6 py-3.5 flex items-center justify-between hover:bg-gray-50 cursor-pointer border-t border-b border-gray-100 -mt-[1px]">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-gray-800 text-white rounded-lg shadow-sm border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                                    <Folder className="w-6 h-6 opacity-90" />
+                                                </div>
+                                                <span className="text-[16px] text-gray-800">{g.group.name}</span>
+                                            </div>
+                                            <span className="text-gray-400 font-bold text-lg">›</span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="px-6 py-4 text-sm text-gray-500 bg-gray-50 border-t border-b border-gray-100 w-full mb-8">You and {friend.username} share no groups.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Friend Totals Full-Screen Modal */}
+            {showFriendTotals && (
+                <div className="fixed inset-0 bg-white z-[80] flex flex-col animate-in slide-in-from-bottom-2 duration-200">
+                    <div className="flex items-center p-4 relative border-b border-gray-100">
+                        <button onClick={() => setShowFriendTotals(false)} className="p-2 -ml-2 text-gray-800 hover:bg-gray-100 rounded-full transition absolute left-4 z-10">
+                            <X className="w-6 h-6" />
+                        </button>
+                        <h2 className="text-[17px] font-medium text-gray-900 w-full text-center">Charts</h2>
+                        <button className="p-2 -mr-2 text-gray-800 hover:bg-gray-100 rounded-full transition absolute right-4">
+                            <HelpCircle className="w-[22px] h-[22px]" strokeWidth={1.5} />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto px-5 pt-4 pb-24">
+                        <div className="mb-8">
+                            <h1 className="text-[24px] text-gray-900 font-medium">You & {friend?.username}</h1>
+                            {monthlySpending.length > 0 ? (
+                                <p className="text-[16px] text-gray-600 mt-1">{monthlySpending[selectedMonthIndex].label} spending</p>
+                            ) : (
+                                <p className="text-[16px] text-gray-600 mt-1">No spending</p>
+                            )}
+                        </div>
+
+                        {/* Chart Area */}
+                        {monthlySpending.length > 0 && (
+                            <div className="w-full flex justify-center mb-10 h-[140px] relative">
+                                {/* Chart grid lines */}
+                                <div className="absolute inset-0 flex flex-col justify-between pt-4 pb-8 pointer-events-none">
+                                    <div className="w-full border-t border-dashed border-gray-200" />
+                                    <div className="w-full border-t border-dashed border-gray-200" />
+                                    <div className="w-full border-t border-dashed border-gray-200" />
+                                </div>
+
+                                <div className="flex items-end justify-center h-full gap-5 z-10 pb-8 relative pt-4">
+                                    {/* Get the max spent out of all months to normalize the heights */}
+                                    {(() => {
+                                        const visibleMonths = monthlySpending.slice(Math.max(0, Object.values(monthlySpending).length - 3));
+                                        const maxGroupSpent = Math.max(...visibleMonths.map(m => m.totalSpent || 1));
+
+                                        return visibleMonths.map((m, idx) => {
+                                            const isSelected = m.label === monthlySpending[selectedMonthIndex].label;
+                                            const heightPercent = Math.max((m.totalSpent / maxGroupSpent) * 100, 5);
+
+                                            return (
+                                                <div key={m.key} className="flex flex-col items-center justify-end h-full">
+                                                    <div
+                                                        className={`w-[32px] rounded-t-lg transition-all ${isSelected ? 'bg-[#3b93c8]' : 'bg-gray-100'}`}
+                                                        style={{ height: `${heightPercent}%` }}
+                                                    >
+                                                        {isSelected && (
+                                                            <div className="w-full bg-[#1b71a2] rounded-t-lg absolute bottom-0" style={{ height: Math.max((m.userShare / (m.totalSpent || 1)) * 100, 5) + '%' }} />
+                                                        )}
+                                                    </div>
+                                                    <span className={`text-[12px] font-bold mt-2 absolute -bottom-6 ${isSelected ? 'text-gray-900' : 'text-gray-400'}`}>{m.shortMonth}</span>
+                                                    <div className={`w-[26px] h-2 rounded-full absolute bottom-[-10px] ${isSelected ? 'bg-[#297dae]' : 'bg-[#aab7c0]'}`} />
+                                                </div>
+                                            )
+                                        });
+                                    })()}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Metrics Content */}
+                        {monthlySpending.length > 0 ? (
+                            <div className="flex flex-col gap-6">
+                                <div>
+                                    <div className="flex items-center gap-1">
+                                        <p className="text-[14px] text-gray-800 font-bold">Total spent</p>
+                                        <HelpCircle className="w-[14px] h-[14px] text-gray-500" />
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-1 relative">
+                                        <div className="w-[6px] h-[20px] bg-[#5ab3ed] rounded-full" />
+                                        <span className="text-[36px] font-light text-[#3b93c8] leading-none">${monthlySpending[selectedMonthIndex].totalSpent.toFixed(2)}</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div className="flex items-center gap-1">
+                                        <p className="text-[14px] text-gray-800 font-bold">Your share</p>
+                                        <HelpCircle className="w-[14px] h-[14px] text-gray-500" />
+                                    </div>
+                                    <div className="flex flex-col mt-1 relative">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-[6px] h-[20px] bg-[#145a85] rounded-full" />
+                                            <span className="text-[36px] font-light text-[#1b71a2] leading-none">${monthlySpending[selectedMonthIndex].userShare.toFixed(2)}</span>
+                                        </div>
+                                        <p className="text-[14px] text-gray-500 mt-2 ml-4 relative">
+                                            {monthlySpending[selectedMonthIndex].totalSpent > 0 ? Math.round((monthlySpending[selectedMonthIndex].userShare / monthlySpending[selectedMonthIndex].totalSpent) * 100) : 0}% of all shared expenses
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-gray-500 text-center py-10">No 1-on-1 spending data to display.</p>
+                        )}
+
+                        {/* Insights & Charts Section */}
+                        {monthlySpending.length > 0 && monthlySpending[selectedMonthIndex].expensesList.length > 0 && (() => {
+                            const curMonthExpenses = monthlySpending[selectedMonthIndex].expensesList;
+                            const maxExp = curMonthExpenses.reduce((max, e) => e.amount > max.amount ? e : max, curMonthExpenses[0]);
+
+                            const spenderMap = {};
+                            curMonthExpenses.forEach(e => {
+                                const pid = e.paidBy._id || e.paidBy;
+                                spenderMap[pid] = (spenderMap[pid] || 0) + e.amount;
+                            });
+
+                            let topAmt = 0;
+                            Object.entries(spenderMap).forEach(([id, amt]) => {
+                                if (amt > topAmt) {
+                                    topAmt = amt;
+                                }
+                            });
+
+                            const myAmt = spenderMap[user.id] || spenderMap[user._id] || 0;
+                            const friendAmt = (spenderMap[friend._id] || 0) + (spenderMap[friend.id] || 0);
+
+                            const topPayerString = myAmt >= friendAmt ? 'You' : friend.username;
+
+                            return (
+                                <div className="mt-10 mb-8 border-t border-gray-100 pt-8">
+                                    <h3 className="text-[17px] text-gray-900 font-bold mb-4 px-1">Monthly insights</h3>
+
+                                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                                        {/* Insight Card 1 */}
+                                        <div className="min-w-[160px] flex-1 bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm">
+                                            <div className="w-8 h-8 rounded-full bg-[#e5f0ea] flex items-center justify-center mb-3">
+                                                <TrendingUp className="w-4 h-4 text-[#108c73]" />
+                                            </div>
+                                            <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Payer</p>
+                                            <p className="text-[16px] text-gray-900 font-medium leading-tight">{topPayerString}</p>
+                                            <p className="text-[14px] text-gray-500 mt-0.5">${topAmt.toFixed(2)}</p>
+                                        </div>
+
+                                        {/* Insight Card 2 */}
+                                        <div className="min-w-[160px] flex-1 bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm">
+                                            <div className="w-8 h-8 rounded-full bg-[#fde9f1] flex items-center justify-center mb-3">
+                                                <PieChart className="w-4 h-4 text-[#b63038]" />
+                                            </div>
+                                            <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Largest Expense</p>
+                                            <p className="text-[16px] text-gray-900 font-medium leading-tight truncate">{maxExp.description}</p>
+                                            <p className="text-[14px] text-gray-500 mt-0.5">${maxExp.amount.toFixed(2)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+
+                    {/* Bottom Nav Footer */}
+                    {monthlySpending.length > 0 && (
+                        <div className="absolute bottom-6 left-0 right-0 px-5 flex items-center justify-between pointer-events-none">
+                            <span className="text-[15px] font-medium text-gray-800 relative left-2 drop-shadow-sm pointer-events-auto cursor-pointer">All time</span>
+                            <div className="flex items-center justify-between bg-[#f8f9fa] shadow-[0_4px_16px_rgba(0,0,0,0.06)] border border-gray-100 rounded-full px-4 py-3.5 w-[240px] pointer-events-auto text-gray-800">
+                                <button
+                                    onClick={() => setSelectedMonthIndex(Math.max(0, selectedMonthIndex - 1))}
+                                    className={`p-1 ${selectedMonthIndex > 0 ? 'text-gray-800 hover:bg-gray-200 rounded-full' : 'text-gray-300 pointer-events-none'}`}
+                                >
+                                    <ChevronLeft className="w-5 h-5" />
+                                </button>
+                                <span className="text-[14.5px] font-medium">{monthlySpending[selectedMonthIndex].label}</span>
+                                <button
+                                    onClick={() => setSelectedMonthIndex(Math.min(monthlySpending.length - 1, selectedMonthIndex + 1))}
+                                    className={`p-1 ${selectedMonthIndex < monthlySpending.length - 1 ? 'text-gray-800 hover:bg-gray-200 rounded-full' : 'text-gray-300 pointer-events-none'}`}
+                                >
+                                    <ChevronRight className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Export Action Sheet Modal */}
+            {showExportOptions && (
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowExportOptions(false)}>
+                    <div className="bg-white w-full sm:w-[400px] rounded-t-2xl sm:rounded-2xl pb-8 sm:pb-4 pt-4 px-4 flex flex-col shadow-2xl animate-in slide-in-from-bottom-5 duration-200" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+                        <h3 className="text-center text-[18px] text-gray-900 font-bold tracking-tight mb-2">Export Shared Expenses</h3>
+                        <p className="text-center text-gray-500 text-[14px] mb-6 px-4">Download a copy of all the expenses with {friend?.username}.</p>
+
+                        <div className="flex flex-col gap-3 px-2">
+                            <button
+                                onClick={() => {
+                                    exportExpenses(expenses, 'pdf', `You and ${friend?.username}`, user);
+                                    setShowExportOptions(false);
+                                }}
+                                className="flex items-center gap-4 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 transition rounded-[14px] border border-gray-200 border-b-[2px]"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
+                                    <FileText className="w-5 h-5 text-rose-600" />
+                                </div>
+                                <div className="flex flex-col text-left">
+                                    <span className="text-[16px] text-gray-800 font-bold">PDF Document</span>
+                                    <span className="text-[13px] text-gray-500 font-medium">Best for printing & sharing</span>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    exportExpenses(expenses, 'csv', `You and ${friend?.username}`, user);
+                                    setShowExportOptions(false);
+                                }}
+                                className="flex items-center gap-4 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 transition rounded-[14px] border border-gray-200 border-b-[2px]"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-[#e5f0ea] flex items-center justify-center">
+                                    <FileSpreadsheet className="w-5 h-5 text-[#108c73]" />
+                                </div>
+                                <div className="flex flex-col text-left">
+                                    <span className="text-[16px] text-gray-800 font-bold">CSV Spreadsheet</span>
+                                    <span className="text-[13px] text-gray-500 font-medium">Best for Excel & Numbers</span>
+                                </div>
+                            </button>
+
+                            <button onClick={() => setShowExportOptions(false)} className="mt-4 py-3 rounded-[12px] bg-white border border-gray-200 text-gray-800 font-bold hover:bg-gray-50 transition w-full text-center">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ======================================= */}
+            {/* FRIEND NOTE MODAL                        */}
+            {/* ======================================= */}
+            {showNoteModal && (
+                <div className="fixed inset-0 bg-white z-[95] flex flex-col animate-in slide-in-from-bottom-3 duration-200">
+                    <div className="flex items-center px-4 pt-6 pb-4 border-b border-gray-100 relative">
+                        <button onClick={() => setShowNoteModal(false)} className="p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-full transition">
+                            <X className="w-6 h-6" />
+                        </button>
+                        <h2 className="absolute left-1/2 -translate-x-1/2 text-[17px] font-semibold text-gray-900">
+                            {friendNote ? 'Edit note' : 'Add note'}
+                        </h2>
+                        <button
+                            onClick={async () => {
+                                const trimmed = draftNote.trim();
+                                try {
+                                    await api.put(`/auth/friend-note/${id}`, { note: trimmed });
+                                    setFriendNote(trimmed);
+                                    setShowNoteModal(false);
+                                } catch { alert('Failed to save note.'); }
+                            }}
+                            className="ml-auto text-[#108c73] font-bold text-[16px] hover:opacity-80 transition"
+                        >
+                            Save
+                        </button>
+                    </div>
+                    <div className="px-5 pt-5 pb-2">
+                        <p className="text-[13px] text-gray-400 font-medium">
+                            Shared note with <span className="text-gray-700 font-bold">{friend?.username}</span> — visible to both of you
+                        </p>
+                    </div>
+                    <div className="flex-1 px-5 pt-3">
+                        <textarea
+                            autoFocus
+                            value={draftNote}
+                            onChange={e => setDraftNote(e.target.value)}
+                            placeholder={`Write a note visible to both you and ${friend?.username}...`}
+                            className="w-full h-full min-h-[200px] resize-none outline-none text-[17px] text-gray-800 placeholder-gray-300 leading-relaxed bg-transparent"
+                        />
+                    </div>
+                    {friendNote && (
+                        <div className="px-5 pb-10">
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await api.put(`/auth/friend-note/${id}`, { note: '' });
+                                        setFriendNote('');
+                                        setDraftNote('');
+                                        setShowNoteModal(false);
+                                    } catch { alert('Failed to remove note.'); }
+                                }}
+                                className="text-rose-500 text-[14px] font-medium hover:opacity-80 transition"
+                            >
+                                Remove note
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ---------------------------------------- */}
+            {/* REMINDERS MODAL                            */}
+            {/* ---------------------------------------- */}
+            {showReminderModal && (() => {
+                const absAmt = Math.abs(balance).toFixed(2);
+                const currSymR = user?.defaultCurrency === 'INR' ? '₹'
+                    : user?.defaultCurrency === 'EUR' ? '€'
+                        : user?.defaultCurrency === 'GBP' ? '£'
+                            : '$';
+                const shareText = balance > 0
+                    ? `Hi ${friend?.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${currSymR}${absAmt} on Paywise.\n\nPlease settle up when you get a chance. You can pay directly in the Paywise app. 🙏\n\nThank you!`
+                    : `Hi ${friend?.username}! 👋\n\nJust letting you know — I owe you ${currSymR}${absAmt} on Paywise and will take care of it soon!\n\nThanks for your patience,\n${user.username}`;
+
+                const handleEmailSend = () => {
+                    const subject = encodeURIComponent(`Payment Reminder — Paywise`);
+                    const body = encodeURIComponent(reminderEmailBody);
+                    const to = encodeURIComponent(friend?.email || '');
+                    // Opens the user's native email app — email goes FROM them, not from Paywise
+                    window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
+                    setShowReminderModal(false);
+                };
+
+                const handleShare = async () => {
+                    if (navigator.share) {
+                        try {
+                            await navigator.share({
+                                title: 'Payment Reminder from Paywise',
+                                text: shareText,
+                            });
+                        } catch { /* user cancelled share */ }
+                    } else {
+                        // Fallback: copy to clipboard
+                        await navigator.clipboard.writeText(shareText);
+                        alert('Message copied to clipboard! Paste it wherever you want to share.');
+                    }
+                    setShowReminderModal(false);
+                };
+
+                return (
+                    <div className="fixed inset-0 bg-black/50 z-[95] flex flex-col justify-end" onClick={() => setShowReminderModal(false)}>
+                        <div
+                            className="bg-white rounded-t-3xl overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-[0_-10px_40px_rgb(0,0,0,0.12)]"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Header */}
+                            <div className="flex items-center px-5 pt-5 pb-4 border-b border-gray-100">
+                                <div>
+                                    <h3 className="text-[18px] font-bold text-gray-900">Send a Reminder</h3>
+                                    <p className="text-[13px] text-gray-400 mt-0.5">
+                                        {balance > 0
+                                            ? `${friend?.username} owes you ${currSymR}${absAmt}`
+                                            : `You owe ${friend?.username} ${currSymR}${absAmt}`}
+                                    </p>
+                                </div>
+                                <button onClick={() => setShowReminderModal(false)} className="ml-auto p-2 text-gray-400 hover:bg-gray-100 rounded-full transition">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="px-5 py-4 pb-6 space-y-4">
+
+                                {/* ── Option 1: Email ─────────────────── */}
+                                <div className="border-2 border-gray-100 rounded-2xl overflow-hidden">
+                                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                        <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[14px] font-bold text-gray-800">Email Reminder</p>
+                                            <p className="text-[12px] text-gray-400 truncate">Sent from your email to {friend?.email}</p>
+                                        </div>
+                                    </div>
+                                    {/* Editable email body */}
+                                    <div className="px-4 pt-3 pb-2">
+                                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Edit message before sending</p>
+                                        <textarea
+                                            value={reminderEmailBody}
+                                            onChange={e => setReminderEmailBody(e.target.value)}
+                                            rows={7}
+                                            className="w-full text-[14px] text-gray-700 leading-relaxed resize-none outline-none bg-transparent"
+                                        />
+                                    </div>
+                                    <div className="px-4 pb-3">
+                                        <button
+                                            onClick={handleEmailSend}
+                                            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition text-[15px] flex items-center justify-center gap-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                            </svg>
+                                            Open Email App &amp; Send
+                                        </button>
+                                        <p className="text-[11px] text-gray-400 text-center mt-2">This will open your email app — the email goes from your address, not Paywise</p>
+                                    </div>
+                                </div>
+
+                                {/* ── Option 2: Share ─────────────────── */}
+                                <button
+                                    onClick={handleShare}
+                                    className="w-full flex items-center gap-4 bg-[#f0faf7] border-2 border-[#d1f0e7] hover:bg-[#e6f7f3] rounded-2xl px-4 py-4 transition text-left"
+                                >
+                                    <div className="w-9 h-9 rounded-xl bg-[#108c73] flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[15px] font-bold text-gray-800">Share via WhatsApp, SMS &amp; more</p>
+                                        <p className="text-[12px] text-gray-500 mt-0.5">Send a professional payment request through any app</p>
+                                    </div>
+                                    <svg className="w-5 h-5 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ---------------------------------------- */}
+            {/* SETTLE UP FULL-SCREEN MODAL               */}
+            {/* ---------------------------------------- */}
+            {showSettleUp && (
+                <div className="fixed inset-0 bg-white z-[90] flex flex-col animate-in slide-in-from-bottom-3 duration-300">
+                    {/* Header */}
+                    <div className="flex items-center px-4 pt-6 pb-4 border-b border-gray-100 relative">
+                        <button
+                            onClick={() => {
+                                if (cashStep === 2) { setCashStep(1); setSettleMode(null); }
+                                else setShowSettleUp(false);
+                            }}
+                            className="p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-full transition"
+                        >
+                            <ChevronLeft className="w-6 h-6" />
+                        </button>
+                        <h2 className="absolute left-1/2 -translate-x-1/2 text-[17px] font-semibold text-gray-900">Settle Up</h2>
+                    </div>
+
+                    {/* Step 1: Choose method */}
+                    {cashStep === 1 && (
+                        <div className="flex flex-col flex-1 px-5 pt-8">
+                            {/* Summary */}
+                            <div className="bg-gray-50 rounded-2xl p-5 mb-8 flex items-center gap-4 border border-gray-100">
+                                <div className="w-12 h-12 rounded-full bg-[#e25b22] flex items-center justify-center text-white text-xl font-bold uppercase flex-shrink-0">
+                                    {friend.username.charAt(0)}
+                                </div>
+                                <div>
+                                    <p className="text-[13px] text-gray-500 font-medium">Amount to settle</p>
+                                    <p className="text-[22px] font-bold text-gray-900">${Math.abs(balance).toFixed(2)}</p>
+                                    <p className="text-[13px] text-gray-500 mt-0.5">
+                                        {balance < 0
+                                            ? `You owe ${friend.username}`
+                                            : `${friend.username} owes you`}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <h3 className="text-[16px] font-bold text-gray-700 mb-4">How do you want to settle?</h3>
+
+                            <div className="flex flex-col gap-3">
+                                {/* Bank option (coming soon) */}
+                                <div className="relative flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed">
+                                    <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                                        <Building2 className="w-6 h-6 text-blue-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[16px] font-bold text-gray-800">Pay with Bank</p>
+                                        <p className="text-[13px] text-gray-500">Direct bank transfer</p>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">Coming Soon</span>
+                                </div>
+
+                                {/* Cash option */}
+                                <button
+                                    onClick={() => { setSettleMode('cash'); setCashStep(2); }}
+                                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-[#108c73] bg-[#f0faf7] hover:bg-[#e5f7f2] transition text-left"
+                                >
+                                    <div className="w-12 h-12 rounded-xl bg-[#d1f0e7] flex items-center justify-center">
+                                        <Banknote className="w-6 h-6 text-[#108c73]" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[16px] font-bold text-gray-800">Pay with Cash</p>
+                                        <p className="text-[13px] text-gray-500">Record a cash payment</p>
+                                    </div>
+                                    <ChevronRight className="w-5 h-5 text-[#108c73]" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 2: Cash — full or partial */}
+                    {cashStep === 2 && settleMode === 'cash' && (
+                        <div className="flex flex-col flex-1 px-5 pt-8">
+                            {/* Summary */}
+                            <div className="flex items-center gap-3 mb-8">
+                                <div className="w-10 h-10 rounded-full bg-[#108c73] flex items-center justify-center">
+                                    <Banknote className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <p className="text-[15px] font-bold text-gray-900">Cash Payment</p>
+                                    <p className="text-[13px] text-gray-500">with {friend.username}</p>
+                                </div>
+                            </div>
+
+                            {/* Full settle */}
+                            <button
+                                onClick={() => handleCashSettle(false)}
+                                disabled={isSettling}
+                                className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#108c73] bg-[#f0faf7] hover:bg-[#e5f7f2] transition mb-4 disabled:opacity-50"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle2 className="w-6 h-6 text-[#108c73]" />
+                                    <div className="text-left">
+                                        <p className="text-[15px] font-bold text-gray-800">Full settlement</p>
+                                        <p className="text-[13px] text-gray-500">Pay the entire balance</p>
+                                    </div>
+                                </div>
+                                <span className="text-[17px] font-bold text-[#108c73]">${Math.abs(balance).toFixed(2)}</span>
+                            </button>
+
+                            {/* Divider */}
+                            <div className="flex items-center gap-3 my-2">
+                                <div className="flex-1 h-[1px] bg-gray-200" />
+                                <span className="text-[13px] text-gray-400 font-medium">or enter a partial amount</span>
+                                <div className="flex-1 h-[1px] bg-gray-200" />
+                            </div>
+
+                            {/* Partial input */}
+                            <div className="mt-4">
+                                <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay</label>
+                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-[#108c73] rounded-xl px-4 py-3 transition bg-white">
+                                    <DollarSign className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                                    <input
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        max={Math.abs(balance)}
+                                        placeholder={`Max $${Math.abs(balance).toFixed(2)}`}
+                                        value={partialAmount}
+                                        onChange={e => setPartialAmount(e.target.value)}
+                                        className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
+                                    />
+                                </div>
+                                <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: ${Math.abs(balance - (parseFloat(partialAmount) || 0)).toFixed(2)}</p>
+                            </div>
+
+                            <button
+                                onClick={() => handleCashSettle(true)}
+                                disabled={isSettling || !partialAmount || parseFloat(partialAmount) <= 0}
+                                className="mt-6 w-full bg-[#108c73] text-white py-4 rounded-2xl text-[16px] font-bold shadow-md hover:bg-[#0d7a63] transition disabled:opacity-40"
+                            >
+                                {isSettling ? 'Recording...' : 'Pay with Cash'}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

@@ -2,17 +2,23 @@ import { useState, useContext, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
 
 export default function AddFriendExpense() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { api, user } = useContext(AuthContext);
+    const { defaultSplitMethod } = useAppSettings();
+    const currSym = getCurrencySymbol(user?.defaultCurrency || 'USD');
 
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [paidBy, setPaidBy] = useState(user.id);
+    const [splitMethod, setSplitMethod] = useState('equally');
     const [friend, setFriend] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => { setSplitMethod(defaultSplitMethod || 'equally'); }, [defaultSplitMethod]);
 
     useEffect(() => {
         const fetchFriend = async () => {
@@ -36,12 +42,20 @@ export default function AddFriendExpense() {
         setIsLoading(true);
 
         try {
-            const splitAmount = parseFloat(amount) / 2;
-
-            const splitsArray = [
-                { user: user.id, amount: splitAmount },
-                { user: id, amount: splitAmount }
-            ];
+            let splitsArray;
+            const total = parseFloat(amount);
+            if (splitMethod === 'full') {
+                // Whoever paid is owed the full amount by the other person
+                const other = paidBy === user.id ? friend?._id : user.id;
+                splitsArray = [{ user: other, amount: total }];
+            } else {
+                // equally or percentage — split 50/50 for 1-on-1
+                const half = total / 2;
+                splitsArray = [
+                    { user: user.id, amount: half },
+                    { user: id, amount: half }
+                ];
+            }
 
             await api.post('/expenses', {
                 description,
@@ -85,7 +99,7 @@ export default function AddFriendExpense() {
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Total Amount</label>
                         <div className="relative flex items-center">
-                            <span className="absolute left-0 text-3xl font-bold text-gray-400">$</span>
+                            <span className="absolute left-0 text-3xl font-bold text-gray-400">{currSym}</span>
                             <input
                                 type="number"
                                 step="0.01"
@@ -96,7 +110,30 @@ export default function AddFriendExpense() {
                                 required
                             />
                         </div>
-                        <p className="text-xs font-medium text-gray-500 mt-2">Cost will be split exactly 50/50.</p>
+                        <p className="text-xs font-medium text-gray-500 mt-2">
+                            {splitMethod === 'full' ? 'You paid — the other person owes you the full amount.' : 'Cost will be split 50/50.'}
+                        </p>
+                    </div>
+
+                    {/* Split Method */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Split Method</label>
+                        <div className="flex flex-col gap-2">
+                            {[
+                                { value: 'equally', label: 'Split Equally (50/50)' },
+                                { value: 'full', label: 'I Am Owed Full Amount' },
+                            ].map(opt => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setSplitMethod(opt.value)}
+                                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 text-left transition ${splitMethod === opt.value ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${splitMethod === opt.value ? 'border-teal-500 bg-teal-500' : 'border-gray-300'}`} />
+                                    <span className="font-medium text-[15px]">{opt.label}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {friend && (
