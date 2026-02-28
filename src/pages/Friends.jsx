@@ -126,8 +126,10 @@ export default function Friends() {
                 ) : (
                     <>
                         {loading ? (
-                            <div className="flex justify-center mt-20">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+                            <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+                                <div className="w-[110px] h-[110px] animate-pulse">
+                                    <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
+                                </div>
                             </div>
                         ) : friends.length === 0 ? (
                             <div className="flex flex-col items-center justify-center mt-32">

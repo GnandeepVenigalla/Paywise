@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ArrowLeft, Check, Users, Receipt, DollarSign } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 export default function SplitItems() {
     const { id } = useParams();
@@ -188,7 +189,15 @@ export default function SplitItems() {
         }
     };
 
-    if (!group) return <div className="p-8 text-center text-gray-500 animate-pulse">Loading members...</div>;
+    if (!group) {
+        return (
+            <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+                <div className="w-[110px] h-[110px] animate-pulse">
+                    <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
+                </div>
+            </div>
+        );
+    }
 
     const total = items.reduce((sum, item) => sum + item.price, 0);
     const assignedTotal = items.reduce((sum, item) => item.assignedTo.length > 0 ? sum + item.price : sum, 0);

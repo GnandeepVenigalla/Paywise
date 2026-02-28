@@ -2,15 +2,19 @@ import { useState, useContext, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
 
 export default function AddExpense() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { api, user } = useContext(AuthContext);
+    const { defaultSplitMethod } = useAppSettings();
+    const currSym = getCurrencySymbol(user?.defaultCurrency || 'USD');
 
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [paidBy, setPaidBy] = useState(user.id);
+    const [splitMethod, setSplitMethod] = useState(defaultSplitMethod || 'equally');
     const [members, setMembers] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -26,35 +30,52 @@ export default function AddExpense() {
         fetchMembers();
     }, [id, api]);
 
+    // When defaultSplitMethod loads from settings, pre-fill
+    useEffect(() => {
+        setSplitMethod(defaultSplitMethod || 'equally');
+    }, [defaultSplitMethod]);
+
+    const buildSplits = () => {
+        const total = parseFloat(amount);
+        if (splitMethod === 'equally') {
+            const each = total / members.length;
+            return members.map(m => ({ user: m._id, amount: each }));
+        } else if (splitMethod === 'full') {
+            // payer is owed everything — everyone else owes their share
+            return members
+                .filter(m => m._id !== paidBy)
+                .map(m => ({ user: m._id, amount: total / (members.length - 1 || 1) }));
+        } else {
+            // percentage — equal for now (full UI in SplitItems)
+            const each = total / members.length;
+            return members.map(m => ({ user: m._id, amount: each }));
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!description || !amount || members.length === 0) return;
-
         setIsLoading(true);
-
         try {
-            const numMembers = members.length;
-            const splitAmount = parseFloat(amount) / numMembers;
-
-            const splitsArray = members.map(m => ({
-                user: m._id,
-                amount: splitAmount
-            }));
-
             await api.post('/expenses', {
                 description,
                 amount: parseFloat(amount),
                 group: id,
-                paidBy: paidBy,
-                splits: splitsArray
+                paidBy,
+                splits: buildSplits(),
             });
-
             navigate(`/group/${id}`);
         } catch (err) {
             console.error(err);
             alert('Error adding expense');
             setIsLoading(false);
         }
+    };
+
+    const SPLIT_LABELS = {
+        equally: 'Split equally among all members',
+        percentage: 'Split by percentage (equal share)',
+        full: 'Paid by one person — others owe their share',
     };
 
     return (
@@ -83,7 +104,7 @@ export default function AddExpense() {
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Amount</label>
                         <div className="relative flex items-center">
-                            <span className="absolute left-0 text-3xl font-bold text-gray-400">$</span>
+                            <span className="absolute left-0 text-3xl font-bold text-gray-400">{currSym}</span>
                             <input
                                 type="number"
                                 step="0.01"
@@ -94,7 +115,29 @@ export default function AddExpense() {
                                 required
                             />
                         </div>
-                        <p className="text-xs font-medium text-gray-500 mt-2">Cost will be split equally among all members</p>
+                    </div>
+
+                    {/* Split Method — pre-filled from app settings */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Split Method</label>
+                        <div className="flex flex-col gap-2">
+                            {[
+                                { value: 'equally', label: 'Split Equally' },
+                                { value: 'percentage', label: 'By Percentage' },
+                                { value: 'full', label: 'I Am Owed Full Amount' },
+                            ].map(opt => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setSplitMethod(opt.value)}
+                                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 text-left transition ${splitMethod === opt.value ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${splitMethod === opt.value ? 'border-teal-500 bg-teal-500' : 'border-gray-300'}`} />
+                                    <span className="font-medium text-[15px]">{opt.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2">{SPLIT_LABELS[splitMethod]}</p>
                     </div>
 
                     {members.length > 0 && (

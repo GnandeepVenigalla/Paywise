@@ -12,3 +12,116 @@ html,
 body {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* ── Theme Engine ──────────────────────────── */
+
+/* Light mode (explicit) */
+html.theme-light {
+  color-scheme: light;
+}
+
+html.theme-light body {
+  background-color: #f9fafb;
+  color: #111827;
+}
+
+/* Dark mode */
+html.theme-dark {
+  color-scheme: dark;
+}
+
+html.theme-dark body {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+html.theme-dark .bg-white {
+  background-color: #1e293b !important;
+}
+
+html.theme-dark .bg-gray-50 {
+  background-color: #0f172a !important;
+}
+
+html.theme-dark .bg-gray-100 {
+  background-color: #1e293b !important;
+}
+
+html.theme-dark .text-gray-900 {
+  color: #f1f5f9 !important;
+}
+
+html.theme-dark .text-gray-800 {
+  color: #e2e8f0 !important;
+}
+
+html.theme-dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+
+html.theme-dark .text-gray-600 {
+  color: #94a3b8 !important;
+}
+
+html.theme-dark .text-gray-500 {
+  color: #64748b !important;
+}
+
+html.theme-dark .text-gray-400 {
+  color: #475569 !important;
+}
+
+html.theme-dark .border-gray-100 {
+  border-color: #1e293b !important;
+}
+
+html.theme-dark .border-gray-200 {
+  border-color: #334155 !important;
+}
+
+html.theme-dark header {
+  background-color: #1e293b !important;
+}
+
+html.theme-dark input,
+html.theme-dark select,
+html.theme-dark textarea {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+/* High Contrast Mode */
+html.high-contrast body {
+  font-weight: 500;
+}
+
+html.high-contrast .text-gray-400,
+html.high-contrast .text-gray-500 {
+  color: #374151 !important;
+}
+
+html.high-contrast .border-gray-100,
+html.high-contrast .border-gray-200 {
+  border-color: #6b7280 !important;
+  border-width: 2px !important;
+}
+
+html.high-contrast .bg-gray-50 {
+  background-color: #f3f4f6 !important;
+}
+
+html.high-contrast button,
+html.high-contrast a {
+  outline-offset: 2px;
+}
+
+/* Privacy mode blur utility */
+.privacy-blur {
+  filter: blur(8px);
+  user-select: none;
+  transition: filter 0.2s;
+}
+
+.privacy-blur:hover {
+  filter: blur(0px);
+}

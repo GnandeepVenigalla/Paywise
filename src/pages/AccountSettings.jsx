@@ -59,13 +59,6 @@ export default function AccountSettings() {
                 </div>
 
                 <div className="mb-6">
-                    <label className="text-gray-700 text-[15px] block mb-1">Default currency</label>
-                    <select className="w-full bg-[#f6f6f6] border border-gray-300 rounded-[5px] px-3 py-2 text-gray-800 outline-none text-[15px] appearance-none" style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>')`, backgroundPosition: 'right 12px center', backgroundRepeat: 'no-repeat' }}>
-                        <option>USD</option>
-                    </select>
-                </div>
-
-                <div className="mb-6">
                     <label className="text-gray-700 text-[15px] block mb-1">Language (for emails and notifications)</label>
                     <select className="w-full bg-[#f6f6f6] border border-gray-300 rounded-[5px] px-3 py-2 text-gray-800 outline-none text-[15px] appearance-none" style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>')`, backgroundPosition: 'right 12px center', backgroundRepeat: 'no-repeat' }}>
                         <option>English</option>
