@@ -294,10 +294,20 @@ export default function GroupDetails() {
         if (window.confirm(`Are you sure you want to delete "${description}"? This will recalculate everyone's balances.`)) {
             try {
                 await api.delete(`/expenses/${expenseId}`);
-                fetchGroup(); // Refresh the group details and balances after deletion
+                fetchGroup();
             } catch (err) {
                 alert('Failed to delete expense: ' + (err.response?.data?.msg || err.message));
             }
+        }
+    };
+
+    const handleDeleteGroup = async () => {
+        if (!window.confirm(`Are you sure you want to delete "${group?.name}"? This will permanently delete the group and ALL its expenses. This cannot be undone.`)) return;
+        try {
+            await api.delete(`/groups/${id}`);
+            navigate('/groups');
+        } catch (err) {
+            alert(err.response?.data?.msg || 'Failed to delete group. You may not have permission.');
         }
     };
 
@@ -914,7 +924,7 @@ export default function GroupDetails() {
                                         </div>
                                     </button>
 
-                                    <button className="px-5 py-5 flex items-center gap-4 hover:bg-rose-50 transition border-b border-gray-50 text-left" onClick={() => alert('Delete group coming soon')}>
+                                    <button className="px-5 py-5 flex items-center gap-4 hover:bg-rose-50 transition border-b border-gray-50 text-left" onClick={handleDeleteGroup}>
                                         <div className="flex-shrink-0">
                                             <Trash2 className="w-6 h-6 text-[#9a1e38] pl-1" strokeWidth={1.5} />
                                         </div>
