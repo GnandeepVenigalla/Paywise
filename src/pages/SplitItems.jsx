@@ -179,7 +179,12 @@ export default function SplitItems() {
                 amount: totalAmount, // or totalAssigned? usually receipt total
                 group: isFriend ? null : id,
                 paidBy: paidBy,
-                splits: splitsArray
+                splits: splitsArray,
+                items: items.map(i => ({
+                    name: i.name,
+                    price: i.price,
+                    assignedTo: i.assignedTo
+                }))
             });
             navigate(isFriend ? `/friend/${id}` : `/group/${id}`);
         } catch (err) {

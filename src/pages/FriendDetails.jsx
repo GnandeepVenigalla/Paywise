@@ -18,6 +18,8 @@ export default function FriendDetails() {
     const [isEditingExpense, setIsEditingExpense] = useState(false);
     const [editDescription, setEditDescription] = useState('');
     const [editAmount, setEditAmount] = useState('');
+    const [editItems, setEditItems] = useState([]);
+    const [selectedMemberIdsForEdit, setSelectedMemberIdsForEdit] = useState([]);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const location = useLocation();
     const [showSettings, setShowSettings] = useState(location.state?.openSettings || false);
@@ -101,10 +103,36 @@ export default function FriendDetails() {
     const handleUpdateExpense = async (e) => {
         e.preventDefault();
         setIsSavingEdit(true);
+
+        // Recalculate splits if items exist
+        let calculatedSplits = null;
+        if (editItems.length > 0) {
+            const userSplits = {};
+            editItems.forEach(item => {
+                if (item.assignedTo && item.assignedTo.length > 0) {
+                    const splitAmount = item.price / item.assignedTo.length;
+                    item.assignedTo.forEach(member => {
+                        const mId = member._id || member;
+                        userSplits[mId] = (userSplits[mId] || 0) + splitAmount;
+                    });
+                }
+            });
+            calculatedSplits = Object.keys(userSplits).map(userId => ({
+                user: userId,
+                amount: userSplits[userId]
+            }));
+        }
+
         try {
             await api.put(`/expenses/${selectedExpense._id}`, {
                 description: editDescription,
-                amount: Number(editAmount)
+                amount: Number(editAmount),
+                items: editItems.map(i => ({
+                    name: i.name,
+                    price: i.price,
+                    assignedTo: i.assignedTo.map(u => u._id || u)
+                })),
+                splits: calculatedSplits || undefined
             });
             setIsEditingExpense(false);
             setSelectedExpense(null);
@@ -114,6 +142,44 @@ export default function FriendDetails() {
         } finally {
             setIsSavingEdit(false);
         }
+    };
+
+    const toggleEditAssign = (itemId) => {
+        if (selectedMemberIdsForEdit.length === 0) {
+            alert("Please select members at the top first.");
+            return;
+        }
+
+        setEditItems(prev => prev.map(item => {
+            if (item._id === itemId || item.id === itemId) {
+                const itemAssignedIds = (item.assignedTo || []).map(u => u._id || u);
+                const allSelectedAreAssigned = selectedMemberIdsForEdit.every(id => itemAssignedIds.includes(id));
+
+                if (allSelectedAreAssigned && itemAssignedIds.length > 0) {
+                    const newAssigned = item.assignedTo.filter(u => !selectedMemberIdsForEdit.includes(u._id || u));
+                    return { ...item, assignedTo: newAssigned };
+                } else {
+                    const alreadyAssignedIds = new Set(itemAssignedIds);
+                    const members = [
+                        { _id: user.id || user._id, username: 'You' },
+                        { _id: friend._id, username: friend.username }
+                    ];
+                    const membersToAdd = members.filter(m =>
+                        selectedMemberIdsForEdit.includes(m._id) && !alreadyAssignedIds.has(m._id)
+                    );
+                    return { ...item, assignedTo: [...(item.assignedTo || []), ...membersToAdd] };
+                }
+            }
+            return item;
+        }));
+    };
+
+    const toggleEditMemberSelection = (memberId) => {
+        setSelectedMemberIdsForEdit(prev =>
+            prev.includes(memberId)
+                ? prev.filter(id => id !== memberId)
+                : [...prev, memberId]
+        );
     };
 
     const deleteExpense = async (expenseId, description) => {
@@ -363,6 +429,8 @@ export default function FriendDetails() {
                                                         setIsEditingExpense(false);
                                                         setEditDescription(item.description);
                                                         setEditAmount(item.amount.toString());
+                                                        setEditItems(item.items || []);
+                                                        setSelectedMemberIdsForEdit([user.id]);
                                                     }
                                                 }}
                                                 className="flex items-center py-2.5 cursor-pointer hover:bg-gray-50 bg-white transition -mx-4 px-4 active:bg-gray-100"
@@ -425,7 +493,7 @@ export default function FriendDetails() {
                             <div className="bg-gray-50 px-5 py-4 flex justify-between items-center border-b border-gray-200">
                                 <h2 className="text-xl font-bold text-gray-900 line-clamp-1">{isEditingExpense ? 'Edit Expense' : 'Expense Details'}</h2>
                                 <div className="flex items-center gap-2">
-                                    {!isEditingExpense && (
+                                    {!isEditingExpense && (selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
                                         <button onClick={() => setIsEditingExpense(true)} className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition">
                                             <Edit2 className="w-5 h-5" />
                                         </button>
@@ -465,6 +533,65 @@ export default function FriendDetails() {
                                             </div>
                                         </div>
                                         <p className="text-xs text-gray-500 font-medium leading-relaxed">Changing the total amount will instantly update and mathematically recalculate the splits.</p>
+
+                                        {editItems.length > 0 && (
+                                            <div className="space-y-4 pt-2 border-t border-gray-100 mt-4">
+                                                <h4 className="text-sm font-bold text-gray-700">Edit Item Assignments</h4>
+
+                                                {/* Member selection pills for editing */}
+                                                <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
+                                                    {[
+                                                        { _id: user.id || user._id, username: 'Me' },
+                                                        { _id: friend._id, username: friend.username }
+                                                    ].map(member => {
+                                                        const isSelected = selectedMemberIdsForEdit.includes(member._id);
+                                                        return (
+                                                            <button
+                                                                key={member._id}
+                                                                type="button"
+                                                                onClick={() => toggleEditMemberSelection(member._id)}
+                                                                className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 transition-all font-semibold text-xs ${isSelected
+                                                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                                                    : 'border-gray-200 bg-white text-gray-600'
+                                                                    }`}
+                                                            >
+                                                                {member.username}
+                                                            </button>
+                                                        )
+                                                    })}
+                                                </div>
+
+                                                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                                    {editItems.map(item => {
+                                                        const assignedIds = (item.assignedTo || []).map(u => u._id || u);
+                                                        const isAssigned = assignedIds.length > 0;
+
+                                                        return (
+                                                            <div
+                                                                key={item._id || item.id}
+                                                                onClick={() => toggleEditAssign(item._id || item.id)}
+                                                                className={`p-3 flex justify-between items-center rounded-xl border-2 transition-all cursor-pointer ${isAssigned ? 'border-slate-300 bg-slate-50' : 'border-gray-100'}`}
+                                                            >
+                                                                <div className="flex-1">
+                                                                    <p className="text-sm font-bold text-gray-800">{item.name}</p>
+                                                                    {isAssigned && (
+                                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                                            {item.assignedTo.map(u => (
+                                                                                <span key={u._id || u} className="text-[10px] bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded-full font-bold">
+                                                                                    {(u._id === (user.id || user._id) || u === (user.id || user._id)) ? 'Me' : friend.username}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <span className="font-bold text-gray-900">${item.price.toFixed(2)}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <button
                                             type="submit"
                                             disabled={isSavingEdit}
@@ -482,6 +609,9 @@ export default function FriendDetails() {
                                             <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
                                             <p className="text-3xl font-bold text-slate-900 mt-2">${selectedExpense.amount.toFixed(2)}</p>
                                             <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
+                                            {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
+                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
+                                            )}
                                             {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
                                             <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
                                         </div>
@@ -500,17 +630,19 @@ export default function FriendDetails() {
                                             </div>
                                         </div>
 
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                deleteExpense(selectedExpense._id, selectedExpense.description);
-                                                setSelectedExpense(null);
-                                            }}
-                                            className="w-full mt-4 font-bold bg-rose-50 text-rose-600 rounded-xl py-3.5 border border-rose-100 hover:bg-rose-100 transition flex items-center justify-center gap-2"
-                                        >
-                                            <Trash2 className="w-5 h-5" />
-                                            Delete Entire Expense
-                                        </button>
+                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteExpense(selectedExpense._id, selectedExpense.description);
+                                                    setSelectedExpense(null);
+                                                }}
+                                                className="w-full mt-4 font-bold bg-rose-50 text-rose-600 rounded-xl py-3.5 border border-rose-100 hover:bg-rose-100 transition flex items-center justify-center gap-2"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                                Delete Entire Expense
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
