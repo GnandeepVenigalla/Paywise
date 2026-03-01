@@ -48,12 +48,9 @@ export default function SplitwiseCallback() {
 
     const handleMigration = async (code) => {
         setStatus('migrating');
-        // This MUST exactly match the redirect_uri used in the authorization request.
-        // The auth-url backend uses the .html bridge page — so we must use it here too.
-        const hostname = window.location.hostname;
-        const redirectUri = (hostname === 'localhost' || hostname === '127.0.0.1')
-            ? 'http://localhost:5173/Paywise/splitwise-callback.html'
-            : `https://${hostname}/Paywise/splitwise-callback.html`;
+        // Must EXACTLY match the redirect_uri used in the authorization request.
+        // The backend always sends the production GitHub Pages URL.
+        const redirectUri = 'https://gnandeepvenigalla.github.io/Paywise/splitwise-callback.html';
 
         try {
             const res = await api.post('/splitwise/migrate', { code, redirectUri });
