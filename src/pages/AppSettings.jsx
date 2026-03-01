@@ -4,7 +4,8 @@ import { AuthContext } from '../context/AuthContext';
 import {
     ChevronLeft, ChevronRight, DollarSign, SplitSquareHorizontal,
     Sun, Moon, Monitor, Eye, EyeOff, Clock, Globe, Lock,
-    Trash2, HardDrive, UserCheck, UserX, Fingerprint, Check
+    Trash2, HardDrive, UserCheck, UserX, Fingerprint, Check,
+    Share2, Loader2
 } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
@@ -44,6 +45,22 @@ export default function AppSettings() {
     const [saved, setSaved] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteInput, setDeleteInput] = useState('');
+    const [migrationLoading, setMigrationLoading] = useState(false);
+
+    const handleMigrationInit = async () => {
+        setMigrationLoading(true);
+        try {
+            const res = await api.get('/splitwise/auth-url');
+            if (res.data.url) {
+                window.location.href = res.data.url;
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Failed to connect to Splitwise. Please try again later.');
+        } finally {
+            setMigrationLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (user?.appSettings) {
@@ -72,6 +89,80 @@ export default function AppSettings() {
             alert('Failed to save. Please try again.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleBiometricToggle = async (enabled) => {
+        if (!enabled) {
+            update('biometricLock', false);
+            return;
+        }
+
+        // Feature detection
+        if (!window.PublicKeyCredential) {
+            alert("Biometrics are not supported on this browser/device.");
+            return;
+        }
+
+        try {
+            // Check if we are on an IP address (WebAuthn requires a domain or localhost)
+            const hostname = window.location.hostname;
+            const isIP = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(hostname);
+            if (isIP && hostname !== '127.0.0.1' && hostname !== 'localhost') {
+                alert("Security Restriction: Biometrics (WebAuthn) do not work on IP addresses. Please use 'localhost' or a real domain name (via deployment).");
+                return;
+            }
+
+            // Check if biometrics are even available
+            const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+            if (!available) {
+                alert("No biometric hardware (like Face ID or Fingerprint) was found or enabled for this browser.");
+                return;
+            }
+
+            // Simple WebAuthn registration
+            const challenge = new Uint8Array(32);
+            window.crypto.getRandomValues(challenge);
+
+            const userID = new TextEncoder().encode(user.id || user._id);
+
+            const options = {
+                publicKey: {
+                    challenge,
+                    rp: { name: "Paywise" },
+                    user: {
+                        id: userID,
+                        name: user.email,
+                        displayName: user.username
+                    },
+                    pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+                    authenticatorSelection: {
+                        authenticatorAttachment: "platform",
+                        userVerification: "required"
+                    },
+                    timeout: 60000,
+                    attestation: "none"
+                }
+            };
+
+            const credential = await navigator.credentials.create(options);
+
+            if (credential) {
+                // If we get here, the user successfully scanned their biometric
+                setSettings(prev => ({
+                    ...prev,
+                    biometricLock: true,
+                    biometricCredentialId: credential.id
+                }));
+                alert("Biometric lock enabled! Your Face ID/Fingerprint is now linked.");
+            }
+        } catch (err) {
+            console.error(err);
+            if (err.name === 'NotAllowedError') {
+                // User cancelled or timed out
+            } else {
+                alert("Failed to setup biometrics. Make sure your device supports it.");
+            }
         }
     };
 
@@ -299,12 +390,42 @@ export default function AppSettings() {
                     label="Biometric Lock"
                     sub="Require Face ID, fingerprint, or PIN every time the app is opened"
                     value={settings.biometricLock}
-                    onChange={v => update('biometricLock', v)}
+                    onChange={v => handleBiometricToggle(v)}
                     last
                 />
             </div>
 
-            {/* ── 5. Data & Account Management ─────────────────── */}
+            {/* ── 5. Integrations ──────────────────────────── */}
+            <SectionHeader
+                icon={<Share2 className="w-4 h-4 text-emerald-500" />}
+                title="Integrations"
+                color="bg-emerald-50"
+            />
+            <div className="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+                <button
+                    onClick={handleMigrationInit}
+                    disabled={migrationLoading || user?.splitwiseMigrationStatus === 'completed'}
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition disabled:opacity-70"
+                >
+                    <div className="text-left flex-1 pr-4">
+                        <p className="text-[16px] font-medium text-gray-800">Splitwise Migration</p>
+                        <p className="text-[13px] text-gray-400 mt-0.5 leading-snug">
+                            {user?.splitwiseMigrationStatus === 'completed'
+                                ? 'Data migration already completed successfully'
+                                : 'Import your groups and expenses from Splitwise'}
+                        </p>
+                    </div>
+                    {migrationLoading ? (
+                        <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+                    ) : user?.splitwiseMigrationStatus === 'completed' ? (
+                        <div className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest">Done</div>
+                    ) : (
+                        <ChevronRight className="w-5 h-5 text-gray-300" />
+                    )}
+                </button>
+            </div>
+
+            {/* ── 6. Data & Account Management ─────────────────── */}
             <SectionHeader
                 icon={<HardDrive className="w-4 h-4 text-gray-500" />}
                 title="Data & Account Management"

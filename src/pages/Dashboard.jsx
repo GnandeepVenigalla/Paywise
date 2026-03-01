@@ -5,6 +5,7 @@ import { Wallet, Layers, Plus, Upload, UserPlus, ChevronRight, Eye } from 'lucid
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
+import SplitwiseMigrationBanner from '../components/SplitwiseMigrationBanner';
 
 export default function Dashboard() {
     const { user, api } = useContext(AuthContext);
@@ -89,6 +90,7 @@ export default function Dashboard() {
             </header>
 
             <main className="px-4 pt-6 max-w-md mx-auto">
+                <SplitwiseMigrationBanner />
 
                 {/* ── Net Balance Card ───────────── */}
                 {totalOwed !== 0 && (
