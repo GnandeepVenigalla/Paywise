@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Paywise - Redirecting...</title>
+</head>
+
+<body>
+    <p>Redirecting to Paywise...</p>
+    <script>
+        // Splitwise redirects here with ?code=XYZ as a query param.
+        // Since Paywise uses HashRouter, the app lives at /#/route
+        // We forward the code into the hash so React can pick it up.
+        var search = window.location.search; // "?code=XYZ"
+        // Build: https://gnandeepvenigalla.github.io/Paywise/#/splitwise-callback?code=XYZ
+        var base = window.location.origin + '/Paywise/';
+        window.location.replace(base + '#/splitwise-callback' + search);
+    </script>
+</body>
+
+</html>
