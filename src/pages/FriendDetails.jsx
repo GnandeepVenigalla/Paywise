@@ -7,6 +7,7 @@ import logoImg from '../assets/logo.png';
 import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
 export default function FriendDetails() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const { api, user } = useContext(AuthContext);
     const { hideBalance } = useAppSettings();
     const currSym = getCurrencySymbol(user?.defaultCurrency || 'USD');
@@ -36,7 +37,7 @@ export default function FriendDetails() {
     const [draftNote, setDraftNote] = useState('');
     const [showReminderModal, setShowReminderModal] = useState(false);
     const [reminderEmailBody, setReminderEmailBody] = useState('');
-    const navigate = useNavigate();
+
 
     const monthlySpending = useMemo(() => {
         if (!expenses || expenses.length === 0) return [];
@@ -678,7 +679,18 @@ export default function FriendDetails() {
                         <div className="mt-4">
                             <h4 className="px-6 py-2 text-[15px] font-bold text-gray-800">Manage relationship</h4>
                             <div className="flex flex-col mt-2">
-                                <button onClick={() => alert('Remove from friends list functionality coming soon!')} className="px-6 py-4 text-left text-[16px] text-gray-800 hover:bg-gray-50 border-t border-b border-gray-100 transition whitespace-nowrap">
+                                <button
+                                    onClick={async () => {
+                                        if (!window.confirm(`Remove ${friend?.username} from your friends list?`)) return;
+                                        try {
+                                            await api.delete(`/auth/friends/${id}`);
+                                            navigate('/friends');
+                                        } catch (err) {
+                                            alert(err.response?.data?.msg || 'Failed to remove friend.');
+                                        }
+                                    }}
+                                    className="px-6 py-4 text-left text-[16px] text-rose-600 font-medium hover:bg-rose-50 border-t border-b border-gray-100 transition w-full"
+                                >
                                     Remove from friends list
                                 </button>
                                 <button onClick={() => alert('Block user functionality coming soon!')} className="px-6 py-4 text-left hover:bg-gray-50 border-b border-gray-100 transition">

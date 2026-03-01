@@ -159,7 +159,7 @@ export default function Account() {
 
             <div className="text-center text-[13px] text-gray-300 mt-10 mb-4 pointer-events-none">
                 <p>Made with ♥ by GD Enterprises</p>
-                <p className="text-[11px] mt-1">Paywise V1.2.5 · © 2026</p>
+                <p className="text-[11px] mt-1">Paywise V1.2.6 · © 2026</p>
             </div>
 
             <BottomNav />
