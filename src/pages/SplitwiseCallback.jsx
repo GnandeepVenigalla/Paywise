@@ -1,39 +1,66 @@
 import { useEffect, useState, useContext } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { Loader2, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
 export default function SplitwiseCallback() {
-    const location = useLocation();
     const navigate = useNavigate();
     const { api, setUser } = useContext(AuthContext);
-    const [status, setStatus] = useState('verifying'); // verifying, migrating, success, error
+    const [status, setStatus] = useState('verifying');
     const [error, setError] = useState(null);
     const [stats, setStats] = useState(null);
 
     useEffect(() => {
-        const query = new URLSearchParams(location.search);
-        const code = query.get('code');
+        // With HashRouter, the URL looks like:
+        //   http://host/Paywise/#/splitwise-callback?code=XYZ
+        // BUT Splitwise may redirect to a non-hash URL:
+        //   http://host/Paywise/splitwise-callback?code=XYZ
+        // We need to check BOTH window.location.search and window.location.hash
+
+        let code = null;
+
+        // 1. Try reading from the standard URL search params (non-hash redirect)
+        const searchParams = new URLSearchParams(window.location.search);
+        code = searchParams.get('code');
+
+        // 2. If not found, try reading from the hash portion (hash redirect)
+        if (!code) {
+            const hashWithQuery = window.location.hash; // e.g. "#/splitwise-callback?code=XYZ"
+            const hashQueryIndex = hashWithQuery.indexOf('?');
+            if (hashQueryIndex !== -1) {
+                const hashParams = new URLSearchParams(hashWithQuery.slice(hashQueryIndex));
+                code = hashParams.get('code');
+            }
+        }
+
+        console.log('[SplitwiseCallback] Detected code:', code ? '***found***' : 'NOT FOUND');
+        console.log('[SplitwiseCallback] Full URL:', window.location.href);
 
         if (!code) {
             setStatus('error');
-            setError('No authorization code received from Splitwise.');
+            setError('No authorization code was received from Splitwise. Please try the migration again.');
             return;
         }
 
         handleMigration(code);
-    }, [location]);
+    }, []);
 
     const handleMigration = async (code) => {
         setStatus('migrating');
-        const redirectUri = window.location.origin + window.location.pathname + '#/splitwise-callback';
+        // This MUST exactly match the redirect_uri used in the authorization request.
+        // The auth-url backend uses the .html bridge page — so we must use it here too.
+        const hostname = window.location.hostname;
+        const redirectUri = (hostname === 'localhost' || hostname === '127.0.0.1')
+            ? 'http://localhost:5173/Paywise/splitwise-callback.html'
+            : `https://${hostname}/Paywise/splitwise-callback.html`;
+
         try {
             const res = await api.post('/splitwise/migrate', { code, redirectUri });
             setStats(res.data);
             setStatus('success');
 
-            // Update local user state
+            // Update local user state so migration status is updated everywhere
             const userRes = await api.get('/auth/me');
             setUser(userRes.data);
 
@@ -42,7 +69,7 @@ export default function SplitwiseCallback() {
                 navigate('/dashboard');
             }, 5000);
         } catch (err) {
-            console.error(err);
+            console.error('[SplitwiseCallback] Migration error:', err);
             setStatus('error');
             setError(err.response?.data?.msg || 'Failed to migrate data. Please try again.');
         }
