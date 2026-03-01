@@ -46,23 +46,16 @@ export default function AppSettings() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteInput, setDeleteInput] = useState('');
     const [migrationLoading, setMigrationLoading] = useState(false);
-    const [showMigrationInput, setShowMigrationInput] = useState(false);
-    const [splitwiseToken, setSplitwiseToken] = useState('');
 
-    const handleMigrate = async () => {
-        if (!splitwiseToken.trim()) return;
+    const handleOAuthMigrate = async () => {
         setMigrationLoading(true);
         try {
-            await api.post('/splitwise/migrate-with-token', { apiToken: splitwiseToken.trim() });
-            // Update user state
-            const userRes = await api.get('/auth/me');
-            if (setUser) setUser(userRes.data);
-            setShowMigrationInput(false);
-            setSplitwiseToken('');
-            alert('✅ Migration successful! Your Splitwise data is now in Paywise.');
+            const res = await api.get('/splitwise/auth-url');
+            if (res.data.url) {
+                window.location.href = res.data.url;
+            }
         } catch (err) {
-            alert('Migration failed: ' + (err?.response?.data?.msg || 'Check your token and try again.'));
-        } finally {
+            alert('Could not connect to Splitwise. Please try again.');
             setMigrationLoading(false);
         }
     };
@@ -407,64 +400,28 @@ export default function AppSettings() {
                 color="bg-emerald-50"
             />
             <div className="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
-                {user?.splitwiseMigrationStatus === 'completed' ? (
-                    <div className="flex items-center justify-between px-5 py-4">
-                        <div>
-                            <p className="text-[16px] font-medium text-gray-800">Splitwise Migration</p>
-                            <p className="text-[13px] text-gray-400 mt-0.5">Data migration completed successfully</p>
+                <button
+                    onClick={handleOAuthMigrate}
+                    disabled={migrationLoading}
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 active:bg-gray-100 transition"
+                >
+                    <div className="text-left flex-1 pr-4">
+                        <div className="flex items-center gap-2">
+                            <p className="text-[16px] font-medium text-gray-800">Splitwise</p>
+                            {user?.splitwiseMigrationStatus === 'completed' && (
+                                <span className="bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest">Synced</span>
+                            )}
                         </div>
-                        <div className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest">Done</div>
+                        <p className="text-[13px] text-gray-400 mt-0.5 leading-snug">
+                            {user?.splitwiseMigrationStatus === 'completed'
+                                ? 'Tap to sync new expenses from Splitwise'
+                                : 'Import your groups, expenses and friends from Splitwise'}
+                        </p>
                     </div>
-                ) : showMigrationInput ? (
-                    <div className="px-5 py-4 flex flex-col gap-3">
-                        <div>
-                            <p className="text-[16px] font-medium text-gray-800">Paste your Splitwise API Token</p>
-                            <p className="text-[12px] text-gray-400 mt-0.5">
-                                Get it from{' '}
-                                <a href="https://secure.splitwise.com/apps" target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-semibold underline">
-                                    secure.splitwise.com/apps
-                                </a>
-                                {' '}→ Your app → "Your token"
-                            </p>
-                        </div>
-                        <input
-                            type="password"
-                            value={splitwiseToken}
-                            onChange={e => setSplitwiseToken(e.target.value)}
-                            placeholder="Paste API token..."
-                            className="w-full border-2 border-gray-200 focus:border-slate-900 rounded-xl px-4 py-3 text-sm outline-none transition"
-                            onKeyDown={e => e.key === 'Enter' && handleMigrate()}
-                        />
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => { setShowMigrationInput(false); setSplitwiseToken(''); }}
-                                className="flex-1 h-11 rounded-xl font-bold text-sm bg-gray-100 text-gray-600"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleMigrate}
-                                disabled={migrationLoading || !splitwiseToken.trim()}
-                                className="flex-[2] h-11 rounded-xl font-bold text-sm bg-slate-900 text-white flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                                {migrationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Import Data'}
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => setShowMigrationInput(true)}
-                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition"
-                    >
-                        <div className="text-left flex-1 pr-4">
-                            <p className="text-[16px] font-medium text-gray-800">Splitwise Migration</p>
-                            <p className="text-[13px] text-gray-400 mt-0.5 leading-snug">
-                                Import your groups and expenses from Splitwise
-                            </p>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-gray-300" />
-                    </button>
-                )}
+                    {migrationLoading
+                        ? <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                        : <ChevronRight className="w-5 h-5 text-gray-300" />}
+                </button>
             </div>
 
             {/* ── 6. Data & Account Management ─────────────────── */}
