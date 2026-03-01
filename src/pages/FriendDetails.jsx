@@ -252,6 +252,28 @@ export default function FriendDetails() {
     }));
     displayItems.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    // Calculate group balances for the settings page
+    const groupBalances = {};
+    expenses.forEach(exp => {
+        if (exp.group) {
+            if (!groupBalances[exp.group._id]) {
+                groupBalances[exp.group._id] = {
+                    _id: 'group-' + exp.group._id,
+                    group: exp.group,
+                    balance: 0
+                };
+            }
+            const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+            if (isPaidByMe) {
+                const fSplit = exp.splits.find(s => s.user?._id === friend._id || s.user?._id === friend.id || s.user === friend._id || s.user === friend.id);
+                if (fSplit) groupBalances[exp.group._id].balance += fSplit.amount;
+            } else if (exp.paidBy?._id === friend._id || exp.paidBy?._id === friend.id || exp.paidBy === friend._id || exp.paidBy === friend.id) {
+                const mySplit = exp.splits.find(s => s.user?._id === user.id || s.user?._id === user._id || s.user === user.id || s.user === user._id);
+                if (mySplit) groupBalances[exp.group._id].balance -= mySplit.amount;
+            }
+        }
+    });
+
     return (
         <div className="min-h-screen bg-white font-sans pb-24">
             {/* Header - Splitwise Style Top Dark Header */}
