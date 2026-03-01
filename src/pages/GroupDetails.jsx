@@ -305,7 +305,7 @@ export default function GroupDetails() {
         if (!window.confirm(`Are you sure you want to delete "${group?.name}"? This will permanently delete the group and ALL its expenses. This cannot be undone.`)) return;
         try {
             await api.delete(`/groups/${id}`);
-            navigate('/groups');
+            navigate('/dashboard');
         } catch (err) {
             alert(err.response?.data?.msg || 'Failed to delete group. You may not have permission.');
         }
@@ -424,59 +424,70 @@ export default function GroupDetails() {
                     </form>
                 )}
 
-                <div className="px-5 py-5 shadow-[0_4px_10px_rgb(0,0,0,0.03)] border-b border-gray-100 mb-2">
-                    <div className="mb-4 flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Current Standing</span>
-                        {myBalance !== 0 ? (
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-500">
-                                    in total
+                <div className="px-5 py-4 border-b border-gray-100 mb-2">
+                    {/* Overall balance summary — clean like Splitwise */}
+                    <div className="mb-3">
+                        {myBalance === 0 ? (
+                            <p className="text-[17px] font-bold text-gray-700">You are all settled up</p>
+                        ) : myBalance > 0 ? (
+                            <p className="text-[17px] font-bold text-gray-800">
+                                You are owed{' '}
+                                <span className={`text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>
+                                    {currSym}{myBalance.toFixed(2)}
                                 </span>
-                                <span className={`text-2xl font-black tracking-tight ${myBalance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                    {myBalance > 0 ? '+' : '-'}{currSym}{Math.abs(myBalance).toFixed(2)}
-                                </span>
-                            </div>
+                                {' '}overall
+                            </p>
                         ) : (
-                            <span className="text-lg font-bold text-gray-700">Settled Up</span>
+                            <p className="text-[17px] font-bold text-gray-800">
+                                You owe{' '}
+                                <span className={`text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>
+                                    {currSym}{Math.abs(myBalance).toFixed(2)}
+                                </span>
+                                {' '}overall
+                            </p>
                         )}
+
+                        {/* Per-member balances */}
+                        <div className="mt-1.5 space-y-0.5">
+                            {(() => {
+                                let othersBalances = [];
+                                [...(group.members || []), ...(group.pastMembers || [])].filter(m => m._id !== user.id).forEach(member => {
+                                    const b = balances[member._id] || 0;
+                                    if (b !== 0) othersBalances.push({ member, b });
+                                });
+                                if (othersBalances.length === 0) return null;
+                                const [first, second, ...rest] = othersBalances;
+                                return (
+                                    <>
+                                        {first && (
+                                            <p className="text-[14px] text-gray-500">
+                                                {first.b > 0 ? (
+                                                    <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{first.b.toFixed(2)}</span></>
+                                                ) : (
+                                                    <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(first.b).toFixed(2)}</span></>
+                                                )}
+                                            </p>
+                                        )}
+                                        {second && (
+                                            <p className="text-[14px] text-gray-500">
+                                                {second.b > 0 ? (
+                                                    <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{second.b.toFixed(2)}</span></>
+                                                ) : (
+                                                    <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(second.b).toFixed(2)}</span></>
+                                                )}
+                                            </p>
+                                        )}
+                                        {rest.length > 0 && (
+                                            <p className="text-[13px] text-gray-400">Plus {rest.length} more balances</p>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </div>
                     </div>
 
-                    <div className="mb-5 space-y-1 pl-1 border-l-2 border-slate-100">
-                        {(() => {
-                            let othersBalances = [];
-                            [...(group.members || []), ...(group.pastMembers || [])].filter(m => m._id !== user.id).forEach(member => {
-                                const b = balances[member._id] || 0;
-                                if (b !== 0) {
-                                    othersBalances.push({ member, b });
-                                }
-                            });
-                            if (othersBalances.length === 0) return null;
-
-                            const [first, second, ...rest] = othersBalances;
-
-                            return (
-                                <div className="space-y-0.5">
-                                    {first && <p className="text-gray-600 font-medium text-[13px]">
-                                        {first.b > 0 ? (
-                                            <>{first.member.username} owes you <span className={`font-bold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{first.b.toFixed(2)}</span></>
-                                        ) : (
-                                            <>You owe {first.member.username} <span className={`font-bold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(first.b).toFixed(2)}</span></>
-                                        )}
-                                    </p>}
-                                    {second && <p className="text-gray-600 font-medium text-[13px]">
-                                        {second.b > 0 ? (
-                                            <>{second.member.username} owes you <span className="font-bold text-emerald-500">${second.b.toFixed(2)}</span></>
-                                        ) : (
-                                            <>You owe {second.member.username} <span className="font-bold text-rose-500">${Math.abs(second.b).toFixed(2)}</span></>
-                                        )}
-                                    </p>}
-                                    {rest.length > 0 && <p className="text-gray-500 text-[12px] mt-1 pt-1 opacity-90">Plus {rest.length} more balances</p>}
-                                </div>
-                            );
-                        })()}
-                    </div>
-
-                    <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide items-center mt-3">
+                    {/* Action buttons */}
+                    <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide items-center">
                         <button onClick={() => setShowGroupSettleUp(true)} className="bg-[#e11d48] text-white px-5 py-2.5 rounded-lg hover:bg-[#be123c] font-bold shadow-sm whitespace-nowrap transition cursor-pointer">
                             Settle up
                         </button>
@@ -491,6 +502,7 @@ export default function GroupDetails() {
                         </button>
                     </div>
                 </div>
+
 
                 <div className="px-5 pb-12">
                     {displayItems.length === 0 ? (
