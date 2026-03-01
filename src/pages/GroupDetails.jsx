@@ -390,8 +390,8 @@ export default function GroupDetails() {
                             {(() => {
                                 let othersBalances = [];
                                 [...(group.members || []), ...(group.pastMembers || [])].filter(m => m._id !== user.id).forEach(member => {
-                                    const b = balances[member._id] || 0;
-                                    if (b !== 0) othersBalances.push({ member, b });
+                                    const b = (pairwiseBalances[member._id]?.[user.id] || 0) - (pairwiseBalances[user.id]?.[member._id] || 0);
+                                    if (Math.abs(b) > 0.001) othersBalances.push({ member, b });
                                 });
                                 if (othersBalances.length === 0) return null;
                                 const [first, second, ...rest] = othersBalances;
