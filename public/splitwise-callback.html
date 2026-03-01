@@ -197,7 +197,11 @@
                 })
                     .then(function (res) { return res.json(); })
                     .then(function (data) {
-                        if (data.groupsCount !== undefined || data.msg === 'Migration successful' || data.msg === 'Migration complete') {
+                        var isSuccess = data.groupsCount !== undefined ||
+                            (data.msg && data.msg.toLowerCase().indexOf('success') !== -1) ||
+                            (data.msg && data.msg.toLowerCase().indexOf('complete') !== -1);
+
+                        if (isSuccess) {
                             var stats = '<div class="stat">✅ ' + (data.groupsCount || 0) + ' groups · ' + (data.expensesCount || 0) + ' expenses imported</div>';
                             setState('success',
                                 'Migration Complete! 🎉',

@@ -45,10 +45,12 @@ export default function FriendDetails() {
         const monthMap = {};
 
         expenses.forEach(exp => {
-            if (exp.description && exp.description.toLowerCase().includes('payment')) return;
-            if (exp.isGroupSummary) return; // ignore grouped summaries for pure 1-on-1 chart logic
+            if (!exp || (exp.description && exp.description.toLowerCase().includes('payment'))) return;
+            if (exp.isGroupSummary) return;
 
             const d = new Date(exp.date);
+            if (isNaN(d.getTime())) return;
+
             const key = `${d.getFullYear()}-${("0" + (d.getMonth() + 1)).slice(-2)}`;
             const monthLabel = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
             const shortMonth = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
@@ -65,12 +67,15 @@ export default function FriendDetails() {
                 };
             }
 
-            monthMap[key].totalSpent += exp.amount;
+            monthMap[key].totalSpent += (exp.amount || 0);
             monthMap[key].expensesList.push(exp);
 
-            const userSplit = exp.splits.find(s => (s.user._id || s.user) === user.id || (s.user._id || s.user) === user._id);
+            const userSplit = (exp.splits || []).find(s => {
+                const sid = s?.user?._id || s?.user;
+                return sid === user?.id || sid === user?._id;
+            });
             if (userSplit) {
-                monthMap[key].userShare += userSplit.amount;
+                monthMap[key].userShare += (userSplit.amount || 0);
             }
         });
 
@@ -252,27 +257,30 @@ export default function FriendDetails() {
     }));
     displayItems.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Calculate group balances for the settings page
+    // Calculate group balances safely for the settings page
     const groupBalances = {};
-    expenses.forEach(exp => {
-        if (exp.group) {
-            if (!groupBalances[exp.group._id]) {
-                groupBalances[exp.group._id] = {
-                    _id: 'group-' + exp.group._id,
-                    group: exp.group,
-                    balance: 0
-                };
+    if (Array.isArray(expenses)) {
+        expenses.forEach(exp => {
+            if (exp && exp.group) {
+                const gid = (exp.group._id || exp.group.id || exp.group || 'none').toString();
+                if (!groupBalances[gid]) {
+                    groupBalances[gid] = {
+                        _id: 'group-' + gid,
+                        group: exp.group,
+                        balance: 0
+                    };
+                }
+                const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+                if (isPaidByMe) {
+                    const fSplit = (exp.splits || []).find(s => s?.user?._id === friend?._id || s?.user?._id === friend?.id || s?.user === friend?._id || s?.user === friend?.id);
+                    if (fSplit) groupBalances[gid].balance += fSplit.amount;
+                } else if (exp.paidBy?._id === friend?._id || exp.paidBy?._id === friend?.id || exp.paidBy === friend?._id || exp.paidBy === friend?.id) {
+                    const mySplit = (exp.splits || []).find(s => s?.user?._id === user.id || s?.user?._id === user._id || s?.user === user.id || s?.user === user._id);
+                    if (mySplit) groupBalances[gid].balance -= mySplit.amount;
+                }
             }
-            const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
-            if (isPaidByMe) {
-                const fSplit = exp.splits.find(s => s.user?._id === friend._id || s.user?._id === friend.id || s.user === friend._id || s.user === friend.id);
-                if (fSplit) groupBalances[exp.group._id].balance += fSplit.amount;
-            } else if (exp.paidBy?._id === friend._id || exp.paidBy?._id === friend.id || exp.paidBy === friend._id || exp.paidBy === friend.id) {
-                const mySplit = exp.splits.find(s => s.user?._id === user.id || s.user?._id === user._id || s.user === user.id || s.user === user._id);
-                if (mySplit) groupBalances[exp.group._id].balance -= mySplit.amount;
-            }
-        }
-    });
+        });
+    }
 
     return (
         <div className="min-h-screen bg-white font-sans pb-24">
@@ -330,27 +338,28 @@ export default function FriendDetails() {
                             <div className="space-y-1.5 pt-1">
                                 {(() => {
                                     const breakdowns = {}; // { groupId/null: { name, balance } }
-                                    expenses.forEach(exp => {
+                                    (expenses || []).forEach(exp => {
+                                        if (!exp) return;
                                         const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
                                         let b = 0;
                                         if (isPaidByMe) {
-                                            const fSplit = exp.splits.find(s => s.user?._id === friend._id || s.user?._id === friend.id || s.user === friend._id || s.user === friend.id);
+                                            const fSplit = (exp.splits || []).find(s => s?.user?._id === friend?._id || s?.user?._id === friend?.id || s?.user === friend?._id || s?.user === friend?.id);
                                             if (fSplit) b = fSplit.amount;
-                                        } else if (exp.paidBy?._id === friend._id || exp.paidBy?._id === friend.id || exp.paidBy === friend._id || exp.paidBy === friend.id) {
-                                            const mySplit = exp.splits.find(s => s.user?._id === user.id || s.user?._id === user._id || s.user === user.id || s.user === user._id);
+                                        } else if (exp.paidBy?._id === friend?._id || exp.paidBy?._id === friend?.id || exp.paidBy === friend?._id || exp.paidBy === friend?.id) {
+                                            const mySplit = (exp.splits || []).find(s => s?.user?._id === user.id || s?.user?._id === user._id || s?.user === user.id || s?.user === user._id);
                                             if (mySplit) b = -mySplit.amount;
                                         }
 
                                         if (b !== 0) {
-                                            const gid = exp.group?._id || 'none';
-                                            if (!breakdowns[gid]) breakdowns[gid] = { name: exp.group?.name || 'non-group expenses', balance: 0 };
+                                            const gid = (exp.group?._id || exp.group || 'none').toString();
+                                            if (!breakdowns[gid]) breakdowns[gid] = { name: exp.group?.name || (typeof exp.group === 'string' ? "Shared Group" : "non-group expenses"), balance: 0 };
                                             breakdowns[gid].balance += b;
                                         }
                                     });
 
                                     return Object.values(breakdowns).filter(item => Math.abs(item.balance) > 0.01).map((item, idx) => (
                                         <p key={idx} className="text-[13.5px] text-gray-600 flex justify-between items-center">
-                                            <span>{friend.username.split(' ')[0]} {item.balance > 0 ? 'owes you' : 'you owe'} in {item.name === 'non-group expenses' ? item.name : `"${item.name}"`}</span>
+                                            <span>{(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes you' : 'you owe'} in {item.name === 'non-group expenses' ? item.name : `"${item.name}"`}</span>
                                             <span className={`font-bold ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                 {currSym}{Math.abs(item.balance).toFixed(2)}
                                             </span>
@@ -423,21 +432,25 @@ export default function FriendDetails() {
                                         amountValue = "$" + Math.abs(item.balance).toFixed(2);
                                         subtitle = `${item.count} Shared Group Action${item.count !== 1 ? 's' : ''}`;
                                     } else {
-                                        const isPaidByMe = item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id;
-                                        const groupNameText = item.group ? ` in "${item.group.name}"` : "";
+                                        const isPaidByMe = item.paidBy?._id === user?.id || item.paidBy?._id === user?._id || item.paidBy === user?.id;
+                                        const groupNameText = item.group ? ` in "${item.group?.name || 'Group'}"` : "";
+                                        const displayPaidAmount = paidAmount || 0;
                                         subtitle = isPaidByMe
-                                            ? `You paid $${paidAmount.toFixed(2)}${groupNameText}`
-                                            : `${item.paidBy?.username || friend.username} paid $${paidAmount.toFixed(2)}${groupNameText}`;
+                                            ? `You paid $${displayPaidAmount.toFixed(2)}${groupNameText}`
+                                            : `${item.paidBy?.username || friend?.username || 'Someone'} paid $${displayPaidAmount.toFixed(2)}${groupNameText}`;
 
                                         if (isPaidByMe) {
-                                            const fSplit = item.splits.find(s => s.user._id === friend._id || s.user === friend._id);
-                                            const splitAmt = fSplit ? fSplit.amount : 0;
+                                            const fSplit = (item.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id));
+                                            const splitAmt = fSplit ? (fSplit.amount || 0) : 0;
                                             amountColor = splitAmt > 0 ? "text-emerald-500" : "text-gray-500";
                                             amountLabel = splitAmt > 0 ? "you lent" : "not involved";
                                             amountValue = "$" + splitAmt.toFixed(2);
                                         } else {
-                                            const mySplit = item.splits.find(s => s.user._id === user.id || s.user === user.id || s.user._id === user._id || s.user === user._id);
-                                            const splitAmt = mySplit ? mySplit.amount : 0;
+                                            const mySplit = (item.splits || []).find(s => {
+                                                const sid = s?.user?._id || s?.user;
+                                                return sid === user?.id || sid === user?._id;
+                                            });
+                                            const splitAmt = mySplit ? (mySplit.amount || 0) : 0;
                                             amountColor = splitAmt > 0 ? "text-rose-600" : "text-gray-500";
                                             amountLabel = splitAmt > 0 ? "you borrowed" : "not involved";
                                             amountValue = "$" + splitAmt.toFixed(2);
@@ -634,30 +647,30 @@ export default function FriendDetails() {
                                                 {selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />}
                                             </div>
                                             <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
-                                            <p className="text-3xl font-bold text-slate-900 mt-2">${selectedExpense.amount.toFixed(2)}</p>
-                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
-                                            {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
-                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
+                                            <p className="text-3xl font-bold text-slate-900 mt-2">${(selectedExpense.amount || 0).toFixed(2)}</p>
+                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {(selectedExpense.paidBy?._id === user?.id || selectedExpense.paidBy === user?.id) ? 'You' : (selectedExpense.paidBy?.username || friend?.username || 'Someone')}</p>
+                                            {selectedExpense.addedBy && selectedExpense.addedBy?._id !== selectedExpense.paidBy?._id && (
+                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {(selectedExpense.addedBy?._id === user?.id || selectedExpense.addedBy === user?.id) ? 'you' : (selectedExpense.addedBy?.username || 'someone')}</p>
                                             )}
-                                            {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
-                                            <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+                                            {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group?.name || 'Shared Group'}</p>}
+                                            <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date || Date.now()).toLocaleDateString()}</p>
                                         </div>
 
                                         <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 max-h-48 overflow-y-auto">
                                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Split Details</h4>
                                             <div className="space-y-2">
-                                                {selectedExpense.splits.map(split => (
-                                                    <div key={split.user._id || split.user} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
+                                                {(selectedExpense.splits || []).map((split, sIdx) => (
+                                                    <div key={split?.user?._id || split?.user || sIdx} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
                                                         <span className="font-semibold text-gray-700 text-sm">
-                                                            {split.user._id === user.id ? 'You' : (split.user.username || friend.username)}
+                                                            {(split?.user?._id === user?.id || split?.user === user?.id) ? 'You' : (split?.user?.username || 'Unknown')}
                                                         </span>
-                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">${split.amount.toFixed(2)}</span>
+                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">${(split?.amount || 0).toFixed(2)}</span>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
 
-                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
+                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy?._id === user?.id) : (selectedExpense.paidBy?._id === user?.id)) && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -736,18 +749,18 @@ export default function FriendDetails() {
                             <div className="flex flex-col mt-2">
                                 {Object.values(groupBalances).length > 0 ? (
                                     Object.values(groupBalances).map(g => (
-                                        <div key={g._id} onClick={() => navigate(`/group/${g.group._id}`)} className="px-6 py-3.5 flex items-center justify-between hover:bg-gray-50 cursor-pointer border-t border-b border-gray-100 -mt-[1px]">
+                                        <div key={g._id} onClick={() => navigate(`/group/${(g.group?._id || g.group || 'none')}`)} className="px-6 py-3.5 flex items-center justify-between hover:bg-gray-50 cursor-pointer border-t border-b border-gray-100 -mt-[1px]">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-12 h-12 bg-gray-800 text-white rounded-lg shadow-sm border border-gray-200 flex items-center justify-center flex-shrink-0">
                                                     <Folder className="w-6 h-6 opacity-90" />
                                                 </div>
-                                                <span className="text-[16px] text-gray-800">{g.group.name}</span>
+                                                <span className="text-[16px] text-gray-800">{(g.group?.name || (typeof g.group === 'string' ? "Shared Group" : "Unnamed Group"))}</span>
                                             </div>
                                             <span className="text-gray-400 font-bold text-lg">›</span>
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="px-6 py-4 text-sm text-gray-500 bg-gray-50 border-t border-b border-gray-100 w-full mb-8">You and {friend.username} share no groups.</p>
+                                    <p className="px-6 py-4 text-sm text-gray-500 bg-gray-50 border-t border-b border-gray-100 w-full mb-8">You and {friend?.username || 'this friend'} share no groups.</p>
                                 )}
                             </div>
                         </div>
