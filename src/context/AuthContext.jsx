@@ -6,6 +6,7 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [sessionAuthenticated, setSessionAuthenticated] = useState(false);
 
     // Access the API dynamically using Vite's proxy resolving Mixed Content errors
     const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://paywise-backend-lemon.vercel.app/api' : '/api');
@@ -56,7 +57,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, api }}>
+        <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, api, sessionAuthenticated, setSessionAuthenticated }}>
             {children}
         </AuthContext.Provider>
     );

@@ -1,10 +1,11 @@
 import { useEffect, useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Wallet, Users, Plus, Upload, UserPlus, ChevronRight, Eye } from 'lucide-react';
+import { Wallet, Layers, Plus, Upload, UserPlus, ChevronRight, Eye } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
+import SplitwiseMigrationBanner from '../components/SplitwiseMigrationBanner';
 
 export default function Dashboard() {
     const { user, api } = useContext(AuthContext);
@@ -73,7 +74,7 @@ export default function Dashboard() {
     const budgetExceeded = monthlyBudget > 0 && Math.abs(Math.min(totalOwed, 0)) > monthlyBudget;
     const balanceColor = budgetExceeded
         ? 'text-orange-500'
-        : totalOwed > 0 ? 'text-[#108c73]' : totalOwed < 0 ? 'text-[#e25b22]' : 'text-gray-500';
+        : totalOwed > 0 ? 'text-emerald-500' : totalOwed < 0 ? 'text-rose-500' : 'text-gray-500';
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20">
@@ -83,47 +84,53 @@ export default function Dashboard() {
                     <img src={logoImg} alt="Paywise" className="w-8 h-8 object-contain" />
                     <h1 className="text-xl font-bold text-gray-900">Paywise</h1>
                 </div>
-                <Link to="/account" className="w-9 h-9 rounded-full bg-teal-100 border-2 border-teal-50 text-teal-700 flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-teal-200 transition">
+                <Link to="/account" className="w-9 h-9 rounded-full bg-slate-100 border-2 border-slate-50 text-slate-950 flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-slate-200 transition">
                     {user?.username?.charAt(0) || 'U'}
                 </Link>
             </header>
 
             <main className="px-4 pt-6 max-w-md mx-auto">
+                <SplitwiseMigrationBanner />
 
-                {/* ── Balance Summary Card ───────────── */}
+                {/* ── Net Balance Card ───────────── */}
                 {totalOwed !== 0 && (
-                    <div className={`rounded-3xl p-5 mb-6 flex items-center justify-between shadow-sm border ${budgetExceeded ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100'}`}>
-                        <div>
-                            <p className="text-[13px] font-semibold text-gray-400 uppercase tracking-wide mb-1">
-                                {totalOwed > 0 ? 'Total you are owed' : 'Total you owe'}
+                    <div className={`rounded-3xl p-6 mb-6 shadow-sm border ${budgetExceeded ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                            <p className="text-[13px] font-semibold text-gray-500 uppercase tracking-wide">
+                                Current Standing
                             </p>
-                            <p className={`text-[26px] font-black ${balanceColor} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                {currSym}{Math.abs(totalOwed).toFixed(2)}
-                            </p>
-                            {budgetExceeded && (
-                                <p className="text-[12px] text-orange-500 font-semibold mt-1">
-                                    ⚠️ Monthly budget of {currSym}{monthlyBudget} exceeded
-                                </p>
+                            {hideBalance && (
+                                <div className="flex items-center gap-1 text-gray-400 text-[12px]">
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>hover to reveal</span>
+                                </div>
                             )}
                         </div>
-                        {hideBalance && (
-                            <div className="flex items-center gap-1 text-gray-400 text-[13px]">
-                                <Eye className="w-4 h-4" />
-                                <span>hover to reveal</span>
+                        <div className="flex items-center gap-3">
+                            <p className={`text-3xl font-black tracking-tight ${balanceColor} ${hideBalance ? 'privacy-blur' : ''}`}>
+                                {totalOwed > 0 ? '+' : (totalOwed < 0 ? '-' : '')}{currSym}{Math.abs(totalOwed).toFixed(2)}
+                            </p>
+                            <div className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg ${totalOwed > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {totalOwed > 0 ? 'You are owed' : 'You owe'}
                             </div>
+                        </div>
+                        {budgetExceeded && (
+                            <p className="text-[12px] text-orange-600 font-semibold mt-3 flex items-center gap-1">
+                                <span>⚠️</span> Monthly budget of {currSym}{monthlyBudget} exceeded
+                            </p>
                         )}
                     </div>
                 )}
 
                 {/* Invite Friends Banner */}
-                <Link to="/invite" className="flex items-center justify-between bg-gradient-to-r from-teal-500 to-emerald-500 text-white px-5 py-4 rounded-3xl shadow-lg shadow-teal-500/20 mb-8 hover:from-teal-600 hover:to-emerald-600 transition-all transform hover:-translate-y-1">
+                <Link to="/invite" className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-800 text-white px-5 py-4 rounded-3xl shadow-lg shadow-slate-800/20 mb-8 hover:from-slate-900 hover:to-slate-900 transition-all transform hover:-translate-y-1">
                     <div className="flex items-center gap-4">
                         <div className="bg-white/20 p-2.5 rounded-2xl">
                             <UserPlus className="w-6 h-6 text-white" />
                         </div>
                         <div>
                             <h3 className="font-bold text-lg tracking-tight">Invite Friends!</h3>
-                            <p className="text-teal-50 text-xs font-medium opacity-90">Grow your squad to split bills</p>
+                            <p className="text-slate-50 text-xs font-medium opacity-90">Grow your squad to split bills</p>
                         </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-white/50" />
@@ -133,7 +140,7 @@ export default function Dashboard() {
                     <h2 className="text-2xl font-bold text-gray-800">Your Groups</h2>
                     <button
                         onClick={() => setIsCreating(!isCreating)}
-                        className="flex items-center gap-1 text-sm font-semibold text-teal-600 hover:text-teal-700 bg-teal-50 px-3 py-1.5 rounded-full transition-colors"
+                        className="flex items-center gap-1 text-sm font-semibold text-slate-900 hover:text-slate-950 bg-slate-50 px-3 py-1.5 rounded-full transition-colors"
                     >
                         <Plus className="w-4 h-4" /> New Group
                     </button>
@@ -146,12 +153,12 @@ export default function Dashboard() {
                             <input
                                 type="text"
                                 autoFocus
-                                className="flex-1 py-2 px-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
+                                className="flex-1 py-2 px-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none transition-all"
                                 value={newGroupName}
                                 onChange={e => setNewGroupName(e.target.value)}
                                 placeholder="e.g. Miami Trip"
                             />
-                            <button type="submit" className="bg-teal-600 text-white px-4 py-2 rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-sm">
+                            <button type="submit" className="bg-slate-900 text-white px-4 py-2 rounded-xl font-medium hover:bg-slate-950 transition-colors shadow-sm">
                                 Create
                             </button>
                         </div>
@@ -161,7 +168,7 @@ export default function Dashboard() {
                 <div className="space-y-4">
                     {groups.length === 0 && !isCreating ? (
                         <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-300">
-                            <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                            <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                             <p className="text-gray-500 font-medium">No groups yet.</p>
                             <p className="text-sm text-gray-400 mt-1">Create a group to start splitting bills!</p>
                         </div>
@@ -172,19 +179,19 @@ export default function Dashboard() {
                                 <Link
                                     to={`/group/${group._id}`}
                                     key={group._id}
-                                    className="block bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-teal-100 transition-all group"
+                                    className="block bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100 transition-all group"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600 group-hover:bg-teal-100 group-hover:scale-105 transition-all">
-                                            <Users className="w-6 h-6" />
+                                        <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-900 group-hover:bg-slate-100 group-hover:scale-105 transition-all">
+                                            <Layers className="w-6 h-6" />
                                         </div>
                                         <div className="flex-1">
                                             <h3 className="font-bold text-gray-800 text-lg">{group.name}</h3>
                                             <p className="text-sm text-gray-500 mt-0.5">{group.members.length} member{group.members.length !== 1 && 's'}</p>
                                         </div>
                                         {myBal !== 0 && (
-                                            <p className={`text-[15px] font-bold flex-shrink-0 ${hideBalance ? 'privacy-blur' : ''} ${myBal > 0 ? 'text-[#108c73]' : 'text-[#e25b22]'}`}>
-                                                {myBal > 0 ? '+' : ''}{currSym}{Math.abs(myBal).toFixed(2)}
+                                            <p className={`text-[15px] font-bold flex-shrink-0 ${hideBalance ? 'privacy-blur' : ''} ${myBal > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                {myBal > 0 ? '+' : '-'}{currSym}{Math.abs(myBal).toFixed(2)}
                                             </p>
                                         )}
                                     </div>

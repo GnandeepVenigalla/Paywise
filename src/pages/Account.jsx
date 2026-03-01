@@ -25,14 +25,14 @@ export default function Account() {
             label: 'Preferences',
             items: [
                 {
-                    icon: <Bell className="w-5 h-5 text-[#108c73]" />,
+                    icon: <Bell className="w-5 h-5 text-slate-900" />,
                     bg: 'bg-[#e6f7f3]',
                     label: 'Notifications',
                     sub: 'Manage your email alerts',
                     to: '/account/notifications',
                 },
                 {
-                    icon: <DollarSign className="w-5 h-5 text-[#108c73]" />,
+                    icon: <DollarSign className="w-5 h-5 text-slate-900" />,
                     bg: 'bg-[#e6f7f3]',
                     label: 'Default Currency',
                     sub: currencyDisplay,
@@ -44,15 +44,15 @@ export default function Account() {
             label: 'Account',
             items: [
                 {
-                    icon: <Settings className="w-5 h-5 text-indigo-600" />,
-                    bg: 'bg-indigo-50',
+                    icon: <Settings className="w-5 h-5 text-slate-900" />,
+                    bg: 'bg-slate-50',
                     label: 'App Settings',
                     sub: 'Split method, budget, theme, privacy',
                     to: '/account/app-settings',
                 },
                 {
-                    icon: <Shield className="w-5 h-5 text-indigo-600" />,
-                    bg: 'bg-indigo-50',
+                    icon: <Shield className="w-5 h-5 text-slate-900" />,
+                    bg: 'bg-slate-50',
                     label: 'Privacy & Security',
                     sub: 'How we protect your data',
                     to: '/account/privacy',
@@ -103,7 +103,7 @@ export default function Account() {
                     </div>
                     <Link
                         to="/account/settings"
-                        className="ml-4 shrink-0 text-[#108c73] font-bold text-[15px] hover:opacity-80 transition"
+                        className="ml-4 shrink-0 text-slate-900 font-bold text-[15px] hover:opacity-80 transition"
                     >
                         Edit
                     </Link>
@@ -159,7 +159,7 @@ export default function Account() {
 
             <div className="text-center text-[13px] text-gray-300 mt-10 mb-4 pointer-events-none">
                 <p>Made with ♥ by GD Enterprises</p>
-                <p className="text-[11px] mt-1">Paywise v1.2.0 · © 2026</p>
+                <p className="text-[11px] mt-1">Paywise V1.2.3 · © 2026</p>
             </div>
 
             <BottomNav />

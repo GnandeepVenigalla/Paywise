@@ -56,10 +56,10 @@ export default function ResetPassword() {
 
                 {success ? (
                     <div className="text-center py-6">
-                        <CheckCircle2 className="w-16 h-16 text-teal-500 mx-auto mb-4" />
+                        <CheckCircle2 className="w-16 h-16 text-slate-800 mx-auto mb-4" />
                         <h3 className="text-xl font-bold text-gray-900 mb-2">Password Reset!</h3>
                         <p className="text-gray-500 mb-6">{success}</p>
-                        <Link to="/login" className="inline-block bg-teal-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-teal-700 transition">
+                        <Link to="/login" className="inline-block bg-slate-900 text-white font-bold py-3 px-6 rounded-xl hover:bg-slate-950 transition">
                             Return to Login
                         </Link>
                     </div>
@@ -71,7 +71,7 @@ export default function ResetPassword() {
                             </div>
                             <input
                                 type="password"
-                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all outline-none"
+                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
                                 placeholder="New Password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -85,7 +85,7 @@ export default function ResetPassword() {
                             </div>
                             <input
                                 type="password"
-                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all outline-none"
+                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
                                 placeholder="Confirm New Password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -96,7 +96,7 @@ export default function ResetPassword() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all cursor-pointer"
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-950 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-800 transition-all cursor-pointer"
                         >
                             {isLoading ? 'Resetting...' : 'Reset Password'}
                         </button>

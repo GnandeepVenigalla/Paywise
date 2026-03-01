@@ -18,6 +18,8 @@ export default function FriendDetails() {
     const [isEditingExpense, setIsEditingExpense] = useState(false);
     const [editDescription, setEditDescription] = useState('');
     const [editAmount, setEditAmount] = useState('');
+    const [editItems, setEditItems] = useState([]);
+    const [selectedMemberIdsForEdit, setSelectedMemberIdsForEdit] = useState([]);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const location = useLocation();
     const [showSettings, setShowSettings] = useState(location.state?.openSettings || false);
@@ -101,10 +103,36 @@ export default function FriendDetails() {
     const handleUpdateExpense = async (e) => {
         e.preventDefault();
         setIsSavingEdit(true);
+
+        // Recalculate splits if items exist
+        let calculatedSplits = null;
+        if (editItems.length > 0) {
+            const userSplits = {};
+            editItems.forEach(item => {
+                if (item.assignedTo && item.assignedTo.length > 0) {
+                    const splitAmount = item.price / item.assignedTo.length;
+                    item.assignedTo.forEach(member => {
+                        const mId = member._id || member;
+                        userSplits[mId] = (userSplits[mId] || 0) + splitAmount;
+                    });
+                }
+            });
+            calculatedSplits = Object.keys(userSplits).map(userId => ({
+                user: userId,
+                amount: userSplits[userId]
+            }));
+        }
+
         try {
             await api.put(`/expenses/${selectedExpense._id}`, {
                 description: editDescription,
-                amount: Number(editAmount)
+                amount: Number(editAmount),
+                items: editItems.map(i => ({
+                    name: i.name,
+                    price: i.price,
+                    assignedTo: i.assignedTo.map(u => u._id || u)
+                })),
+                splits: calculatedSplits || undefined
             });
             setIsEditingExpense(false);
             setSelectedExpense(null);
@@ -114,6 +142,44 @@ export default function FriendDetails() {
         } finally {
             setIsSavingEdit(false);
         }
+    };
+
+    const toggleEditAssign = (itemId) => {
+        if (selectedMemberIdsForEdit.length === 0) {
+            alert("Please select members at the top first.");
+            return;
+        }
+
+        setEditItems(prev => prev.map(item => {
+            if (item._id === itemId || item.id === itemId) {
+                const itemAssignedIds = (item.assignedTo || []).map(u => u._id || u);
+                const allSelectedAreAssigned = selectedMemberIdsForEdit.every(id => itemAssignedIds.includes(id));
+
+                if (allSelectedAreAssigned && itemAssignedIds.length > 0) {
+                    const newAssigned = item.assignedTo.filter(u => !selectedMemberIdsForEdit.includes(u._id || u));
+                    return { ...item, assignedTo: newAssigned };
+                } else {
+                    const alreadyAssignedIds = new Set(itemAssignedIds);
+                    const members = [
+                        { _id: user.id || user._id, username: 'You' },
+                        { _id: friend._id, username: friend.username }
+                    ];
+                    const membersToAdd = members.filter(m =>
+                        selectedMemberIdsForEdit.includes(m._id) && !alreadyAssignedIds.has(m._id)
+                    );
+                    return { ...item, assignedTo: [...(item.assignedTo || []), ...membersToAdd] };
+                }
+            }
+            return item;
+        }));
+    };
+
+    const toggleEditMemberSelection = (memberId) => {
+        setSelectedMemberIdsForEdit(prev =>
+            prev.includes(memberId)
+                ? prev.filter(id => id !== memberId)
+                : [...prev, memberId]
+        );
     };
 
     const deleteExpense = async (expenseId, description) => {
@@ -171,7 +237,7 @@ export default function FriendDetails() {
 
     if (!friend) {
         return (
-            <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+            <div className="fixed inset-0 bg-[#1e293b] flex flex-col items-center justify-center z-[100]">
                 <div className="w-[110px] h-[110px] animate-pulse">
                     <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
                 </div>
@@ -224,7 +290,7 @@ export default function FriendDetails() {
     return (
         <div className="min-h-screen bg-white font-sans pb-24">
             {/* Header - Splitwise Style Top Dark Header */}
-            <header className="bg-[#126b70] text-white pt-6 pb-6 px-4 sticky top-0 z-10">
+            <header className="bg-slate-950 text-white pt-6 pb-6 px-4 sticky top-0 z-10">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
@@ -255,18 +321,24 @@ export default function FriendDetails() {
 
             <main className="bg-white max-w-lg mx-auto">
                 <div className="px-4 py-5 shadow-[0_4px_10px_rgb(0,0,0,0.03)] border-b border-gray-100 mb-2">
-                    <div className="mb-4">
-                        {balance > 0 ? (
-                            <p className="text-gray-700 text-[15px]">{friend.username} owes you <span className={`text-[#108c73] font-medium ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{balance.toFixed(2)}</span></p>
-                        ) : balance < 0 ? (
-                            <p className="text-gray-700 text-[15px]">You owe {friend.username} <span className={`text-[#e25b22] font-medium ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(balance).toFixed(2)}</span></p>
+                    <div className="mb-4 flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Current Standing</span>
+                        {balance !== 0 ? (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-500">
+                                    {balance > 0 ? 'owes you' : 'you owe'}
+                                </span>
+                                <span className={`text-2xl font-black tracking-tight ${balance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
+                                    {balance > 0 ? '+' : '-'}{currSym}{Math.abs(balance).toFixed(2)}
+                                </span>
+                            </div>
                         ) : (
-                            <p className="text-gray-700 text-[15px]">You and {friend.username} are settled up.</p>
+                            <span className="text-lg font-bold text-gray-700">Settled Up</span>
                         )}
                     </div>
 
                     <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide items-center">
-                        <button onClick={openSettleUp} className="bg-[#e25b22] text-white px-5 py-2 rounded-lg hover:bg-[#c94d1a] font-bold shadow-sm whitespace-nowrap transition">
+                        <button onClick={openSettleUp} className="bg-[#e11d48] text-white px-5 py-2 rounded-lg hover:bg-[#be123c] font-bold shadow-sm whitespace-nowrap transition">
                             Settle up
                         </button>
                         <button
@@ -322,7 +394,7 @@ export default function FriendDetails() {
                                     let paidAmount = item.isGroupSummary ? null : item.amount;
 
                                     if (item.isGroupSummary) {
-                                        amountColor = item.balance > 0 ? "text-[#108c73]" : (item.balance < 0 ? "text-[#e25b22]" : "text-gray-500");
+                                        amountColor = item.balance > 0 ? "text-emerald-500" : (item.balance < 0 ? "text-rose-600" : "text-gray-500");
                                         amountLabel = item.balance > 0 ? "you lent" : (item.balance < 0 ? "you borrowed" : "settled");
                                         amountValue = "$" + Math.abs(item.balance).toFixed(2);
                                         subtitle = `${item.count} Shared Group Action${item.count !== 1 ? 's' : ''}`;
@@ -333,13 +405,13 @@ export default function FriendDetails() {
                                         if (isPaidByMe) {
                                             const fSplit = item.splits.find(s => s.user._id === friend._id || s.user === friend._id);
                                             const splitAmt = fSplit ? fSplit.amount : 0;
-                                            amountColor = splitAmt > 0 ? "text-[#108c73]" : "text-gray-500";
+                                            amountColor = splitAmt > 0 ? "text-emerald-500" : "text-gray-500";
                                             amountLabel = splitAmt > 0 ? "you lent" : "not involved";
                                             amountValue = "$" + splitAmt.toFixed(2);
                                         } else {
                                             const mySplit = item.splits.find(s => s.user._id === user.id || s.user === user.id || s.user._id === user._id || s.user === user._id);
                                             const splitAmt = mySplit ? mySplit.amount : 0;
-                                            amountColor = splitAmt > 0 ? "text-[#e25b22]" : "text-gray-500";
+                                            amountColor = splitAmt > 0 ? "text-rose-600" : "text-gray-500";
                                             amountLabel = splitAmt > 0 ? "you borrowed" : "not involved";
                                             amountValue = "$" + splitAmt.toFixed(2);
                                         }
@@ -357,6 +429,8 @@ export default function FriendDetails() {
                                                         setIsEditingExpense(false);
                                                         setEditDescription(item.description);
                                                         setEditAmount(item.amount.toString());
+                                                        setEditItems(item.items || []);
+                                                        setSelectedMemberIdsForEdit([user.id]);
                                                     }
                                                 }}
                                                 className="flex items-center py-2.5 cursor-pointer hover:bg-gray-50 bg-white transition -mx-4 px-4 active:bg-gray-100"
@@ -366,7 +440,7 @@ export default function FriendDetails() {
                                                     <span className="text-gray-500 text-[17px] font-light leading-none">{day}</span>
                                                 </div>
 
-                                                <div className={`w-10 h-10 ml-3 ${item.isGroupSummary ? 'bg-gray-200 text-gray-500' : 'bg-[#e5f0ea] text-[#1e8b6e]'} flex items-center justify-center flex-shrink-0`}>
+                                                <div className={`w-10 h-10 ml-3 ${item.isGroupSummary ? 'bg-gray-200 text-gray-500' : 'bg-slate-50 text-slate-900'} flex items-center justify-center flex-shrink-0`}>
                                                     {item.isGroupSummary ? <Folder className="w-5 h-5 opacity-80" /> : <Receipt className="w-5 h-5 opacity-90" />}
                                                 </div>
 
@@ -393,7 +467,7 @@ export default function FriendDetails() {
             <div className="fixed bottom-6 right-5">
                 <Link
                     to={`/friend/${id}/add`}
-                    className="bg-[#108c73] text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-[#0c705c] transition transform hover:scale-105"
+                    className="bg-slate-900 text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-slate-950 transition transform hover:scale-105"
                 >
                     <Receipt className="w-5 h-5" />
                     Add expense
@@ -419,7 +493,7 @@ export default function FriendDetails() {
                             <div className="bg-gray-50 px-5 py-4 flex justify-between items-center border-b border-gray-200">
                                 <h2 className="text-xl font-bold text-gray-900 line-clamp-1">{isEditingExpense ? 'Edit Expense' : 'Expense Details'}</h2>
                                 <div className="flex items-center gap-2">
-                                    {!isEditingExpense && (
+                                    {!isEditingExpense && (selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
                                         <button onClick={() => setIsEditingExpense(true)} className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition">
                                             <Edit2 className="w-5 h-5" />
                                         </button>
@@ -440,7 +514,7 @@ export default function FriendDetails() {
                                                 type="text"
                                                 value={editDescription}
                                                 onChange={e => setEditDescription(e.target.value)}
-                                                className="w-full py-3 px-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none shadow-sm"
+                                                className="w-full py-3 px-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm"
                                                 required
                                             />
                                         </div>
@@ -453,16 +527,75 @@ export default function FriendDetails() {
                                                     step="0.01"
                                                     value={editAmount}
                                                     onChange={e => setEditAmount(e.target.value)}
-                                                    className="w-full py-3 pl-8 pr-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none shadow-sm font-bold"
+                                                    className="w-full py-3 pl-8 pr-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm font-bold"
                                                     required
                                                 />
                                             </div>
                                         </div>
                                         <p className="text-xs text-gray-500 font-medium leading-relaxed">Changing the total amount will instantly update and mathematically recalculate the splits.</p>
+
+                                        {editItems.length > 0 && (
+                                            <div className="space-y-4 pt-2 border-t border-gray-100 mt-4">
+                                                <h4 className="text-sm font-bold text-gray-700">Edit Item Assignments</h4>
+
+                                                {/* Member selection pills for editing */}
+                                                <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
+                                                    {[
+                                                        { _id: user.id || user._id, username: 'Me' },
+                                                        { _id: friend._id, username: friend.username }
+                                                    ].map(member => {
+                                                        const isSelected = selectedMemberIdsForEdit.includes(member._id);
+                                                        return (
+                                                            <button
+                                                                key={member._id}
+                                                                type="button"
+                                                                onClick={() => toggleEditMemberSelection(member._id)}
+                                                                className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 transition-all font-semibold text-xs ${isSelected
+                                                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                                                    : 'border-gray-200 bg-white text-gray-600'
+                                                                    }`}
+                                                            >
+                                                                {member.username}
+                                                            </button>
+                                                        )
+                                                    })}
+                                                </div>
+
+                                                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                                    {editItems.map(item => {
+                                                        const assignedIds = (item.assignedTo || []).map(u => u._id || u);
+                                                        const isAssigned = assignedIds.length > 0;
+
+                                                        return (
+                                                            <div
+                                                                key={item._id || item.id}
+                                                                onClick={() => toggleEditAssign(item._id || item.id)}
+                                                                className={`p-3 flex justify-between items-center rounded-xl border-2 transition-all cursor-pointer ${isAssigned ? 'border-slate-300 bg-slate-50' : 'border-gray-100'}`}
+                                                            >
+                                                                <div className="flex-1">
+                                                                    <p className="text-sm font-bold text-gray-800">{item.name}</p>
+                                                                    {isAssigned && (
+                                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                                            {item.assignedTo.map(u => (
+                                                                                <span key={u._id || u} className="text-[10px] bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded-full font-bold">
+                                                                                    {(u._id === (user.id || user._id) || u === (user.id || user._id)) ? 'Me' : friend.username}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <span className="font-bold text-gray-900">${item.price.toFixed(2)}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <button
                                             type="submit"
                                             disabled={isSavingEdit}
-                                            className="w-full font-bold bg-teal-600 text-white rounded-xl py-3.5 shadow-md hover:bg-teal-700 transition disabled:opacity-50 mt-4"
+                                            className="w-full font-bold bg-slate-900 text-white rounded-xl py-3.5 shadow-md hover:bg-slate-950 transition disabled:opacity-50 mt-4"
                                         >
                                             {isSavingEdit ? 'Saving...' : 'Save Changes'}
                                         </button>
@@ -470,13 +603,16 @@ export default function FriendDetails() {
                                 ) : (
                                     <div>
                                         <div className="text-center mb-6">
-                                            <div className={`w-16 h-16 ${selectedExpense.group ? 'bg-indigo-50 text-indigo-600' : 'bg-teal-50 text-teal-600'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner`}>
+                                            <div className={`w-16 h-16 ${selectedExpense.group ? 'bg-slate-50 text-slate-900' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner`}>
                                                 {selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />}
                                             </div>
                                             <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
-                                            <p className="text-3xl font-bold text-teal-600 mt-2">${selectedExpense.amount.toFixed(2)}</p>
+                                            <p className="text-3xl font-bold text-slate-900 mt-2">${selectedExpense.amount.toFixed(2)}</p>
                                             <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
-                                            {selectedExpense.group && <p className="text-xs font-bold text-indigo-500 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
+                                            {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
+                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
+                                            )}
+                                            {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
                                             <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
                                         </div>
 
@@ -494,17 +630,19 @@ export default function FriendDetails() {
                                             </div>
                                         </div>
 
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                deleteExpense(selectedExpense._id, selectedExpense.description);
-                                                setSelectedExpense(null);
-                                            }}
-                                            className="w-full mt-4 font-bold bg-rose-50 text-rose-600 rounded-xl py-3.5 border border-rose-100 hover:bg-rose-100 transition flex items-center justify-center gap-2"
-                                        >
-                                            <Trash2 className="w-5 h-5" />
-                                            Delete Entire Expense
-                                        </button>
+                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteExpense(selectedExpense._id, selectedExpense.description);
+                                                    setSelectedExpense(null);
+                                                }}
+                                                className="w-full mt-4 font-bold bg-rose-50 text-rose-600 rounded-xl py-3.5 border border-rose-100 hover:bg-rose-100 transition flex items-center justify-center gap-2"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                                Delete Entire Expense
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -527,7 +665,7 @@ export default function FriendDetails() {
                     <div className="flex-1 overflow-y-auto pb-10">
                         {/* Profile Info */}
                         <div className="p-6 flex items-center gap-4">
-                            <div className="w-16 h-16 bg-[#126b70] text-white rounded-full flex items-center justify-center text-3xl font-black uppercase shadow-sm">
+                            <div className="w-16 h-16 bg-slate-950 text-white rounded-full flex items-center justify-center text-3xl font-black uppercase shadow-sm">
                                 {friend.username?.charAt(0)}
                             </div>
                             <div>
@@ -706,8 +844,8 @@ export default function FriendDetails() {
                                     <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
                                         {/* Insight Card 1 */}
                                         <div className="min-w-[160px] flex-1 bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm">
-                                            <div className="w-8 h-8 rounded-full bg-[#e5f0ea] flex items-center justify-center mb-3">
-                                                <TrendingUp className="w-4 h-4 text-[#108c73]" />
+                                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                                                <TrendingUp className="w-4 h-4 text-slate-900" />
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Payer</p>
                                             <p className="text-[16px] text-gray-900 font-medium leading-tight">{topPayerString}</p>
@@ -785,8 +923,8 @@ export default function FriendDetails() {
                                 }}
                                 className="flex items-center gap-4 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 transition rounded-[14px] border border-gray-200 border-b-[2px]"
                             >
-                                <div className="w-10 h-10 rounded-full bg-[#e5f0ea] flex items-center justify-center">
-                                    <FileSpreadsheet className="w-5 h-5 text-[#108c73]" />
+                                <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center">
+                                    <FileSpreadsheet className="w-5 h-5 text-slate-900" />
                                 </div>
                                 <div className="flex flex-col text-left">
                                     <span className="text-[16px] text-gray-800 font-bold">CSV Spreadsheet</span>
@@ -823,7 +961,7 @@ export default function FriendDetails() {
                                     setShowNoteModal(false);
                                 } catch { alert('Failed to save note.'); }
                             }}
-                            className="ml-auto text-[#108c73] font-bold text-[16px] hover:opacity-80 transition"
+                            className="ml-auto text-slate-900 font-bold text-[16px] hover:opacity-80 transition"
                         >
                             Save
                         </button>
@@ -963,9 +1101,9 @@ export default function FriendDetails() {
                                 {/* ── Option 2: Share ─────────────────── */}
                                 <button
                                     onClick={handleShare}
-                                    className="w-full flex items-center gap-4 bg-[#f0faf7] border-2 border-[#d1f0e7] hover:bg-[#e6f7f3] rounded-2xl px-4 py-4 transition text-left"
+                                    className="w-full flex items-center gap-4 bg-slate-50 border-2 border-[#d1f0e7] hover:bg-[#e6f7f3] rounded-2xl px-4 py-4 transition text-left"
                                 >
-                                    <div className="w-9 h-9 rounded-xl bg-[#108c73] flex items-center justify-center flex-shrink-0">
+                                    <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center flex-shrink-0">
                                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                         </svg>
@@ -1009,7 +1147,7 @@ export default function FriendDetails() {
                         <div className="flex flex-col flex-1 px-5 pt-8">
                             {/* Summary */}
                             <div className="bg-gray-50 rounded-2xl p-5 mb-8 flex items-center gap-4 border border-gray-100">
-                                <div className="w-12 h-12 rounded-full bg-[#e25b22] flex items-center justify-center text-white text-xl font-bold uppercase flex-shrink-0">
+                                <div className="w-12 h-12 rounded-full bg-[#e11d48] flex items-center justify-center text-white text-xl font-bold uppercase flex-shrink-0">
                                     {friend.username.charAt(0)}
                                 </div>
                                 <div>
@@ -1041,16 +1179,16 @@ export default function FriendDetails() {
                                 {/* Cash option */}
                                 <button
                                     onClick={() => { setSettleMode('cash'); setCashStep(2); }}
-                                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-[#108c73] bg-[#f0faf7] hover:bg-[#e5f7f2] transition text-left"
+                                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-900 bg-slate-50 hover:bg-slate-200 transition text-left"
                                 >
                                     <div className="w-12 h-12 rounded-xl bg-[#d1f0e7] flex items-center justify-center">
-                                        <Banknote className="w-6 h-6 text-[#108c73]" />
+                                        <Banknote className="w-6 h-6 text-slate-900" />
                                     </div>
                                     <div className="flex-1">
                                         <p className="text-[16px] font-bold text-gray-800">Pay with Cash</p>
                                         <p className="text-[13px] text-gray-500">Record a cash payment</p>
                                     </div>
-                                    <ChevronRight className="w-5 h-5 text-[#108c73]" />
+                                    <ChevronRight className="w-5 h-5 text-slate-900" />
                                 </button>
                             </div>
                         </div>
@@ -1061,7 +1199,7 @@ export default function FriendDetails() {
                         <div className="flex flex-col flex-1 px-5 pt-8">
                             {/* Summary */}
                             <div className="flex items-center gap-3 mb-8">
-                                <div className="w-10 h-10 rounded-full bg-[#108c73] flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center">
                                     <Banknote className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
@@ -1074,16 +1212,16 @@ export default function FriendDetails() {
                             <button
                                 onClick={() => handleCashSettle(false)}
                                 disabled={isSettling}
-                                className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#108c73] bg-[#f0faf7] hover:bg-[#e5f7f2] transition mb-4 disabled:opacity-50"
+                                className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-slate-900 bg-slate-50 hover:bg-slate-200 transition mb-4 disabled:opacity-50"
                             >
                                 <div className="flex items-center gap-3">
-                                    <CheckCircle2 className="w-6 h-6 text-[#108c73]" />
+                                    <CheckCircle2 className="w-6 h-6 text-slate-900" />
                                     <div className="text-left">
                                         <p className="text-[15px] font-bold text-gray-800">Full settlement</p>
                                         <p className="text-[13px] text-gray-500">Pay the entire balance</p>
                                     </div>
                                 </div>
-                                <span className="text-[17px] font-bold text-[#108c73]">${Math.abs(balance).toFixed(2)}</span>
+                                <span className="text-[17px] font-bold text-slate-900">${Math.abs(balance).toFixed(2)}</span>
                             </button>
 
                             {/* Divider */}
@@ -1096,7 +1234,7 @@ export default function FriendDetails() {
                             {/* Partial input */}
                             <div className="mt-4">
                                 <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay</label>
-                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-[#108c73] rounded-xl px-4 py-3 transition bg-white">
+                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-slate-900 rounded-xl px-4 py-3 transition bg-white">
                                     <DollarSign className="w-5 h-5 text-gray-400 flex-shrink-0" />
                                     <input
                                         type="number"
@@ -1115,7 +1253,7 @@ export default function FriendDetails() {
                             <button
                                 onClick={() => handleCashSettle(true)}
                                 disabled={isSettling || !partialAmount || parseFloat(partialAmount) <= 0}
-                                className="mt-6 w-full bg-[#108c73] text-white py-4 rounded-2xl text-[16px] font-bold shadow-md hover:bg-[#0d7a63] transition disabled:opacity-40"
+                                className="mt-6 w-full bg-slate-900 text-white py-4 rounded-2xl text-[16px] font-bold shadow-md hover:bg-slate-950 transition disabled:opacity-40"
                             >
                                 {isSettling ? 'Recording...' : 'Pay with Cash'}
                             </button>

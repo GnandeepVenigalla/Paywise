@@ -40,9 +40,9 @@ export default function ForgotPassword() {
 
                 {error && <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center font-medium">{error}</div>}
                 {success && (
-                    <div className="mb-6 bg-teal-50 border border-teal-100 p-4 rounded-xl text-center">
-                        <CheckCircle2 className="w-8 h-8 text-teal-500 mx-auto mb-2" />
-                        <p className="text-sm text-teal-800 font-medium">{success}</p>
+                    <div className="mb-6 bg-slate-50 border border-slate-100 p-4 rounded-xl text-center">
+                        <CheckCircle2 className="w-8 h-8 text-slate-800 mx-auto mb-2" />
+                        <p className="text-sm text-slate-950 font-medium">{success}</p>
                     </div>
                 )}
 
@@ -54,7 +54,7 @@ export default function ForgotPassword() {
                             </div>
                             <input
                                 type="email"
-                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all outline-none"
+                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
                                 placeholder="Email address"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -65,7 +65,7 @@ export default function ForgotPassword() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all cursor-pointer"
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-950 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-800 transition-all cursor-pointer"
                         >
                             {isLoading ? 'Sending...' : 'Send Reset Link'}
                         </button>
@@ -73,7 +73,7 @@ export default function ForgotPassword() {
                 )}
 
                 <div className="mt-8 text-center">
-                    <Link to="/login" className="text-sm font-semibold text-teal-600 hover:text-teal-500 transition-colors">
+                    <Link to="/login" className="text-sm font-semibold text-slate-900 hover:text-slate-800 transition-colors">
                         Back to login
                     </Link>
                 </div>

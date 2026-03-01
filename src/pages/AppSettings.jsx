@@ -4,7 +4,8 @@ import { AuthContext } from '../context/AuthContext';
 import {
     ChevronLeft, ChevronRight, DollarSign, SplitSquareHorizontal,
     Sun, Moon, Monitor, Eye, EyeOff, Clock, Globe, Lock,
-    Trash2, HardDrive, UserCheck, UserX, Fingerprint, Check
+    Trash2, HardDrive, UserCheck, UserX, Fingerprint, Check,
+    Share2, Loader2
 } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
@@ -44,6 +45,22 @@ export default function AppSettings() {
     const [saved, setSaved] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteInput, setDeleteInput] = useState('');
+    const [migrationLoading, setMigrationLoading] = useState(false);
+
+    const handleMigrationInit = async () => {
+        setMigrationLoading(true);
+        try {
+            const res = await api.get('/splitwise/auth-url');
+            if (res.data.url) {
+                window.location.href = res.data.url;
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Failed to connect to Splitwise. Please try again later.');
+        } finally {
+            setMigrationLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (user?.appSettings) {
@@ -75,6 +92,80 @@ export default function AppSettings() {
         }
     };
 
+    const handleBiometricToggle = async (enabled) => {
+        if (!enabled) {
+            update('biometricLock', false);
+            return;
+        }
+
+        // Feature detection
+        if (!window.PublicKeyCredential) {
+            alert("Biometrics are not supported on this browser/device.");
+            return;
+        }
+
+        try {
+            // Check if we are on an IP address (WebAuthn requires a domain or localhost)
+            const hostname = window.location.hostname;
+            const isIP = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(hostname);
+            if (isIP && hostname !== '127.0.0.1' && hostname !== 'localhost') {
+                alert("Security Restriction: Biometrics (WebAuthn) do not work on IP addresses. Please use 'localhost' or a real domain name (via deployment).");
+                return;
+            }
+
+            // Check if biometrics are even available
+            const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+            if (!available) {
+                alert("No biometric hardware (like Face ID or Fingerprint) was found or enabled for this browser.");
+                return;
+            }
+
+            // Simple WebAuthn registration
+            const challenge = new Uint8Array(32);
+            window.crypto.getRandomValues(challenge);
+
+            const userID = new TextEncoder().encode(user.id || user._id);
+
+            const options = {
+                publicKey: {
+                    challenge,
+                    rp: { name: "Paywise" },
+                    user: {
+                        id: userID,
+                        name: user.email,
+                        displayName: user.username
+                    },
+                    pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+                    authenticatorSelection: {
+                        authenticatorAttachment: "platform",
+                        userVerification: "required"
+                    },
+                    timeout: 60000,
+                    attestation: "none"
+                }
+            };
+
+            const credential = await navigator.credentials.create(options);
+
+            if (credential) {
+                // If we get here, the user successfully scanned their biometric
+                setSettings(prev => ({
+                    ...prev,
+                    biometricLock: true,
+                    biometricCredentialId: credential.id
+                }));
+                alert("Biometric lock enabled! Your Face ID/Fingerprint is now linked.");
+            }
+        } catch (err) {
+            console.error(err);
+            if (err.name === 'NotAllowedError') {
+                // User cancelled or timed out
+            } else {
+                alert("Failed to setup biometrics. Make sure your device supports it.");
+            }
+        }
+    };
+
     const handleClearCache = () => {
         localStorage.removeItem('paywise_cache');
         alert('Cache cleared successfully!');
@@ -84,7 +175,7 @@ export default function AppSettings() {
     const Toggle = ({ value, onChange }) => (
         <button
             onClick={() => onChange(!value)}
-            className={`relative w-[51px] h-[31px] rounded-full transition-colors duration-200 flex-shrink-0 ${value ? 'bg-[#108c73]' : 'bg-gray-300'}`}
+            className={`relative w-[51px] h-[31px] rounded-full transition-colors duration-200 flex-shrink-0 ${value ? 'bg-slate-900' : 'bg-gray-300'}`}
         >
             <div className={`absolute top-[3px] w-[25px] h-[25px] bg-white rounded-full shadow transition-transform duration-200 ${value ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
         </button>
@@ -122,7 +213,7 @@ export default function AppSettings() {
                 <button
                     onClick={handleSave}
                     disabled={saving}
-                    className={`ml-auto text-[16px] font-bold transition ${saved ? 'text-[#108c73]' : 'text-[#108c73] hover:opacity-70'} disabled:opacity-50`}
+                    className={`ml-auto text-[16px] font-bold transition ${saved ? 'text-slate-900' : 'text-slate-900 hover:opacity-70'} disabled:opacity-50`}
                 >
                     {saved ? <span className="flex items-center gap-1"><Check className="w-5 h-5" />Saved</span> : saving ? 'Saving…' : 'Save'}
                 </button>
@@ -130,7 +221,7 @@ export default function AppSettings() {
 
             {/* ── 1. Financial Customization ─────────────────── */}
             <SectionHeader
-                icon={<DollarSign className="w-4 h-4 text-[#108c73]" />}
+                icon={<DollarSign className="w-4 h-4 text-slate-900" />}
                 title="Financial Customization"
                 color="bg-[#e6f7f3]"
             />
@@ -143,13 +234,13 @@ export default function AppSettings() {
                             <button
                                 key={opt.value}
                                 onClick={() => update('defaultSplitMethod', opt.value)}
-                                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition text-left ${settings.defaultSplitMethod === opt.value ? 'border-[#108c73] bg-[#f0faf7]' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}
+                                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition text-left ${settings.defaultSplitMethod === opt.value ? 'border-slate-900 bg-slate-50' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}
                             >
-                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${settings.defaultSplitMethod === opt.value ? 'border-[#108c73] bg-[#108c73]' : 'border-gray-300'}`}>
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${settings.defaultSplitMethod === opt.value ? 'border-slate-900 bg-slate-900' : 'border-gray-300'}`}>
                                     {settings.defaultSplitMethod === opt.value && <div className="w-2 h-2 bg-white rounded-full" />}
                                 </div>
                                 <div>
-                                    <p className={`text-[15px] font-semibold ${settings.defaultSplitMethod === opt.value ? 'text-[#108c73]' : 'text-gray-700'}`}>{opt.label}</p>
+                                    <p className={`text-[15px] font-semibold ${settings.defaultSplitMethod === opt.value ? 'text-slate-900' : 'text-gray-700'}`}>{opt.label}</p>
                                     <p className="text-[12px] text-gray-400">{opt.desc}</p>
                                 </div>
                             </button>
@@ -161,7 +252,7 @@ export default function AppSettings() {
                 <div className="px-5 py-4">
                     <p className="text-[16px] font-medium text-gray-800 mb-1">Monthly Budget</p>
                     <p className="text-[13px] text-gray-400 mb-3">If you spend more than this, your dashboard balance will turn orange as a warning.</p>
-                    <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-[#108c73] rounded-xl px-4 py-3 transition bg-white">
+                    <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-slate-900 rounded-xl px-4 py-3 transition bg-white">
                         <span className="text-gray-400 text-[18px] font-bold">$</span>
                         <input
                             type="number"
@@ -191,10 +282,10 @@ export default function AppSettings() {
                             <button
                                 key={value}
                                 onClick={() => update('theme', value)}
-                                className={`flex flex-col items-center gap-2 py-3 rounded-xl border-2 transition ${settings.theme === value ? 'border-[#108c73] bg-[#f0faf7]' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}
+                                className={`flex flex-col items-center gap-2 py-3 rounded-xl border-2 transition ${settings.theme === value ? 'border-slate-900 bg-slate-50' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}
                             >
-                                <Icon className={`w-5 h-5 ${settings.theme === value ? 'text-[#108c73]' : 'text-gray-500'}`} />
-                                <span className={`text-[13px] font-semibold ${settings.theme === value ? 'text-[#108c73]' : 'text-gray-600'}`}>{label}</span>
+                                <Icon className={`w-5 h-5 ${settings.theme === value ? 'text-slate-900' : 'text-gray-500'}`} />
+                                <span className={`text-[13px] font-semibold ${settings.theme === value ? 'text-slate-900' : 'text-gray-600'}`}>{label}</span>
                             </button>
                         ))}
                     </div>
@@ -218,7 +309,7 @@ export default function AppSettings() {
                             <button
                                 key={fmt}
                                 onClick={() => update('dateFormat', fmt)}
-                                className={`text-[12px] font-bold px-3 py-1.5 rounded-lg border-2 transition ${settings.dateFormat === fmt ? 'border-[#108c73] bg-[#f0faf7] text-[#108c73]' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                className={`text-[12px] font-bold px-3 py-1.5 rounded-lg border-2 transition ${settings.dateFormat === fmt ? 'border-slate-900 bg-slate-50 text-slate-900' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                             >
                                 {fmt}
                             </button>
@@ -236,7 +327,7 @@ export default function AppSettings() {
                             <button
                                 key={v}
                                 onClick={() => update('timeFormat', v)}
-                                className={`text-[13px] font-bold px-4 py-1.5 rounded-lg border-2 transition ${settings.timeFormat === v ? 'border-[#108c73] bg-[#f0faf7] text-[#108c73]' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                className={`text-[13px] font-bold px-4 py-1.5 rounded-lg border-2 transition ${settings.timeFormat === v ? 'border-slate-900 bg-slate-50 text-slate-900' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                             >
                                 {l}
                             </button>
@@ -262,9 +353,9 @@ export default function AppSettings() {
 
             {/* ── 3. Privacy & Social ──────────────────────────── */}
             <SectionHeader
-                icon={<Eye className="w-4 h-4 text-indigo-600" />}
+                icon={<Eye className="w-4 h-4 text-slate-900" />}
                 title="Privacy & Social"
-                color="bg-indigo-50"
+                color="bg-slate-50"
             />
             <div className="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <ToggleRow
@@ -299,12 +390,42 @@ export default function AppSettings() {
                     label="Biometric Lock"
                     sub="Require Face ID, fingerprint, or PIN every time the app is opened"
                     value={settings.biometricLock}
-                    onChange={v => update('biometricLock', v)}
+                    onChange={v => handleBiometricToggle(v)}
                     last
                 />
             </div>
 
-            {/* ── 5. Data & Account Management ─────────────────── */}
+            {/* ── 5. Integrations ──────────────────────────── */}
+            <SectionHeader
+                icon={<Share2 className="w-4 h-4 text-emerald-500" />}
+                title="Integrations"
+                color="bg-emerald-50"
+            />
+            <div className="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+                <button
+                    onClick={handleMigrationInit}
+                    disabled={migrationLoading || user?.splitwiseMigrationStatus === 'completed'}
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition disabled:opacity-70"
+                >
+                    <div className="text-left flex-1 pr-4">
+                        <p className="text-[16px] font-medium text-gray-800">Splitwise Migration</p>
+                        <p className="text-[13px] text-gray-400 mt-0.5 leading-snug">
+                            {user?.splitwiseMigrationStatus === 'completed'
+                                ? 'Data migration already completed successfully'
+                                : 'Import your groups and expenses from Splitwise'}
+                        </p>
+                    </div>
+                    {migrationLoading ? (
+                        <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+                    ) : user?.splitwiseMigrationStatus === 'completed' ? (
+                        <div className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest">Done</div>
+                    ) : (
+                        <ChevronRight className="w-5 h-5 text-gray-300" />
+                    )}
+                </button>
+            </div>
+
+            {/* ── 6. Data & Account Management ─────────────────── */}
             <SectionHeader
                 icon={<HardDrive className="w-4 h-4 text-gray-500" />}
                 title="Data & Account Management"
@@ -338,7 +459,7 @@ export default function AppSettings() {
                 <button
                     onClick={handleSave}
                     disabled={saving}
-                    className={`w-full py-4 rounded-2xl text-[16px] font-bold shadow-sm transition ${saved ? 'bg-[#108c73] text-white' : 'bg-[#108c73] text-white hover:bg-[#0d7a63]'} disabled:opacity-50`}
+                    className={`w-full py-4 rounded-2xl text-[16px] font-bold shadow-sm transition ${saved ? 'bg-slate-900 text-white' : 'bg-slate-900 text-white hover:bg-slate-950'} disabled:opacity-50`}
                 >
                     {saved ? '✓ Settings Saved!' : saving ? 'Saving…' : 'Save Settings'}
                 </button>

@@ -34,7 +34,7 @@ export default function JoinGroup() {
                 <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-sm w-full">
                     <h2 className="text-xl font-bold text-gray-900 mb-2">Oops!</h2>
                     <p className="text-gray-500 mb-6">{error}</p>
-                    <button onClick={() => navigate('/')} className="w-full bg-teal-600 text-white font-bold py-3 rounded-xl">Go Home</button>
+                    <button onClick={() => navigate('/')} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl">Go Home</button>
                 </div>
             </div>
         );
@@ -43,7 +43,7 @@ export default function JoinGroup() {
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-5">
             <div className="animate-pulse flex flex-col items-center">
-                <div className="w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mb-4"></div>
+                <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin mb-4"></div>
                 <p className="font-bold text-gray-600">Joining group...</p>
             </div>
         </div>

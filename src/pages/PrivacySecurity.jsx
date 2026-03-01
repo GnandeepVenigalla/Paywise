@@ -16,8 +16,8 @@ export default function PrivacySecurity() {
 
             <main className="max-w-3xl mx-auto px-5 pt-8">
                 <div className="text-center mb-10">
-                    <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
-                        <Shield className="w-8 h-8 text-teal-600" />
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+                        <Shield className="w-8 h-8 text-slate-900" />
                     </div>
                     <h2 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">How we protect your data</h2>
                     <p className="text-gray-500 text-[15px] max-w-lg mx-auto leading-relaxed">
@@ -27,7 +27,7 @@ export default function PrivacySecurity() {
 
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
                     <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <Eye className="w-5 h-5 text-teal-600" />
+                        <Eye className="w-5 h-5 text-slate-900" />
                         1. Information We Collect
                     </h3>
                     <div className="space-y-4 text-[15px] text-gray-600 leading-relaxed">
@@ -44,7 +44,7 @@ export default function PrivacySecurity() {
 
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
                     <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <Lock className="w-5 h-5 text-teal-600" />
+                        <Lock className="w-5 h-5 text-slate-900" />
                         2. How We Secure Your Information
                     </h3>
                     <div className="space-y-4 text-[15px] text-gray-600 leading-relaxed">
@@ -62,7 +62,7 @@ export default function PrivacySecurity() {
 
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-8">
                     <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-teal-600" />
+                        <FileText className="w-5 h-5 text-slate-900" />
                         3. Does Paywise Share Your Information?
                     </h3>
                     <div className="space-y-4 text-[15px] text-gray-600 leading-relaxed">

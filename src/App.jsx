@@ -20,10 +20,12 @@ import PrivacySecurity from './pages/PrivacySecurity';
 import CurrencySettings from './pages/CurrencySettings';
 import AppSettings from './pages/AppSettings';
 import JoinGroup from './pages/JoinGroup';
+import SplitwiseCallback from './pages/SplitwiseCallback';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 import logoImg from './assets/logo.png';
 import { useAppSettings } from './hooks/useAppSettings';
+import BiometricGate from './components/BiometricGate';
 
 // Applies theme + high contrast to <html> globally
 function ThemeApplier() {
@@ -35,7 +37,7 @@ const PrivateRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+      <div className="fixed inset-0 bg-[#1e293b] flex flex-col items-center justify-center z-[100]">
         <div className="w-[110px] h-[110px] animate-pulse">
           <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
         </div>
@@ -51,32 +53,35 @@ function App() {
       <AuthProvider>
         <ThemeApplier />
         <div className="min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden bg-gray-50 text-gray-900 font-sans relative">
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/resetpassword/:resettoken" element={<ResetPassword />} />
-            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-            <Route path="/friends" element={<PrivateRoute><Friends /></PrivateRoute>} />
-            <Route path="/friend/:id" element={<PrivateRoute><FriendDetails /></PrivateRoute>} />
-            <Route path="/friend/:id/add" element={<PrivateRoute><AddFriendExpense /></PrivateRoute>} />
-            <Route path="/friend/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
-            <Route path="/friend/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
-            <Route path="/activity" element={<PrivateRoute><Activity /></PrivateRoute>} />
-            <Route path="/account" element={<PrivateRoute><Account /></PrivateRoute>} />
-            <Route path="/account/settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
-            <Route path="/account/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
-            <Route path="/account/privacy" element={<PrivateRoute><PrivacySecurity /></PrivateRoute>} />
-            <Route path="/account/currency" element={<PrivateRoute><CurrencySettings /></PrivateRoute>} />
-            <Route path="/account/app-settings" element={<PrivateRoute><AppSettings /></PrivateRoute>} />
-            <Route path="/invite" element={<PrivateRoute><InviteFriend /></PrivateRoute>} />
-            <Route path="/join/:id" element={<JoinGroup />} />
-            <Route path="/group/:id" element={<PrivateRoute><GroupDetails /></PrivateRoute>} />
-            <Route path="/group/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
-            <Route path="/group/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
-            <Route path="/group/:id/add" element={<PrivateRoute><AddExpense /></PrivateRoute>} />
-            <Route path="/" element={<Navigate to="/dashboard" />} />
-          </Routes>
+          <BiometricGate>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/resetpassword/:resettoken" element={<ResetPassword />} />
+              <Route path="/splitwise-callback" element={<PrivateRoute><SplitwiseCallback /></PrivateRoute>} />
+              <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+              <Route path="/friends" element={<PrivateRoute><Friends /></PrivateRoute>} />
+              <Route path="/friend/:id" element={<PrivateRoute><FriendDetails /></PrivateRoute>} />
+              <Route path="/friend/:id/add" element={<PrivateRoute><AddFriendExpense /></PrivateRoute>} />
+              <Route path="/friend/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
+              <Route path="/friend/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
+              <Route path="/activity" element={<PrivateRoute><Activity /></PrivateRoute>} />
+              <Route path="/account" element={<PrivateRoute><Account /></PrivateRoute>} />
+              <Route path="/account/settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
+              <Route path="/account/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
+              <Route path="/account/privacy" element={<PrivateRoute><PrivacySecurity /></PrivateRoute>} />
+              <Route path="/account/currency" element={<PrivateRoute><CurrencySettings /></PrivateRoute>} />
+              <Route path="/account/app-settings" element={<PrivateRoute><AppSettings /></PrivateRoute>} />
+              <Route path="/invite" element={<PrivateRoute><InviteFriend /></PrivateRoute>} />
+              <Route path="/join/:id" element={<JoinGroup />} />
+              <Route path="/group/:id" element={<PrivateRoute><GroupDetails /></PrivateRoute>} />
+              <Route path="/group/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
+              <Route path="/group/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
+              <Route path="/group/:id/add" element={<PrivateRoute><AddExpense /></PrivateRoute>} />
+              <Route path="/" element={<Navigate to="/dashboard" />} />
+            </Routes>
+          </BiometricGate>
         </div>
       </AuthProvider>
     </Router>

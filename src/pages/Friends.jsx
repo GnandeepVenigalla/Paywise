@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, Users, Search, Plus, ArrowRight, ArrowLeft } from 'lucide-react';
+import { UserPlus, HeartHandshake, Search, Plus, ArrowRight, ArrowLeft } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 
@@ -71,11 +71,11 @@ export default function Friends() {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => setIsAddingMode(!isAddingMode)}
-                        className="p-2 rounded-full bg-teal-50 text-teal-600 hover:bg-teal-100 transition shadow-sm"
+                        className="p-2 rounded-full bg-slate-50 text-slate-900 hover:bg-slate-100 transition shadow-sm"
                     >
-                        {isAddingMode ? <Users className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
+                        {isAddingMode ? <HeartHandshake className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
                     </button>
-                    <Link to="/account" className="w-9 h-9 rounded-full bg-teal-100 border-2 border-teal-50 text-teal-700 flex items-center justify-center font-bold text-lg uppercase shadow-sm border-l-gray-200 ml-1 cursor-pointer hover:bg-teal-200 transition">
+                    <Link to="/account" className="w-9 h-9 rounded-full bg-slate-100 border-2 border-slate-50 text-slate-950 flex items-center justify-center font-bold text-lg uppercase shadow-sm border-l-gray-200 ml-1 cursor-pointer hover:bg-slate-200 transition">
                         {user?.username?.charAt(0) || 'U'}
                     </Link>
                 </div>
@@ -92,7 +92,7 @@ export default function Friends() {
                                 value={searchQuery}
                                 onChange={handleSearch}
                                 placeholder="Search by email or username..."
-                                className="w-full bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-4 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none shadow-sm"
+                                className="w-full bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-4 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm"
                                 autoFocus
                             />
                         </div>
@@ -102,7 +102,7 @@ export default function Friends() {
                                 searchResults.map(result => (
                                     <div key={result._id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center font-bold uppercase">
+                                            <div className="w-10 h-10 bg-slate-100 text-slate-950 rounded-full flex items-center justify-center font-bold uppercase">
                                                 {result.username.charAt(0)}
                                             </div>
                                             <div>
@@ -112,7 +112,7 @@ export default function Friends() {
                                         </div>
                                         <button
                                             onClick={() => handleAddFriend(result._id)}
-                                            className="px-3 py-1.5 bg-teal-50 text-teal-600 rounded-lg text-sm font-bold hover:bg-teal-100 transition"
+                                            className="px-3 py-1.5 bg-slate-50 text-slate-900 rounded-lg text-sm font-bold hover:bg-slate-100 transition"
                                         >
                                             Add
                                         </button>
@@ -126,7 +126,7 @@ export default function Friends() {
                 ) : (
                     <>
                         {loading ? (
-                            <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+                            <div className="fixed inset-0 bg-[#1e293b] flex flex-col items-center justify-center z-[100]">
                                 <div className="w-[110px] h-[110px] animate-pulse">
                                     <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
                                 </div>
@@ -134,18 +134,18 @@ export default function Friends() {
                         ) : friends.length === 0 ? (
                             <div className="flex flex-col items-center justify-center mt-32">
                                 <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6 text-gray-400">
-                                    <Users className="w-12 h-12" />
+                                    <HeartHandshake className="w-12 h-12" />
                                 </div>
                                 <h2 className="text-xl font-bold text-gray-800 mb-2">No friends yet</h2>
                                 <p className="text-gray-500 text-center text-sm px-8 leading-relaxed max-w-sm">Search the app and add friends to split bills instantly without making a group.</p>
                                 <button
                                     onClick={() => setIsAddingMode(true)}
-                                    className="mt-8 font-bold bg-teal-600 text-white rounded-xl py-4 px-10 shadow-md hover:bg-teal-700 transition"
+                                    className="mt-8 font-bold bg-slate-900 text-white rounded-xl py-4 px-10 shadow-md hover:bg-slate-950 transition"
                                 >
                                     Find a Friend
                                 </button>
                                 <p className="text-xs text-gray-400 mt-6 uppercase tracking-wider font-semibold">Or share an invite link</p>
-                                <Link to="/invite" className="mt-2 text-sm text-teal-600 hover:text-teal-700 font-bold transition flex items-center gap-1">
+                                <Link to="/invite" className="mt-2 text-sm text-slate-900 hover:text-slate-950 font-bold transition flex items-center gap-1">
                                     Invite outside Paywise <ArrowRight className="w-4 h-4" />
                                 </Link>
                             </div>
@@ -156,11 +156,11 @@ export default function Friends() {
                                     <Link
                                         to={`/friend/${friend.id}`}
                                         key={friend.id}
-                                        className="block bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-teal-100 transition-all group"
+                                        className="block bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100 transition-all group"
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center font-bold text-lg uppercase group-hover:scale-105 transition">
+                                                <div className="w-12 h-12 bg-slate-50 text-slate-900 rounded-full flex items-center justify-center font-bold text-lg uppercase group-hover:scale-105 transition">
                                                     {friend.username.charAt(0)}
                                                 </div>
                                                 <div>
@@ -170,7 +170,7 @@ export default function Friends() {
                                             </div>
                                             <div className="text-right flex flex-col items-end">
                                                 {friend.balance > 0 ? (
-                                                    <p className="font-bold text-teal-600">owes you ${friend.balance.toFixed(2)}</p>
+                                                    <p className="font-bold text-emerald-500">owes you ${friend.balance.toFixed(2)}</p>
                                                 ) : friend.balance < 0 ? (
                                                     <p className="font-bold text-rose-600">you owe ${Math.abs(friend.balance).toFixed(2)}</p>
                                                 ) : (
