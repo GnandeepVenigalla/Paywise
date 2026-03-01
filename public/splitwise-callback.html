@@ -141,14 +141,14 @@
 
     <script>
         var PAYWISE_HOME = 'https://gnandeepvenigalla.github.io/Paywise/#/dashboard';
-        var API_BASE     = 'https://paywise-backend-lemon.vercel.app/api';
+        var API_BASE = 'https://paywise-backend-lemon.vercel.app/api';
         var REDIRECT_URI = 'https://gnandeepvenigalla.github.io/Paywise/splitwise-callback.html';
 
         function setState(type, title, body, extra) {
             var card = document.getElementById('card');
             var icon = type === 'loading' ? '<div class="spinner"></div>'
-                     : type === 'success' ? '✅'
-                     : '❌';
+                : type === 'success' ? '✅'
+                    : '❌';
             card.innerHTML =
                 '<div class="icon ' + type + '">' + icon + '</div>' +
                 '<h2>' + title + '</h2>' +
@@ -161,10 +161,17 @@
         var code = params.get('code');
 
         if (!code) {
-            // No code – user visited the page directly without OAuth
+            // No code – show debug info to understand what Splitwise returned
+            var error = params.get('error');
+            var errorDesc = params.get('error_description');
+            var allParams = window.location.search || '(no URL params received)';
+            var debugMsg = error
+                ? 'Splitwise returned error: <strong>' + error + '</strong>' + (errorDesc ? ' — ' + errorDesc : '')
+                : 'No code received. URL params: <code>' + allParams + '</code><br/>Full URL: <code style="font-size:10px;word-break:break-all">' + window.location.href + '</code>';
+
             setState('error',
-                'No Authorization Code',
-                'This page is only accessible after authorizing Paywise on Splitwise. Please go back and try again.',
+                'Authorization Failed',
+                debugMsg,
                 '<a href="' + PAYWISE_HOME + '" class="btn">Back to Paywise</a>'
             );
         } else {
@@ -188,30 +195,30 @@
                     },
                     body: JSON.stringify({ code: code, redirectUri: REDIRECT_URI })
                 })
-                .then(function(res) { return res.json(); })
-                .then(function(data) {
-                    if (data.groupsCount !== undefined || data.msg === 'Migration successful') {
-                        var stats = '<div class="stat">✅ ' + (data.groupsCount || 0) + ' groups · ' + (data.expensesCount || 0) + ' expenses imported</div>';
-                        setState('success',
-                            'Migration Complete! 🎉',
-                            'Your Splitwise data is now in Paywise.',
-                            stats + '<a href="' + PAYWISE_HOME + '" class="btn">View Dashboard</a>'
-                        );
-                    } else {
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data.groupsCount !== undefined || data.msg === 'Migration successful') {
+                            var stats = '<div class="stat">✅ ' + (data.groupsCount || 0) + ' groups · ' + (data.expensesCount || 0) + ' expenses imported</div>';
+                            setState('success',
+                                'Migration Complete! 🎉',
+                                'Your Splitwise data is now in Paywise.',
+                                stats + '<a href="' + PAYWISE_HOME + '" class="btn">View Dashboard</a>'
+                            );
+                        } else {
+                            setState('error',
+                                'Migration Failed',
+                                data.msg || 'An unexpected error occurred. Please try again.',
+                                '<a href="' + PAYWISE_HOME + '" class="btn">Back to Paywise</a>'
+                            );
+                        }
+                    })
+                    .catch(function (err) {
                         setState('error',
-                            'Migration Failed',
-                            data.msg || 'An unexpected error occurred. Please try again.',
-                            '<a href="' + PAYWISE_HOME + '" class="btn">Back to Paywise</a>'
+                            'Connection Error',
+                            'Could not reach the Paywise server. Please try again.',
+                            '<a href="' + PAYWISE_HOME + '" class="btn secondary">Back to Paywise</a>'
                         );
-                    }
-                })
-                .catch(function(err) {
-                    setState('error',
-                        'Connection Error',
-                        'Could not reach the Paywise server. Please try again.',
-                        '<a href="' + PAYWISE_HOME + '" class="btn secondary">Back to Paywise</a>'
-                    );
-                });
+                    });
             }
         }
     </script>
