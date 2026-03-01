@@ -4,13 +4,17 @@ import { AuthContext } from '../context/AuthContext';
 import { ArrowLeft, UserPlus, Receipt, CreditCard, Camera, Trash2, X, Edit2, LogOut, Check, Settings, Calendar, Users, Scale, Link2, User, Plane, Home, Heart, ClipboardList, Share, Copy, Link as LinkIcon, Link2Off, Expand, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2 } from 'lucide-react';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
-import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
+import { useAppSettings } from '../hooks/useAppSettings';
+import { useMonthlySpending } from '../hooks/useMonthlySpending';
+import ExpenseItem from '../components/UI/ExpenseItem';
+import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS, convertAmount } from '../utils/formatters';
+import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, toggleItemAssignment } from '../utils/expenseUtils';
 export default function GroupDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { api, user } = useContext(AuthContext);
+    const currSym = CURRENCY_SYMBOLS[user?.defaultCurrency || 'USD'] || '$';
     const { hideBalance } = useAppSettings();
-    const currSym = getCurrencySymbol(user?.defaultCurrency || 'USD');
     const [group, setGroup] = useState(null);
     const [expenses, setExpenses] = useState([]);
     const [balances, setBalances] = useState({});
@@ -58,43 +62,8 @@ export default function GroupDetails() {
     const [reminderEmailBody, setReminderEmailBody] = useState('');
 
 
-    const monthlySpending = useMemo(() => {
-        if (!expenses || expenses.length === 0) return [];
-
-        const monthMap = {};
-
-        expenses.forEach(exp => {
-            if (exp.description && exp.description.toLowerCase().includes('payment')) return; // Typically omit payments
-
-            const d = new Date(exp.date);
-            const key = `${d.getFullYear()}-${("0" + (d.getMonth() + 1)).slice(-2)}`;
-            const monthLabel = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            const shortMonth = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-
-            if (!monthMap[key]) {
-                monthMap[key] = {
-                    key,
-                    label: monthLabel,
-                    shortMonth,
-                    totalSpent: 0,
-                    userShare: 0,
-                    timestamp: new Date(d.getFullYear(), d.getMonth(), 1).getTime(),
-                    expensesList: []
-                };
-            }
-
-            monthMap[key].totalSpent += exp.amount;
-            monthMap[key].expensesList.push(exp);
-
-            const userSplit = exp.splits.find(s => (s.user._id || s.user) === user.id || (s.user._id || s.user) === user._id);
-            if (userSplit) {
-                monthMap[key].userShare += userSplit.amount;
-            }
-        });
-
-        const sorted = Object.values(monthMap).sort((a, b) => a.timestamp - b.timestamp);
-        return sorted; // Oldest first, newest last. So index = length - 1 is the latest
-    }, [expenses, user]);
+    // Extract monthly spending aggregation logic to custom hook
+    const monthlySpending = useMonthlySpending(expenses, user);
 
     useEffect(() => {
         if (monthlySpending.length > 0) {
@@ -103,31 +72,37 @@ export default function GroupDetails() {
     }, [monthlySpending]);
 
     const pairwiseBalances = useMemo(() => {
-        if (!group?.members || !expenses) return {};
+        if (!group?.members || !expenses || !user) return {};
         let pairwise = {};
         const allAssociatedMembers = [...(group.members || []), ...(group.pastMembers || [])];
 
         allAssociatedMembers.forEach(m => {
-            pairwise[m._id] = {};
+            const mId = String(m._id || m);
+            pairwise[mId] = {};
             allAssociatedMembers.forEach(other => {
-                if (m._id !== other._id) pairwise[m._id][other._id] = 0;
+                const otherId = String(other._id || other);
+                if (mId !== otherId) pairwise[mId][otherId] = 0;
             });
         });
 
         expenses.forEach(exp => {
-            const creditorId = exp.paidBy._id || exp.paidBy;
+            const creditorId = String(exp.paidBy?._id || exp.paidBy);
+            const sourceCurr = exp.currency || 'USD';
+            const targetCurr = user?.defaultCurrency || 'USD';
             exp.splits.forEach(split => {
-                const debtorId = split.user._id || split.user;
+                const debtorId = String(split.user?._id || split.user);
                 if (debtorId !== creditorId && pairwise[debtorId] && pairwise[debtorId][creditorId] !== undefined) {
-                    pairwise[debtorId][creditorId] += split.amount;
+                    const convertedAmount = convertAmount(split.amount, sourceCurr, targetCurr);
+                    pairwise[debtorId][creditorId] += convertedAmount;
                 }
             });
         });
 
-        for (let i = 0; i < allAssociatedMembers.length; i++) {
-            for (let j = i + 1; j < allAssociatedMembers.length; j++) {
-                const a = allAssociatedMembers[i]._id;
-                const b = allAssociatedMembers[j]._id;
+        const memberIds = allAssociatedMembers.map(m => String(m._id || m));
+        for (let i = 0; i < memberIds.length; i++) {
+            for (let j = i + 1; j < memberIds.length; j++) {
+                const a = memberIds[i];
+                const b = memberIds[j];
                 const aOwesB = pairwise[a][b] || 0;
                 const bOwesA = pairwise[b][a] || 0;
                 if (aOwesB > bOwesA) {
@@ -140,7 +115,7 @@ export default function GroupDetails() {
             }
         }
         return pairwise;
-    }, [group, expenses]);
+    }, [group, expenses, user]);
 
     const formatName = (username) => {
         if (!username) return 'Unknown';
@@ -178,33 +153,13 @@ export default function GroupDetails() {
         setIsSavingEdit(true);
 
         // Recalculate splits if items exist
-        let calculatedSplits = null;
-        if (editItems.length > 0) {
-            const userSplits = {};
-            editItems.forEach(item => {
-                if (item.assignedTo && item.assignedTo.length > 0) {
-                    const splitAmount = item.price / item.assignedTo.length;
-                    item.assignedTo.forEach(member => {
-                        const mId = member._id || member;
-                        userSplits[mId] = (userSplits[mId] || 0) + splitAmount;
-                    });
-                }
-            });
-            calculatedSplits = Object.keys(userSplits).map(userId => ({
-                user: userId,
-                amount: userSplits[userId]
-            }));
-        }
+        const calculatedSplits = calculateSplitsFromItems(editItems);
 
         try {
             await api.put(`/expenses/${selectedExpense._id}`, {
                 description: editDescription,
                 amount: Number(editAmount),
-                items: editItems.map(i => ({
-                    name: i.name,
-                    price: i.price,
-                    assignedTo: i.assignedTo.map(u => u._id || u)
-                })),
+                items: normalizeItemsForSave(editItems),
                 splits: calculatedSplits || undefined
             });
             setIsEditingExpense(false);
@@ -222,24 +177,7 @@ export default function GroupDetails() {
             return;
         }
 
-        setEditItems(prev => prev.map(item => {
-            if (item._id === itemId || item.id === itemId) {
-                const itemAssignedIds = (item.assignedTo || []).map(u => u._id || u);
-                const allSelectedAreAssigned = selectedMemberIdsForEdit.every(id => itemAssignedIds.includes(id));
-
-                if (allSelectedAreAssigned && itemAssignedIds.length > 0) {
-                    const newAssigned = item.assignedTo.filter(u => !selectedMemberIdsForEdit.includes(u._id || u));
-                    return { ...item, assignedTo: newAssigned };
-                } else {
-                    const alreadyAssignedIds = new Set(itemAssignedIds);
-                    const membersToAdd = (group.members || []).filter(m =>
-                        selectedMemberIdsForEdit.includes(m._id) && !alreadyAssignedIds.has(m._id)
-                    );
-                    return { ...item, assignedTo: [...(item.assignedTo || []), ...membersToAdd] };
-                }
-            }
-            return item;
-        }));
+        setEditItems(prev => toggleItemAssignment(prev, itemId, selectedMemberIdsForEdit, group.members || []));
     };
 
     const toggleEditMemberSelection = (memberId) => {
@@ -433,7 +371,7 @@ export default function GroupDetails() {
                             <p className="text-[17px] font-bold text-gray-800">
                                 You are owed{' '}
                                 <span className={`text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                    {currSym}{myBalance.toFixed(2)}
+                                    {formatCurrency(myBalance, user?.defaultCurrency)}
                                 </span>
                                 {' '}overall
                             </p>
@@ -441,7 +379,7 @@ export default function GroupDetails() {
                             <p className="text-[17px] font-bold text-gray-800">
                                 You owe{' '}
                                 <span className={`text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                    {currSym}{Math.abs(myBalance).toFixed(2)}
+                                    {formatCurrency(myBalance, user?.defaultCurrency)}
                                 </span>
                                 {' '}overall
                             </p>
@@ -462,18 +400,18 @@ export default function GroupDetails() {
                                         {first && (
                                             <p className="text-[14px] text-gray-500">
                                                 {first.b > 0 ? (
-                                                    <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{first.b.toFixed(2)}</span></>
+                                                    <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(first.b, user?.defaultCurrency)}</span></>
                                                 ) : (
-                                                    <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(first.b).toFixed(2)}</span></>
+                                                    <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(first.b, user?.defaultCurrency)}</span></>
                                                 )}
                                             </p>
                                         )}
                                         {second && (
                                             <p className="text-[14px] text-gray-500">
                                                 {second.b > 0 ? (
-                                                    <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{second.b.toFixed(2)}</span></>
+                                                    <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(second.b, user?.defaultCurrency)}</span></>
                                                 ) : (
-                                                    <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(second.b).toFixed(2)}</span></>
+                                                    <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(second.b, user?.defaultCurrency)}</span></>
                                                 )}
                                             </p>
                                         )}
@@ -515,82 +453,40 @@ export default function GroupDetails() {
                             {(() => {
                                 let lastMonth = '';
                                 return displayItems.map(item => {
-                                    const dateObj = new Date(item.date);
-                                    let monthYear = dateObj.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-                                    const monthShort = dateObj.toLocaleDateString("en-US", { month: "short" });
-                                    const day = ("0" + dateObj.getDate()).slice(-2);
-
-                                    if (isNaN(dateObj.getTime())) {
-                                        monthYear = 'Unknown Date';
-                                    }
-
+                                    const monthYear = formatMonthYear(item.date);
                                     const showHeader = monthYear !== lastMonth;
                                     lastMonth = monthYear;
 
                                     const isSettleUp = item.description.toLowerCase() === 'settle up';
-                                    let amountColor, amountLabel, amountValue;
-                                    let subtitle = "";
+                                    const isPaidByMe = (item.paidBy?._id || item.paidBy) === (user?.id || user?._id);
 
-                                    if (isSettleUp) {
-                                        const payer = item.paidBy._id === user.id ? 'You' : item.paidBy.username;
-                                        const payeeId = item.splits[0]?.user?._id || item.splits[0]?.user;
-                                        const payeeUser = group.members?.find(m => m._id === payeeId)?.username || 'Someone';
-                                        const payee = payeeId === user.id ? 'You' : payeeUser;
-                                        // Special rendering for Settle Up
-                                        return (
-                                            <div key={item._id}>
-                                                {showHeader && <h4 className="text-[13px] font-bold text-gray-700 mt-6 mb-3">{monthYear}</h4>}
-                                                <div
-                                                    onClick={() => {
-                                                        setSelectedExpense(item);
-                                                        setIsEditingExpense(false);
-                                                        setEditDescription(item.description);
-                                                        setEditAmount(item.amount.toString());
-                                                        setEditItems(item.items || []);
-                                                        setSelectedMemberIdsForEdit([user.id]);
-                                                    }}
-                                                    className="flex items-center py-2.5 cursor-pointer hover:bg-gray-50 bg-white transition -mx-4 px-4 active:bg-gray-100"
-                                                >
-                                                    <div className="flex flex-col items-center justify-center min-w-[32px] opacity-70">
-                                                        <span className="text-gray-500 text-[11px] font-medium leading-none mb-0.5">{monthShort}</span>
-                                                        <span className="text-gray-500 text-[17px] font-light leading-none">{day}</span>
-                                                    </div>
-
-                                                    <div className="w-10 h-10 ml-3 flex items-center justify-center flex-shrink-0 relative">
-                                                        {/* Pure icon with lines mimicking UI screenshot */}
-                                                        <Scale className="w-8 h-8 text-slate-900" />
-                                                    </div>
-
-                                                    <div className="flex-1 min-w-0 px-3 py-1">
-                                                        <h4 className="font-medium text-gray-700 text-[14px] leading-tight truncate">{payer} paid {payee} ${item.amount.toFixed(2)}.</h4>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-
-                                    let paidAmount = item.amount;
-                                    const isPaidByMe = item.paidBy._id === user.id || item.paidBy._id === user._id;
-                                    subtitle = isPaidByMe ? `You paid $${paidAmount.toFixed(2)}` : `${item.paidBy.username} paid $${paidAmount.toFixed(2)}`;
+                                    // Calculate user's involvement for the component
+                                    let userSplit = 0;
+                                    const mySplit = item.splits?.find(s => (s.user._id || s.user) === (user.id || user._id));
 
                                     if (isPaidByMe) {
-                                        const mySplit = item.splits.find(s => s.user._id === user.id || s.user === user.id);
-                                        const splitAmt = mySplit ? (paidAmount - mySplit.amount) : paidAmount;
-                                        amountColor = splitAmt > 0 ? "text-emerald-500" : "text-gray-500";
-                                        amountLabel = splitAmt > 0 ? "you lent" : "not involved";
-                                        amountValue = splitAmt > 0 ? "$" + splitAmt.toFixed(2) : "";
+                                        // If I paid, userSplit is what OTHERS owe me (total - my share)
+                                        userSplit = item.amount - (mySplit ? mySplit.amount : 0);
                                     } else {
-                                        const mySplit = item.splits.find(s => s.user._id === user.id || s.user === user.id);
-                                        const splitAmt = mySplit ? mySplit.amount : 0;
-                                        amountColor = splitAmt > 0 ? "text-rose-600" : "text-gray-500";
-                                        amountLabel = splitAmt > 0 ? "you borrowed" : "not involved";
-                                        amountValue = splitAmt > 0 ? "$" + splitAmt.toFixed(2) : "";
+                                        // If someone else paid, userSplit is what I owe (my share, as negative)
+                                        userSplit = mySplit ? -mySplit.amount : 0;
                                     }
 
                                     return (
-                                        <div key={item._id}>
-                                            {showHeader && <h4 className="text-[13px] font-bold text-gray-700 mt-6 mb-3">{monthYear}</h4>}
-                                            <div
+                                        <div key={item._id || Math.random()}>
+                                            {showHeader && (
+                                                <div className="px-5 py-3 bg-gray-50/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50">
+                                                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">{monthYear}</span>
+                                                </div>
+                                            )}
+                                            <ExpenseItem
+                                                description={isSettleUp ? `${isPaidByMe ? 'You' : item.paidBy.username} settled up` : item.description}
+                                                amount={item.amount}
+                                                date={item.date}
+                                                payerName={isPaidByMe ? 'You' : (item.paidBy?.username || 'Someone')}
+                                                userSplit={userSplit}
+                                                targetCurrency={user?.defaultCurrency || 'USD'}
+                                                sourceCurrency={item.currency || 'USD'}
                                                 onClick={() => {
                                                     setSelectedExpense(item);
                                                     setIsEditingExpense(false);
@@ -598,32 +494,11 @@ export default function GroupDetails() {
                                                     setEditAmount(item.amount.toString());
                                                     setEditItems(item.items || []);
                                                     setSelectedMemberIdsForEdit([user.id]);
+                                                    // Note: GroupDetails might have a different modal name or state
+                                                    // In this file it seems to be handled by a generic setSelectedExpense(item) 
+                                                    // which triggers a modal.
                                                 }}
-                                                className="flex items-center py-2.5 cursor-pointer hover:bg-gray-50 bg-white transition -mx-4 px-4 active:bg-gray-100"
-                                            >
-                                                <div className="flex flex-col items-center justify-center min-w-[32px] opacity-70">
-                                                    <span className="text-gray-500 text-[11px] font-medium leading-none mb-0.5">{monthShort}</span>
-                                                    <span className="text-gray-500 text-[17px] font-light leading-none">{day}</span>
-                                                </div>
-
-                                                <div className={`w-10 h-10 ml-3 flex items-center justify-center flex-shrink-0 relative`}>
-                                                    <div className="bg-orange-50 w-10 h-10 flex items-center justify-center border border-orange-100 rounded-lg">
-                                                        <Receipt className="w-5 h-5 opacity-90 text-orange-600" />
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex-1 min-w-0 px-3">
-                                                    <h4 className="font-medium text-gray-800 text-[16px] leading-tight truncate">{item.description}</h4>
-                                                    <p className="text-[13px] text-gray-500 truncate mt-0.5">{subtitle}</p>
-                                                </div>
-
-                                                {amountValue && (
-                                                    <div className="text-right flex flex-col justify-center flex-shrink-0">
-                                                        <p className={`text-[11px] font-medium opacity-80 ${amountColor}`}>{amountLabel}</p>
-                                                        <p className={`text-[16px] leading-tight font-medium ${amountColor}`}>{amountValue}</p>
-                                                    </div>
-                                                )}
-                                            </div>
+                                            />
                                         </div>
                                     );
                                 });
@@ -764,7 +639,7 @@ export default function GroupDetails() {
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                <span className="font-bold text-gray-900">${item.price.toFixed(2)}</span>
+                                                                <span className="font-bold text-gray-900">{formatCurrency(item.price, user?.defaultCurrency, selectedExpense.currency)}</span>
                                                             </div>
                                                         );
                                                     })}
@@ -787,7 +662,7 @@ export default function GroupDetails() {
                                                 <Receipt className="w-8 h-8" />
                                             </div>
                                             <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
-                                            <p className="text-3xl font-bold text-slate-900 mt-2">${selectedExpense.amount.toFixed(2)}</p>
+                                            <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense.amount, user?.defaultCurrency, selectedExpense.currency)}</p>
                                             <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
                                             {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
                                                 <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
@@ -803,7 +678,7 @@ export default function GroupDetails() {
                                                         <span className="font-semibold text-gray-700 text-sm">
                                                             {split.user?._id === user.id ? 'You' : (split.user?.username || 'Someone')}
                                                         </span>
-                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">${split.amount.toFixed(2)}</span>
+                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split.amount, user?.defaultCurrency, selectedExpense.currency)}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -889,12 +764,12 @@ export default function GroupDetails() {
                                                     {b < 0 ? (
                                                         <>
                                                             <p className="text-[11px] font-medium text-rose-600 uppercase tracking-wide">owes</p>
-                                                            <p className="text-[19px] font-medium text-rose-600 leading-tight">${Math.abs(b).toFixed(2)}</p>
+                                                            <p className="text-[19px] font-medium text-rose-600 leading-tight">{formatCurrency(b, user?.defaultCurrency)}</p>
                                                         </>
                                                     ) : b > 0 ? (
                                                         <>
                                                             <p className="text-[11px] font-medium text-slate-900 uppercase tracking-wide">gets back</p>
-                                                            <p className="text-[19px] font-medium text-slate-900 leading-tight">${b.toFixed(2)}</p>
+                                                            <p className="text-[19px] font-medium text-slate-900 leading-tight">{formatCurrency(b, user?.defaultCurrency)}</p>
                                                         </>
                                                     ) : (
                                                         <p className="text-[15px] font-medium text-gray-400 mt-2">settled up</p>
@@ -985,7 +860,7 @@ export default function GroupDetails() {
                                         type="text"
                                         value={newGroupName}
                                         onChange={(e) => setNewGroupName(e.target.value)}
-                                        className="w-full text-[18px] text-gray-900 border-b border-gray-300 pb-1.5 focus:border-slate-900 focus:border-b-2 outline-none transition-colors"
+                                        className="w-full text-[22px] font-black text-gray-900 border-b-2 border-slate-100 dark:border-slate-800 transition-all focus:border-slate-900 bg-transparent py-2 outline-none"
                                         autoFocus
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
@@ -1000,13 +875,13 @@ export default function GroupDetails() {
                             {/* Settle-up Date */}
                             <div className="mt-8">
                                 <label className="text-[13px] font-bold text-gray-500 mb-3 block">Settle-up date</label>
-                                <div className="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-3 focus-within:border-slate-900 transition bg-white">
+                                <div className="flex items-center gap-3 border-2 border-slate-50 dark:border-slate-800 rounded-2xl px-5 py-4 focus-within:border-slate-900 transition-all bg-white shadow-sm">
                                     <Calendar className="w-5 h-5 text-gray-400 flex-shrink-0" />
                                     <input
                                         type="date"
                                         value={draftSettleDate}
                                         onChange={e => setDraftSettleDate(e.target.value)}
-                                        className="flex-1 outline-none text-[16px] text-gray-800 bg-transparent"
+                                        className="flex-1 outline-none text-[16px] text-gray-900 font-bold bg-transparent"
                                     />
                                 </div>
                                 {draftSettleDate && (
@@ -1035,13 +910,13 @@ export default function GroupDetails() {
                                             <div key={type.id} className="relative flex-1">
                                                 <button
                                                     onClick={() => setGroupType(type.id)}
-                                                    className={`w-full py-3.5 flex flex-col items-center gap-2 border rounded-xl transition relative z-10 ${isSelected ? 'border-slate-900 bg-[#e6f4ef]' : 'border-gray-200 hover:bg-gray-50 bg-white'}`}
+                                                    className={`w-full py-4 flex flex-col items-center gap-2 border-2 rounded-2xl transition-all relative z-10 shadow-sm ${isSelected ? 'border-slate-900 bg-slate-900 text-white' : 'border-gray-50 dark:border-slate-800 hover:bg-gray-50 bg-white'}`}
                                                 >
-                                                    <type.Icon className={`w-[26px] h-[26px] ${isSelected ? 'text-slate-900' : 'text-gray-700'}`} strokeWidth={1.5} />
-                                                    <span className={`text-[13px] ${isSelected ? 'font-bold text-slate-900' : 'font-medium text-gray-700'}`}>{type.label}</span>
+                                                    <type.Icon className={`w-[28px] h-[28px] ${isSelected ? 'text-white' : 'text-gray-700'}`} strokeWidth={1.5} />
+                                                    <span className={`text-[12px] uppercase tracking-wider ${isSelected ? 'font-black' : 'font-bold text-gray-500'}`}>{type.label}</span>
                                                 </button>
                                                 {isSelected && (
-                                                    <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-[11px] h-[11px] bg-[#e6f4ef] transform rotate-45 border-b border-r border-slate-900 z-0"></div>
+                                                    <div className="absolute -bottom-[4px] left-1/2 -translate-x-1/2 w-[12px] h-[12px] bg-slate-900 transform rotate-45 z-0"></div>
                                                 )}
                                             </div>
                                         )
@@ -1835,7 +1710,7 @@ export default function GroupDetails() {
                                                 <p className="text-[13px] text-gray-500">Pay the entire balance</p>
                                             </div>
                                         </div>
-                                        <span className="text-[17px] font-bold text-slate-900">${settleUpTarget.amount.toFixed(2)}</span>
+                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(settleUpTarget.amount, user?.defaultCurrency)}</span>
                                     </button>
 
                                     {/* Divider */}
@@ -1855,13 +1730,13 @@ export default function GroupDetails() {
                                                 min="0.01"
                                                 step="0.01"
                                                 max={settleUpTarget.amount}
-                                                placeholder={`Max $${settleUpTarget.amount.toFixed(2)}`}
+                                                placeholder={`Max ${formatCurrency(settleUpTarget.amount, user?.defaultCurrency)}`}
                                                 value={groupPartialAmount}
                                                 onChange={e => setGroupPartialAmount(e.target.value)}
                                                 className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
                                             />
                                         </div>
-                                        <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: ${Math.abs(settleUpTarget.amount - (parseFloat(groupPartialAmount) || 0)).toFixed(2)}</p>
+                                        <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(Math.abs(settleUpTarget.amount - (parseFloat(groupPartialAmount) || 0)), user?.defaultCurrency)}</p>
                                     </div>
 
                                     <button

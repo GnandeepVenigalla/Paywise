@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
+import { formatCurrency } from '../utils/formatters';
 
 export default function Activity() {
     const { api, user } = useContext(AuthContext);
@@ -77,13 +78,13 @@ export default function Activity() {
                                 const othersOweMe = expense.amount - mySplitAmount;
                                 displayMessage = `You added "${expense.description}"`;
                                 amountColor = 'text-emerald-500';
-                                amountDisplay = `You get back $${othersOweMe.toFixed(2)}`;
+                                amountDisplay = `You get back ${formatCurrency(othersOweMe, user?.defaultCurrency, expense.currency)}`;
                                 Icon = ArrowLeft;
                             } else {
                                 // Someone else paid, I am involved
                                 displayMessage = `${expense.paidBy.username} added "${expense.description}"`;
                                 amountColor = 'text-rose-600';
-                                amountDisplay = `You owe $${mySplitAmount.toFixed(2)}`;
+                                amountDisplay = `You owe ${formatCurrency(mySplitAmount, user?.defaultCurrency, expense.currency)}`;
                                 Icon = ArrowRight;
                             }
 

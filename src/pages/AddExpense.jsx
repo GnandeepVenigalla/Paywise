@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
+import { calculateGroupSplits } from '../utils/expenseUtils';
 
 export default function AddExpense() {
     const { id } = useParams();
@@ -36,20 +37,7 @@ export default function AddExpense() {
     }, [defaultSplitMethod]);
 
     const buildSplits = () => {
-        const total = parseFloat(amount);
-        if (splitMethod === 'equally') {
-            const each = total / members.length;
-            return members.map(m => ({ user: m._id, amount: each }));
-        } else if (splitMethod === 'full') {
-            // payer is owed everything — everyone else owes their share
-            return members
-                .filter(m => m._id !== paidBy)
-                .map(m => ({ user: m._id, amount: total / (members.length - 1 || 1) }));
-        } else {
-            // percentage — equal for now (full UI in SplitItems)
-            const each = total / members.length;
-            return members.map(m => ({ user: m._id, amount: each }));
-        }
+        return calculateGroupSplits(parseFloat(amount), members, splitMethod, paidBy);
     };
 
     const handleSubmit = async (e) => {
@@ -60,6 +48,7 @@ export default function AddExpense() {
             await api.post('/expenses', {
                 description,
                 amount: parseFloat(amount),
+                currency: user?.defaultCurrency || 'USD',
                 group: id,
                 paidBy,
                 splits: buildSplits(),

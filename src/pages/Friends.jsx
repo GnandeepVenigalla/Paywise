@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, HeartHandshake, Search, Plus, ArrowRight, ArrowLeft } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
+import { formatCurrency } from '../utils/formatters';
 
 export default function Friends() {
     const { api, user } = useContext(AuthContext);
@@ -170,9 +171,9 @@ export default function Friends() {
                                             </div>
                                             <div className="text-right flex flex-col items-end">
                                                 {friend.balance > 0 ? (
-                                                    <p className="font-bold text-emerald-500">owes you ${friend.balance.toFixed(2)}</p>
+                                                    <p className="font-bold text-emerald-500">owes you {formatCurrency(friend.balance, user.defaultCurrency)}</p>
                                                 ) : friend.balance < 0 ? (
-                                                    <p className="font-bold text-rose-600">you owe ${Math.abs(friend.balance).toFixed(2)}</p>
+                                                    <p className="font-bold text-rose-600">you owe {formatCurrency(friend.balance, user.defaultCurrency)}</p>
                                                 ) : (
                                                     <p className="font-medium text-gray-400">settled up</p>
                                                 )}

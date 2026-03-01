@@ -25,7 +25,7 @@ html.theme-light body {
   color: #111827;
 }
 
-/* Dark mode */
+/* Dark mode base */
 html.theme-dark {
   color-scheme: dark;
 }
@@ -35,6 +35,7 @@ html.theme-dark body {
   color: #f1f5f9;
 }
 
+/* Dark mode utilities - Overriding Tailwind globals */
 html.theme-dark .bg-white {
   background-color: #1e293b !important;
 }
@@ -47,32 +48,45 @@ html.theme-dark .bg-gray-100 {
   background-color: #1e293b !important;
 }
 
+/* Handle opacity variants for dark mode */
+html.theme-dark .bg-gray-50\/50 {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+
+html.theme-dark .bg-white\/20 {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.theme-dark .bg-black\/20 {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+}
+
 html.theme-dark .text-gray-900 {
-  color: #f1f5f9 !important;
+  color: #f8fafc !important;
 }
 
 html.theme-dark .text-gray-800 {
-  color: #e2e8f0 !important;
+  color: #f1f5f9 !important;
 }
 
 html.theme-dark .text-gray-700,
 html.theme-dark .text-slate-700 {
-  color: #f1f5f9 !important;
+  color: #e2e8f0 !important;
 }
 
 html.theme-dark .text-gray-600,
 html.theme-dark .text-slate-600 {
-  color: #e2e8f0 !important;
+  color: #cbd5e1 !important;
 }
 
 html.theme-dark .text-gray-500,
 html.theme-dark .text-slate-500 {
-  color: #cbd5e1 !important;
+  color: #94a3b8 !important;
 }
 
 html.theme-dark .text-gray-400,
 html.theme-dark .text-slate-400 {
-  color: #94a3b8 !important;
+  color: #64748b !important;
 }
 
 html.theme-dark .text-slate-900,
@@ -87,30 +101,102 @@ html.theme-dark .bg-slate-100 {
   color: #f8fafc !important;
 }
 
+/* FIX: Do NOT invert dark sections to light gray in dark mode */
 html.theme-dark .bg-slate-900,
 html.theme-dark .bg-slate-950,
 html.theme-dark .bg-slate-800 {
-  background-color: #f1f5f9 !important;
-  color: #0f172a !important;
+  background-color: #020617 !important;
+  /* Keep it dark, even darker */
+  color: #ffffff !important;
 }
 
 html.theme-dark .border-gray-100 {
-  border-color: #1e293b !important;
-}
-
-html.theme-dark .border-gray-200 {
   border-color: #334155 !important;
 }
 
-html.theme-dark header {
+html.theme-dark .border-gray-200 {
+  border-color: #475569 !important;
+}
+
+html.theme-dark .border-gray-300 {
+  border-color: #64748b !important;
+}
+
+html.theme-dark .border-gray-400 {
+  border-color: #94a3b8 !important;
+}
+
+html.theme-dark .border-slate-900,
+html.theme-dark .border-slate-800 {
+  border-color: #334155 !important;
+}
+
+/* Fix for specific selection colors in dark mode */
+html.theme-dark .bg-\[#e6f4ef\] {
+  background-color: #064e3b !important;
+  color: #f1f5f9 !important;
+  border-color: #059669 !important;
+}
+
+html.theme-dark .bg-\[#e6f4ef\] * {
+  color: #f1f5f9 !important;
+}
+
+/* Hover state overrides for dark mode */
+html.theme-dark .hover\:bg-gray-50:hover {
+  background-color: #1e293b !important;
+}
+
+html.theme-dark .hover\:bg-gray-100:hover {
+  background-color: #334155 !important;
+}
+
+html.theme-dark .hover\:bg-rose-50\/50:hover {
+  background-color: rgba(225, 29, 72, 0.1) !important;
+}
+
+html.theme-dark .bg-emerald-50 {
+  background-color: rgba(5, 150, 105, 0.1) !important;
+  color: #6ee7b7 !important;
+}
+
+
+html.theme-dark header.bg-slate-950 {
+  background-color: #020617 !important;
+}
+
+html.theme-dark header.bg-white,
+html.theme-dark .bg-white {
   background-color: #1e293b !important;
 }
 
 html.theme-dark input,
 html.theme-dark select,
 html.theme-dark textarea {
-  background-color: #1e293b !important;
+  background-color: transparent !important;
   color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+/* Explicit fix for icons in dark mode grids */
+html.theme-dark .grid button svg {
+  color: #f1f5f9 !important;
+}
+
+html.theme-dark .grid button.bg-\[#e6f4ef\] svg {
+  color: #6ee7b7 !important;
+}
+
+html.theme-dark .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+html.theme-dark .shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+}
+
+html.theme-dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
 }
 
 /* High Contrast Mode */

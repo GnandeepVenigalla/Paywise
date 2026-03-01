@@ -46,6 +46,7 @@ export default function AppSettings() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteInput, setDeleteInput] = useState('');
     const [migrationLoading, setMigrationLoading] = useState(false);
+    const [cameraPermission, setCameraPermission] = useState(localStorage.getItem('camera_granted') === 'true');
 
     const handleOAuthMigrate = async () => {
         setMigrationLoading(true);
@@ -57,6 +58,24 @@ export default function AppSettings() {
         } catch (err) {
             alert('Could not connect to Splitwise. Please try again.');
             setMigrationLoading(false);
+        }
+    };
+
+    const handleCameraToggle = async (enabled) => {
+        if (!enabled) {
+            localStorage.removeItem('camera_granted');
+            setCameraPermission(false);
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(track => track.stop());
+            localStorage.setItem('camera_granted', 'true');
+            setCameraPermission(true);
+            alert("Camera access enabled!");
+        } catch (err) {
+            alert("Could not access camera. Please check your browser settings.");
         }
     };
 
@@ -377,10 +396,10 @@ export default function AppSettings() {
                 />
             </div>
 
-            {/* ── 4. Security ─────────────────────────────────── */}
+            {/* ── 4. Security & Permissions ─────────────────────────── */}
             <SectionHeader
-                icon={<Fingerprint className="w-4 h-4 text-rose-500" />}
-                title="Security"
+                icon={<Lock className="w-4 h-4 text-rose-500" />}
+                title="Security & Permissions"
                 color="bg-rose-50"
             />
             <div className="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -389,6 +408,12 @@ export default function AppSettings() {
                     sub="Require Face ID, fingerprint, or PIN every time the app is opened"
                     value={settings.biometricLock}
                     onChange={v => handleBiometricToggle(v)}
+                />
+                <ToggleRow
+                    label="Camera Access"
+                    sub="Allow access to your camera for receipt scanning"
+                    value={cameraPermission}
+                    onChange={v => handleCameraToggle(v)}
                     last
                 />
             </div>
