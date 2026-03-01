@@ -246,46 +246,10 @@ export default function FriendDetails() {
         );
     }
 
-    const displayItems = [];
-    const groupBalances = {};
-
-    expenses.forEach(exp => {
-        if (exp.group) {
-            if (!groupBalances[exp.group._id]) {
-                groupBalances[exp.group._id] = {
-                    isGroupSummary: true,
-                    _id: 'group-' + exp.group._id,
-                    group: exp.group,
-                    balance: 0,
-                    count: 0,
-                    date: exp.date
-                };
-            }
-
-            // Calculate how much friend owes user (+) or user owes friend (-) from this expense
-            const isPaidByMe = exp.paidBy._id === user.id || exp.paidBy._id === user._id;
-            if (isPaidByMe) {
-                const fSplit = exp.splits.find(s => s.user._id === friend._id || s.user === friend._id);
-                if (fSplit) groupBalances[exp.group._id].balance += fSplit.amount;
-            } else if (exp.paidBy._id === friend._id) {
-                const mySplit = exp.splits.find(s => s.user._id === user.id || s.user === user.id || s.user._id === user._id || s.user === user._id);
-                if (mySplit) groupBalances[exp.group._id].balance -= mySplit.amount;
-            }
-
-            groupBalances[exp.group._id].count += 1;
-            // keep most recent date
-            if (new Date(exp.date) > new Date(groupBalances[exp.group._id].date)) {
-                groupBalances[exp.group._id].date = exp.date;
-            }
-        } else {
-            displayItems.push({
-                ...exp,
-                isGroupSummary: false
-            });
-        }
-    });
-
-    displayItems.push(...Object.values(groupBalances));
+    const displayItems = [...expenses].map(exp => ({
+        ...exp,
+        isGroupSummary: false
+    }));
     displayItems.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     return (
@@ -322,19 +286,56 @@ export default function FriendDetails() {
 
             <main className="bg-white max-w-lg mx-auto">
                 <div className="px-4 py-5 shadow-[0_4px_10px_rgb(0,0,0,0.03)] border-b border-gray-100 mb-2">
-                    <div className="mb-4 flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Current Standing</span>
-                        {balance !== 0 ? (
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-500">
-                                    {balance > 0 ? 'owes you' : 'you owe'}
-                                </span>
-                                <span className={`text-2xl font-black tracking-tight ${balance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                    {balance > 0 ? '+' : '-'}{currSym}{Math.abs(balance).toFixed(2)}
-                                </span>
+                    <div className="mb-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-3">
+                            <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Current Standing</span>
+                            {balance !== 0 ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-gray-500">
+                                        {balance > 0 ? 'owes you' : 'you owe'}
+                                    </span>
+                                    <span className={`text-2xl font-black tracking-tight ${balance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
+                                        {balance > 0 ? '+' : '-'}{currSym}{Math.abs(balance).toFixed(2)}
+                                    </span>
+                                </div>
+                            ) : (
+                                <span className="text-lg font-bold text-gray-700">Settled Up</span>
+                            )}
+                        </div>
+
+                        {/* Breakdown */}
+                        {balance !== 0 && (
+                            <div className="space-y-1.5 pt-1">
+                                {(() => {
+                                    const breakdowns = {}; // { groupId/null: { name, balance } }
+                                    expenses.forEach(exp => {
+                                        const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+                                        let b = 0;
+                                        if (isPaidByMe) {
+                                            const fSplit = exp.splits.find(s => s.user?._id === friend._id || s.user?._id === friend.id || s.user === friend._id || s.user === friend.id);
+                                            if (fSplit) b = fSplit.amount;
+                                        } else if (exp.paidBy?._id === friend._id || exp.paidBy?._id === friend.id || exp.paidBy === friend._id || exp.paidBy === friend.id) {
+                                            const mySplit = exp.splits.find(s => s.user?._id === user.id || s.user?._id === user._id || s.user === user.id || s.user === user._id);
+                                            if (mySplit) b = -mySplit.amount;
+                                        }
+
+                                        if (b !== 0) {
+                                            const gid = exp.group?._id || 'none';
+                                            if (!breakdowns[gid]) breakdowns[gid] = { name: exp.group?.name || 'non-group expenses', balance: 0 };
+                                            breakdowns[gid].balance += b;
+                                        }
+                                    });
+
+                                    return Object.values(breakdowns).filter(item => Math.abs(item.balance) > 0.01).map((item, idx) => (
+                                        <p key={idx} className="text-[13.5px] text-gray-600 flex justify-between items-center">
+                                            <span>{friend.username.split(' ')[0]} {item.balance > 0 ? 'owes you' : 'you owe'} in {item.name === 'non-group expenses' ? item.name : `"${item.name}"`}</span>
+                                            <span className={`font-bold ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                {currSym}{Math.abs(item.balance).toFixed(2)}
+                                            </span>
+                                        </p>
+                                    ));
+                                })()}
                             </div>
-                        ) : (
-                            <span className="text-lg font-bold text-gray-700">Settled Up</span>
                         )}
                     </div>
 
@@ -400,8 +401,11 @@ export default function FriendDetails() {
                                         amountValue = "$" + Math.abs(item.balance).toFixed(2);
                                         subtitle = `${item.count} Shared Group Action${item.count !== 1 ? 's' : ''}`;
                                     } else {
-                                        const isPaidByMe = item.paidBy._id === user.id || item.paidBy._id === user._id;
-                                        subtitle = isPaidByMe ? `You paid $${paidAmount.toFixed(2)}` : `${item.paidBy.username || friend.username} paid $${paidAmount.toFixed(2)}`;
+                                        const isPaidByMe = item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id;
+                                        const groupNameText = item.group ? ` in "${item.group.name}"` : "";
+                                        subtitle = isPaidByMe
+                                            ? `You paid $${paidAmount.toFixed(2)}${groupNameText}`
+                                            : `${item.paidBy?.username || friend.username} paid $${paidAmount.toFixed(2)}${groupNameText}`;
 
                                         if (isPaidByMe) {
                                             const fSplit = item.splits.find(s => s.user._id === friend._id || s.user === friend._id);
