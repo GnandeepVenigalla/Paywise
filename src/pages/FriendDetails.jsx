@@ -37,6 +37,11 @@ export default function FriendDetails() {
     const [draftNote, setDraftNote] = useState('');
     const [showReminderModal, setShowReminderModal] = useState(false);
     const [reminderEmailBody, setReminderEmailBody] = useState('');
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportReason, setReportReason] = useState('Spam');
+    const [reportDetails, setReportDetails] = useState('');
+    const [isReporting, setIsReporting] = useState(false);
+    const [isBlocking, setIsBlocking] = useState(false);
 
 
     const monthlySpending = useMemo(() => {
@@ -45,12 +50,10 @@ export default function FriendDetails() {
         const monthMap = {};
 
         expenses.forEach(exp => {
-            if (!exp || (exp.description && exp.description.toLowerCase().includes('payment'))) return;
-            if (exp.isGroupSummary) return;
+            if (exp.description && exp.description.toLowerCase().includes('payment')) return;
+            if (exp.isGroupSummary) return; // ignore grouped summaries for pure 1-on-1 chart logic
 
             const d = new Date(exp.date);
-            if (isNaN(d.getTime())) return;
-
             const key = `${d.getFullYear()}-${("0" + (d.getMonth() + 1)).slice(-2)}`;
             const monthLabel = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
             const shortMonth = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
@@ -67,15 +70,12 @@ export default function FriendDetails() {
                 };
             }
 
-            monthMap[key].totalSpent += (exp.amount || 0);
+            monthMap[key].totalSpent += exp.amount;
             monthMap[key].expensesList.push(exp);
 
-            const userSplit = (exp.splits || []).find(s => {
-                const sid = s?.user?._id || s?.user;
-                return sid === user?.id || sid === user?._id;
-            });
+            const userSplit = exp.splits.find(s => (s.user._id || s.user) === user.id || (s.user._id || s.user) === user._id);
             if (userSplit) {
-                monthMap[key].userShare += (userSplit.amount || 0);
+                monthMap[key].userShare += userSplit.amount;
             }
         });
 
@@ -97,6 +97,33 @@ export default function FriendDetails() {
             setBalance(res.data.balance);
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleBlockUser = async () => {
+        if (!window.confirm(`Are you sure you want to block ${friend?.username}? This will remove them from your friends list and prevent further interaction.`)) return;
+        setIsBlocking(true);
+        try {
+            await api.post(`/auth/friends/block/${id}`);
+            navigate('/friends');
+        } catch (err) {
+            alert(err.response?.data?.msg || 'Failed to block user.');
+        } finally {
+            setIsBlocking(false);
+        }
+    };
+
+    const handleReportUser = async () => {
+        setIsReporting(true);
+        try {
+            await api.post(`/auth/friends/report/${id}`, { reason: reportReason, details: reportDetails });
+            alert('Thank you for reporting. We have received your submission and will review it shortly.');
+            setShowReportModal(false);
+            setReportDetails('');
+        } catch (err) {
+            alert(err.response?.data?.msg || 'Failed to submit report.');
+        } finally {
+            setIsReporting(false);
         }
     };
 
@@ -432,25 +459,21 @@ export default function FriendDetails() {
                                         amountValue = "$" + Math.abs(item.balance).toFixed(2);
                                         subtitle = `${item.count} Shared Group Action${item.count !== 1 ? 's' : ''}`;
                                     } else {
-                                        const isPaidByMe = item.paidBy?._id === user?.id || item.paidBy?._id === user?._id || item.paidBy === user?.id;
-                                        const groupNameText = item.group ? ` in "${item.group?.name || 'Group'}"` : "";
-                                        const displayPaidAmount = paidAmount || 0;
+                                        const isPaidByMe = item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id;
+                                        const groupNameText = item.group ? ` in "${item.group.name}"` : "";
                                         subtitle = isPaidByMe
-                                            ? `You paid $${displayPaidAmount.toFixed(2)}${groupNameText}`
-                                            : `${item.paidBy?.username || friend?.username || 'Someone'} paid $${displayPaidAmount.toFixed(2)}${groupNameText}`;
+                                            ? `You paid $${paidAmount.toFixed(2)}${groupNameText}`
+                                            : `${item.paidBy?.username || friend.username} paid $${paidAmount.toFixed(2)}${groupNameText}`;
 
                                         if (isPaidByMe) {
-                                            const fSplit = (item.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id));
-                                            const splitAmt = fSplit ? (fSplit.amount || 0) : 0;
+                                            const fSplit = item.splits.find(s => s.user._id === friend._id || s.user === friend._id);
+                                            const splitAmt = fSplit ? fSplit.amount : 0;
                                             amountColor = splitAmt > 0 ? "text-emerald-500" : "text-gray-500";
                                             amountLabel = splitAmt > 0 ? "you lent" : "not involved";
                                             amountValue = "$" + splitAmt.toFixed(2);
                                         } else {
-                                            const mySplit = (item.splits || []).find(s => {
-                                                const sid = s?.user?._id || s?.user;
-                                                return sid === user?.id || sid === user?._id;
-                                            });
-                                            const splitAmt = mySplit ? (mySplit.amount || 0) : 0;
+                                            const mySplit = item.splits.find(s => s.user._id === user.id || s.user === user.id || s.user._id === user._id || s.user === user._id);
+                                            const splitAmt = mySplit ? mySplit.amount : 0;
                                             amountColor = splitAmt > 0 ? "text-rose-600" : "text-gray-500";
                                             amountLabel = splitAmt > 0 ? "you borrowed" : "not involved";
                                             amountValue = "$" + splitAmt.toFixed(2);
@@ -647,30 +670,30 @@ export default function FriendDetails() {
                                                 {selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />}
                                             </div>
                                             <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
-                                            <p className="text-3xl font-bold text-slate-900 mt-2">${(selectedExpense.amount || 0).toFixed(2)}</p>
-                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {(selectedExpense.paidBy?._id === user?.id || selectedExpense.paidBy === user?.id) ? 'You' : (selectedExpense.paidBy?.username || friend?.username || 'Someone')}</p>
-                                            {selectedExpense.addedBy && selectedExpense.addedBy?._id !== selectedExpense.paidBy?._id && (
-                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {(selectedExpense.addedBy?._id === user?.id || selectedExpense.addedBy === user?.id) ? 'you' : (selectedExpense.addedBy?.username || 'someone')}</p>
+                                            <p className="text-3xl font-bold text-slate-900 mt-2">${selectedExpense.amount.toFixed(2)}</p>
+                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
+                                            {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
+                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
                                             )}
-                                            {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group?.name || 'Shared Group'}</p>}
-                                            <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date || Date.now()).toLocaleDateString()}</p>
+                                            {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
+                                            <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
                                         </div>
 
                                         <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 max-h-48 overflow-y-auto">
                                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Split Details</h4>
                                             <div className="space-y-2">
-                                                {(selectedExpense.splits || []).map((split, sIdx) => (
-                                                    <div key={split?.user?._id || split?.user || sIdx} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
+                                                {selectedExpense.splits.map(split => (
+                                                    <div key={split.user._id || split.user} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
                                                         <span className="font-semibold text-gray-700 text-sm">
-                                                            {(split?.user?._id === user?.id || split?.user === user?.id) ? 'You' : (split?.user?.username || 'Unknown')}
+                                                            {split.user._id === user.id ? 'You' : (split.user.username || friend.username)}
                                                         </span>
-                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">${(split?.amount || 0).toFixed(2)}</span>
+                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">${split.amount.toFixed(2)}</span>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
 
-                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy?._id === user?.id) : (selectedExpense.paidBy?._id === user?.id)) && (
+                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -732,11 +755,15 @@ export default function FriendDetails() {
                                 >
                                     Remove from friends list
                                 </button>
-                                <button onClick={() => alert('Block user functionality coming soon!')} className="px-6 py-4 text-left hover:bg-gray-50 border-b border-gray-100 transition">
-                                    <h5 className="text-[16px] text-gray-800">Block user</h5>
+                                <button
+                                    onClick={handleBlockUser}
+                                    className="px-6 py-4 text-left hover:bg-gray-50 border-b border-gray-100 transition disabled:opacity-50"
+                                    disabled={isBlocking}
+                                >
+                                    <h5 className="text-[16px] text-gray-800">{isBlocking ? 'Blocking...' : 'Block user'}</h5>
                                     <p className="text-[14px] text-gray-500 leading-snug mt-1 max-w-[95%]">Remove this user from your friends list, hide any groups you share, and suppress future expenses/notifications from them.</p>
                                 </button>
-                                <button onClick={() => alert('Report user functionality coming soon!')} className="px-6 py-4 text-left hover:bg-gray-50 border-b border-gray-100 transition">
+                                <button onClick={() => setShowReportModal(true)} className="px-6 py-4 text-left hover:bg-gray-50 border-b border-gray-100 transition">
                                     <h5 className="text-[16px] text-gray-800">Report user</h5>
                                     <p className="text-[14px] text-gray-500 leading-snug mt-1">Flag an abusive, suspicious, or spam account.</p>
                                 </button>
@@ -1310,6 +1337,61 @@ export default function FriendDetails() {
                             </button>
                         </div>
                     )}
+                </div>
+            )}
+            {/* Report User Modal */}
+            {showReportModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[150] px-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <h3 className="text-xl font-bold text-gray-900 mb-1">Report {friend?.username}</h3>
+                            <p className="text-sm text-gray-500 mb-6">Your report is confidential. We'll review this user's activity based on your feedback.</p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Reason</label>
+                                    <select
+                                        value={reportReason}
+                                        onChange={(e) => setReportReason(e.target.value)}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-[15px] focus:outline-none focus:ring-2 focus:ring-slate-900 appearance-none"
+                                    >
+                                        <option value="Spam">Spam</option>
+                                        <option value="Abusive content">Abusive content</option>
+                                        <option value="Suspicious activity">Suspicious activity</option>
+                                        <option value="Impersonation">Impersonation</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Additional details</label>
+                                    <textarea
+                                        value={reportDetails}
+                                        onChange={(e) => setReportDetails(e.target.value)}
+                                        placeholder="Tell us more about the issue..."
+                                        rows={3}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-[15px] focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-8">
+                                <button
+                                    onClick={() => setShowReportModal(false)}
+                                    className="flex-1 py-3.5 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleReportUser}
+                                    disabled={isReporting}
+                                    className="flex-1 py-3.5 rounded-xl font-bold bg-slate-950 text-white hover:bg-slate-900 transition disabled:opacity-50"
+                                >
+                                    {isReporting ? 'Submitting...' : 'Submit'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
