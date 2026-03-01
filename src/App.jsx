@@ -35,7 +35,7 @@ const PrivateRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+      <div className="fixed inset-0 bg-[#1e293b] flex flex-col items-center justify-center z-[100]">
         <div className="w-[110px] h-[110px] animate-pulse">
           <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
         </div>

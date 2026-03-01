@@ -191,7 +191,7 @@ export default function SplitItems() {
 
     if (!group) {
         return (
-            <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+            <div className="fixed inset-0 bg-[#1e293b] flex flex-col items-center justify-center z-[100]">
                 <div className="w-[110px] h-[110px] animate-pulse">
                     <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
                 </div>
@@ -213,7 +213,7 @@ export default function SplitItems() {
                     <button
                         onClick={saveExpense}
                         disabled={isLoading || assignedTotal === 0}
-                        className="text-teal-600 font-bold px-3 py-1.5 rounded-full hover:bg-teal-50 disabled:opacity-50 transition"
+                        className="text-slate-900 font-bold px-3 py-1.5 rounded-full hover:bg-slate-50 disabled:opacity-50 transition"
                     >
                         {isLoading ? 'Saving...' : 'Save'}
                     </button>
@@ -230,7 +230,7 @@ export default function SplitItems() {
                                 setSelectedMemberIds(group.members.map(m => m._id));
                             }
                         }}
-                        className="text-xs font-bold text-teal-600 bg-teal-50 px-3 py-1 rounded hover:bg-teal-100 transition"
+                        className="text-xs font-bold text-slate-900 bg-slate-50 px-3 py-1 rounded hover:bg-slate-100 transition"
                     >
                         {selectedMemberIds.length === group.members.length ? 'Deselect All' : 'Select All'}
                     </button>
@@ -243,11 +243,11 @@ export default function SplitItems() {
                                 key={member._id}
                                 onClick={() => toggleMemberSelection(member._id)}
                                 className={`whitespace-nowrap flex items-center gap-1.5 px-4 py-2 rounded-full border-2 transition-all font-semibold text-sm shadow-sm ${isSelected
-                                    ? 'border-transparent bg-teal-600 text-white transform scale-105'
-                                    : 'border-gray-200 bg-white text-gray-600 hover:border-teal-200'
+                                    ? 'border-transparent bg-slate-900 text-white transform scale-105'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-slate-200'
                                     }`}
                             >
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] uppercase font-bold ${isSelected ? 'bg-white text-teal-600' : 'bg-gray-100 text-gray-500'}`}>
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] uppercase font-bold ${isSelected ? 'bg-white text-slate-900' : 'bg-gray-100 text-gray-500'}`}>
                                     {member.username.charAt(0)}
                                 </div>
                                 {member._id === user.id ? 'Me' : member.username}
@@ -260,7 +260,7 @@ export default function SplitItems() {
                 <div className="flex items-center justify-center gap-2 mb-2 bg-gray-50 border border-gray-100 rounded-lg p-2 max-w-[200px] mx-auto shadow-inner">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Paid By:</span>
                     <select
-                        className="text-sm font-bold bg-transparent text-teal-700 outline-none w-auto appearance-none cursor-pointer"
+                        className="text-sm font-bold bg-transparent text-slate-950 outline-none w-auto appearance-none cursor-pointer"
                         value={paidBy}
                         onChange={e => setPaidBy(e.target.value)}
                     >
@@ -283,7 +283,7 @@ export default function SplitItems() {
                             <div
                                 key={item.id}
                                 onClick={() => toggleAssign(item.id)}
-                                className={`bg-white p-4 justify-between flex items-center rounded-2xl border-2 transition-all cursor-pointer shadow-sm ${isAssigned ? 'border-teal-400 bg-teal-50/30' : 'border-gray-200 hover:border-teal-200'
+                                className={`bg-white p-4 justify-between flex items-center rounded-2xl border-2 transition-all cursor-pointer shadow-sm ${isAssigned ? 'border-slate-400 bg-slate-50/30' : 'border-gray-200 hover:border-slate-200'
                                     }`}
                             >
                                 <div className="flex-1 pr-4">
@@ -293,7 +293,7 @@ export default function SplitItems() {
                                             {item.assignedTo.map(uid => {
                                                 const m = group.members.find(m => m._id === uid);
                                                 return m ? (
-                                                    <span key={uid} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-700 uppercase tracking-wide">
+                                                    <span key={uid} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-950 uppercase tracking-wide">
                                                         {m.username}
                                                     </span>
                                                 ) : null;
@@ -303,12 +303,12 @@ export default function SplitItems() {
                                 </div>
 
                                 <div className="flex items-center gap-4">
-                                    <span className={`text-xl font-extrabold ${isAssigned ? 'text-teal-700' : 'text-gray-900'}`}>
+                                    <span className={`text-xl font-extrabold ${isAssigned ? 'text-slate-950' : 'text-gray-900'}`}>
                                         ${item.price.toFixed(2)}
                                     </span>
 
                                     <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all shadow-sm ${isAssigned
-                                        ? 'bg-teal-500 border-teal-500 text-white scale-110'
+                                        ? 'bg-slate-800 border-slate-800 text-white scale-110'
                                         : 'border-gray-300 text-transparent'
                                         }`}>
                                         <Check className="w-5 h-5" />
@@ -342,7 +342,7 @@ export default function SplitItems() {
                 {/* Progress bar */}
                 <div className="h-1.5 w-full bg-gray-100 rounded-full mt-4 overflow-hidden">
                     <div
-                        className="h-full bg-gradient-to-r from-teal-400 to-emerald-500 rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-slate-400 to-slate-800 rounded-full transition-all duration-500"
                         style={{ width: `${total > 0 ? (assignedTotal / total) * 100 : 0}%` }}
                     ></div>
                 </div>

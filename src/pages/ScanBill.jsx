@@ -122,7 +122,7 @@ export default function ScanBill() {
                                 </p>
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="py-4 px-8 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold hover:from-teal-600 hover:to-emerald-600 transition shadow-lg shadow-teal-500/30 flex items-center gap-3">
+                                    className="py-4 px-8 rounded-full bg-gradient-to-r from-slate-800 to-slate-800 text-white font-bold hover:from-slate-900 hover:to-slate-900 transition shadow-lg shadow-slate-800/30 flex items-center gap-3">
                                     <Camera className="w-6 h-6" />
                                     Open Native Camera
                                 </button>
@@ -131,7 +131,7 @@ export default function ScanBill() {
                             <>
                                 {cameraState === 'loading' && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-black z-0">
-                                        <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
+                                        <Loader2 className="w-8 h-8 text-slate-800 animate-spin" />
                                     </div>
                                 )}
                                 <Webcam
@@ -146,8 +146,8 @@ export default function ScanBill() {
                                 />
                                 {/* Overlay grid for scanning */}
                                 <div className="absolute inset-0 pointer-events-none border-[40px] border-black/50 transition-all z-10">
-                                    <div className="w-full h-full border-2 border-dashed border-teal-400/70 rounded-3xl relative">
-                                        <div className="absolute top-1/2 left-0 w-full h-[2px] bg-teal-400/50 shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-scan"></div>
+                                    <div className="w-full h-full border-2 border-dashed border-slate-400/70 rounded-3xl relative">
+                                        <div className="absolute top-1/2 left-0 w-full h-[2px] bg-slate-400/50 shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-scan"></div>
                                     </div>
                                 </div>
 
@@ -160,10 +160,10 @@ export default function ScanBill() {
                         <img src={imageSrc} alt="Receipt" className="max-w-full max-h-[70vh] rounded-xl shadow-2xl border border-white/10" />
                         {isProcessing && (
                             <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex flex-col items-center justify-center rounded-xl z-20 transition-all">
-                                <Loader2 className="w-12 h-12 text-teal-400 animate-spin mb-4" />
-                                <p className="text-teal-400 font-bold tracking-widest text-lg animate-pulse mb-2">EXTRACTING ITEMS</p>
+                                <Loader2 className="w-12 h-12 text-slate-400 animate-spin mb-4" />
+                                <p className="text-slate-400 font-bold tracking-widest text-lg animate-pulse mb-2">EXTRACTING ITEMS</p>
                                 <div className="w-64 h-2 bg-gray-800 rounded-full overflow-hidden mt-4">
-                                    <div className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                                    <div className="h-full bg-gradient-to-r from-slate-800 to-purple-400 transition-all duration-300" style={{ width: `${progress}%` }}></div>
                                 </div>
                                 <p className="text-gray-400 text-xs mt-3 font-medium">{progress}% Complete</p>
                             </div>
@@ -213,7 +213,7 @@ export default function ScanBill() {
                         <button
                             onClick={processImage}
                             disabled={isProcessing}
-                            className="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold hover:from-teal-600 hover:to-emerald-600 transition disabled:opacity-50 shadow-lg shadow-teal-500/30 flex items-center justify-center gap-2"
+                            className="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-slate-800 to-slate-800 text-white font-bold hover:from-slate-900 hover:to-slate-900 transition disabled:opacity-50 shadow-lg shadow-slate-800/30 flex items-center justify-center gap-2"
                         >
                             <Upload className="w-5 h-5" /> Use Photo
                         </button>

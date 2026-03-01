@@ -33,7 +33,7 @@ export default function Activity() {
                     <h1 className="text-xl font-bold text-gray-900">Paywise</h1>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link to="/account" className="w-9 h-9 rounded-full bg-teal-100 border-2 border-teal-50 text-teal-700 flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-teal-200 transition">
+                    <Link to="/account" className="w-9 h-9 rounded-full bg-slate-100 border-2 border-slate-50 text-slate-950 flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-slate-200 transition">
                         {user?.username?.charAt(0) || 'U'}
                     </Link>
                 </div>
@@ -41,7 +41,7 @@ export default function Activity() {
 
             <main className="p-4 mt-2 max-w-lg mx-auto">
                 {loading ? (
-                    <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+                    <div className="fixed inset-0 bg-[#1e293b] flex flex-col items-center justify-center z-[100]">
                         <div className="w-[110px] h-[110px] animate-pulse">
                             <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
                         </div>
@@ -76,7 +76,7 @@ export default function Activity() {
                                 // I paid for it
                                 const othersOweMe = expense.amount - mySplitAmount;
                                 displayMessage = `You added "${expense.description}"`;
-                                amountColor = 'text-teal-600';
+                                amountColor = 'text-emerald-500';
                                 amountDisplay = `You get back $${othersOweMe.toFixed(2)}`;
                                 Icon = ArrowLeft;
                             } else {
@@ -103,7 +103,7 @@ export default function Activity() {
                                     className="block bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:bg-gray-50 transition active:scale-[0.99]"
                                 >
                                     <div className="flex gap-4">
-                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isPaidByMe ? 'bg-teal-50 text-teal-600' : 'bg-rose-50 text-rose-600'}`}>
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isPaidByMe ? 'bg-slate-50 text-slate-900' : 'bg-rose-50 text-rose-600'}`}>
                                             <Icon className="w-6 h-6" />
                                         </div>
                                         <div className="flex-1 min-w-0">

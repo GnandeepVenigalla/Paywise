@@ -66,8 +66,8 @@ export default function CurrencySettings() {
             </div>
 
             {/* Explanation */}
-            <div className="px-5 pt-5 pb-3 bg-[#f0faf7] border-b border-[#d1f0e7]">
-                <p className="text-[14px] text-[#108c73] font-medium leading-snug">
+            <div className="px-5 pt-5 pb-3 bg-slate-50 border-b border-[#d1f0e7]">
+                <p className="text-[14px] text-slate-900 font-medium leading-snug">
                     Choose the currency that will be used by default when you add new expenses. Your existing expenses won't be affected.
                 </p>
             </div>
@@ -97,17 +97,17 @@ export default function CurrencySettings() {
                             key={currency.code}
                             onClick={() => handleSave(currency.code)}
                             disabled={saving}
-                            className={`w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition text-left ${isSelected ? 'bg-[#f0faf7]' : ''}`}
+                            className={`w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition text-left ${isSelected ? 'bg-slate-50' : ''}`}
                         >
                             <span className="text-[26px] flex-shrink-0">{currency.flag}</span>
                             <div className="flex-1 min-w-0">
-                                <p className={`text-[16px] font-semibold ${isSelected ? 'text-[#108c73]' : 'text-gray-800'}`}>
+                                <p className={`text-[16px] font-semibold ${isSelected ? 'text-slate-900' : 'text-gray-800'}`}>
                                     {currency.code}
                                     <span className="ml-2 text-[14px] font-normal text-gray-500">{currency.symbol}</span>
                                 </p>
                                 <p className="text-[13px] text-gray-400 truncate">{currency.name}</p>
                             </div>
-                            {isSelected && <Check className="w-5 h-5 text-[#108c73] flex-shrink-0" />}
+                            {isSelected && <Check className="w-5 h-5 text-slate-900 flex-shrink-0" />}
                         </button>
                     );
                 })}

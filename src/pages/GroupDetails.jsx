@@ -242,7 +242,7 @@ export default function GroupDetails() {
 
     if (!group) {
         return (
-            <div className="fixed inset-0 bg-[#42b79e] flex flex-col items-center justify-center z-[100]">
+            <div className="fixed inset-0 bg-[#1e293b] flex flex-col items-center justify-center z-[100]">
                 <div className="w-[110px] h-[110px] animate-pulse">
                     <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
                 </div>
@@ -339,13 +339,13 @@ export default function GroupDetails() {
                         <div className="flex gap-2">
                             <input
                                 type="email"
-                                className="flex-1 py-2.5 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#108c73] focus:border-transparent outline-none transition-all shadow-sm"
+                                className="flex-1 py-2.5 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f172a] focus:border-transparent outline-none transition-all shadow-sm"
                                 value={emailToInvite}
                                 onChange={e => setEmailToInvite(e.target.value)}
                                 placeholder="friend@example.com"
                                 required
                             />
-                            <button type="submit" className="bg-[#108c73] text-white px-5 py-2.5 rounded-lg font-bold hover:bg-[#0c705c] transition shadow-sm">
+                            <button type="submit" className="bg-slate-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-slate-950 transition shadow-sm">
                                 Add
                             </button>
                         </div>
@@ -354,16 +354,23 @@ export default function GroupDetails() {
                 )}
 
                 <div className="px-5 py-5 shadow-[0_4px_10px_rgb(0,0,0,0.03)] border-b border-gray-100 mb-2">
-                    <div className="mb-5 space-y-1">
-                        <p className="text-gray-700 text-[18px] mb-2 font-medium">
-                            {myBalance > 0 ? (
-                                <>You are owed <span className={`text-[#108c73] font-bold ${hideBalance ? 'privacy-blur' : ''}`}>+{currSym}{Math.abs(myBalance).toFixed(2)}</span> overall</>
-                            ) : myBalance < 0 ? (
-                                <>You owe <span className={`text-[#e25b22] font-bold ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(myBalance).toFixed(2)}</span> overall</>
-                            ) : (
-                                <>You are <span className="text-gray-500 font-bold">settled up</span> overall</>
-                            )}
-                        </p>
+                    <div className="mb-4 flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Current Standing</span>
+                        {myBalance !== 0 ? (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-500">
+                                    in total
+                                </span>
+                                <span className={`text-2xl font-black tracking-tight ${myBalance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
+                                    {myBalance > 0 ? '+' : '-'}{currSym}{Math.abs(myBalance).toFixed(2)}
+                                </span>
+                            </div>
+                        ) : (
+                            <span className="text-lg font-bold text-gray-700">Settled Up</span>
+                        )}
+                    </div>
+
+                    <div className="mb-5 space-y-1 pl-1 border-l-2 border-slate-100">
                         {(() => {
                             let othersBalances = [];
                             [...(group.members || []), ...(group.pastMembers || [])].filter(m => m._id !== user.id).forEach(member => {
@@ -378,28 +385,28 @@ export default function GroupDetails() {
 
                             return (
                                 <div className="space-y-0.5">
-                                    {first && <p className="text-gray-700 text-[14px]">
+                                    {first && <p className="text-gray-600 font-medium text-[13px]">
                                         {first.b > 0 ? (
-                                            <>{first.member.username} owes you <span className={`text-[#108c73] ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{first.b.toFixed(2)}</span></>
+                                            <>{first.member.username} owes you <span className={`font-bold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{first.b.toFixed(2)}</span></>
                                         ) : (
-                                            <>You owe {first.member.username} <span className={`text-[#e25b22] ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(first.b).toFixed(2)}</span></>
+                                            <>You owe {first.member.username} <span className={`font-bold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{currSym}{Math.abs(first.b).toFixed(2)}</span></>
                                         )}
                                     </p>}
-                                    {second && <p className="text-gray-700 text-[14px]">
+                                    {second && <p className="text-gray-600 font-medium text-[13px]">
                                         {second.b > 0 ? (
-                                            <>{second.member.username} owes you <span className="text-[#108c73]">${second.b.toFixed(2)}</span></>
+                                            <>{second.member.username} owes you <span className="font-bold text-emerald-500">${second.b.toFixed(2)}</span></>
                                         ) : (
-                                            <>You owe {second.member.username} <span className="text-[#e25b22]">${Math.abs(second.b).toFixed(2)}</span></>
+                                            <>You owe {second.member.username} <span className="font-bold text-rose-500">${Math.abs(second.b).toFixed(2)}</span></>
                                         )}
                                     </p>}
-                                    {rest.length > 0 && <p className="text-gray-600 font-medium text-[13px] mt-1 pt-1 opacity-90">Plus {rest.length} more balances</p>}
+                                    {rest.length > 0 && <p className="text-gray-500 text-[12px] mt-1 pt-1 opacity-90">Plus {rest.length} more balances</p>}
                                 </div>
                             );
                         })()}
                     </div>
 
                     <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide items-center mt-3">
-                        <button onClick={() => setShowGroupSettleUp(true)} className="bg-[#e25b22] text-white px-5 py-2.5 rounded-lg hover:bg-[#c94d1a] font-bold shadow-sm whitespace-nowrap transition cursor-pointer">
+                        <button onClick={() => setShowGroupSettleUp(true)} className="bg-[#e11d48] text-white px-5 py-2.5 rounded-lg hover:bg-[#be123c] font-bold shadow-sm whitespace-nowrap transition cursor-pointer">
                             Settle up
                         </button>
                         <button onClick={() => setShowGroupBalances(true)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition cursor-pointer">
@@ -466,7 +473,7 @@ export default function GroupDetails() {
 
                                                     <div className="w-10 h-10 ml-3 flex items-center justify-center flex-shrink-0 relative">
                                                         {/* Pure icon with lines mimicking UI screenshot */}
-                                                        <Scale className="w-8 h-8 text-[#108c73]" />
+                                                        <Scale className="w-8 h-8 text-slate-900" />
                                                     </div>
 
                                                     <div className="flex-1 min-w-0 px-3 py-1">
@@ -484,13 +491,13 @@ export default function GroupDetails() {
                                     if (isPaidByMe) {
                                         const mySplit = item.splits.find(s => s.user._id === user.id || s.user === user.id);
                                         const splitAmt = mySplit ? (paidAmount - mySplit.amount) : paidAmount;
-                                        amountColor = splitAmt > 0 ? "text-[#108c73]" : "text-gray-500";
+                                        amountColor = splitAmt > 0 ? "text-emerald-500" : "text-gray-500";
                                         amountLabel = splitAmt > 0 ? "you lent" : "not involved";
                                         amountValue = splitAmt > 0 ? "$" + splitAmt.toFixed(2) : "";
                                     } else {
                                         const mySplit = item.splits.find(s => s.user._id === user.id || s.user === user.id);
                                         const splitAmt = mySplit ? mySplit.amount : 0;
-                                        amountColor = splitAmt > 0 ? "text-[#e25b22]" : "text-gray-500";
+                                        amountColor = splitAmt > 0 ? "text-rose-600" : "text-gray-500";
                                         amountLabel = splitAmt > 0 ? "you borrowed" : "not involved";
                                         amountValue = splitAmt > 0 ? "$" + splitAmt.toFixed(2) : "";
                                     }
@@ -513,8 +520,8 @@ export default function GroupDetails() {
                                                 </div>
 
                                                 <div className={`w-10 h-10 ml-3 flex items-center justify-center flex-shrink-0 relative`}>
-                                                    <div className="bg-[#f2e7c9] w-10 h-10 flex items-center justify-center border border-[#e1d2a7] rounded-sm">
-                                                        <Receipt className="w-5 h-5 opacity-90 text-gray-800" />
+                                                    <div className="bg-orange-50 w-10 h-10 flex items-center justify-center border border-orange-100 rounded-lg">
+                                                        <Receipt className="w-5 h-5 opacity-90 text-orange-600" />
                                                     </div>
                                                 </div>
 
@@ -544,7 +551,7 @@ export default function GroupDetails() {
                 <div className="fixed bottom-6 right-5 z-20">
                     <Link
                         to={`/group/${id}/add`}
-                        className="bg-[#108c73] text-white rounded-full shadow-[0_4px_10px_rgb(0,0,0,0.15)] px-5 py-3.5 flex items-center justify-center gap-2 font-bold hover:bg-[#0c705c] transition transform hover:scale-105"
+                        className="bg-slate-900 text-white rounded-full shadow-[0_4px_10px_rgb(0,0,0,0.15)] px-5 py-3.5 flex items-center justify-center gap-2 font-bold hover:bg-slate-950 transition transform hover:scale-105"
                     >
                         <Receipt className="w-5 h-5" />
                         Add expense
@@ -599,7 +606,7 @@ export default function GroupDetails() {
                                             type="text"
                                             value={editDescription}
                                             onChange={e => setEditDescription(e.target.value)}
-                                            className="w-full py-3 px-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none shadow-sm"
+                                            className="w-full py-3 px-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm"
                                             required
                                         />
                                     </div>
@@ -612,7 +619,7 @@ export default function GroupDetails() {
                                                 step="0.01"
                                                 value={editAmount}
                                                 onChange={e => setEditAmount(e.target.value)}
-                                                className="w-full py-3 pl-8 pr-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none shadow-sm font-bold"
+                                                className="w-full py-3 pl-8 pr-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm font-bold"
                                                 required
                                             />
                                         </div>
@@ -621,7 +628,7 @@ export default function GroupDetails() {
                                     <button
                                         type="submit"
                                         disabled={isSavingEdit}
-                                        className="w-full font-bold bg-teal-600 text-white rounded-xl py-3.5 shadow-md hover:bg-teal-700 transition disabled:opacity-50 mt-4"
+                                        className="w-full font-bold bg-slate-900 text-white rounded-xl py-3.5 shadow-md hover:bg-slate-950 transition disabled:opacity-50 mt-4"
                                     >
                                         {isSavingEdit ? 'Saving...' : 'Save Changes'}
                                     </button>
@@ -629,11 +636,11 @@ export default function GroupDetails() {
                             ) : (
                                 <div>
                                     <div className="text-center mb-6">
-                                        <div className="w-16 h-16 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner">
+                                        <div className="w-16 h-16 bg-slate-50 text-slate-900 rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner">
                                             <Receipt className="w-8 h-8" />
                                         </div>
                                         <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
-                                        <p className="text-3xl font-bold text-teal-600 mt-2">${selectedExpense.amount.toFixed(2)}</p>
+                                        <p className="text-3xl font-bold text-slate-900 mt-2">${selectedExpense.amount.toFixed(2)}</p>
                                         <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
                                         <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
                                     </div>
@@ -692,7 +699,7 @@ export default function GroupDetails() {
                             </div>
                             <button
                                 onClick={() => { setNewGroupName(group.name); setShowCustomizeGroup(true); }}
-                                className="text-[#108c73] font-bold text-[15px] px-2 flex-shrink-0">
+                                className="text-slate-900 font-bold text-[15px] px-2 flex-shrink-0">
                                 Edit
                             </button>
                         </div>
@@ -716,7 +723,7 @@ export default function GroupDetails() {
                                     return (
                                         <div key={member._id} onClick={() => setSelectedMemberModal(member)} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer border-b border-gray-50">
                                             <div className="flex items-center gap-4 max-w-[65%]">
-                                                <div className="w-[52px] h-[52px] bg-[#126b70] text-white rounded-full flex items-center justify-center text-[22px] font-medium uppercase shadow-sm flex-shrink-0">
+                                                <div className="w-[52px] h-[52px] bg-slate-950 text-white rounded-full flex items-center justify-center text-[22px] font-medium uppercase shadow-sm flex-shrink-0">
                                                     {member.username?.charAt(0)}
                                                 </div>
                                                 <div className="truncate flex-1">
@@ -727,13 +734,13 @@ export default function GroupDetails() {
                                             <div className="text-right flex-shrink-0">
                                                 {b < 0 ? (
                                                     <>
-                                                        <p className="text-[11px] font-medium text-[#e25b22] uppercase tracking-wide">owes</p>
-                                                        <p className="text-[19px] font-medium text-[#e25b22] leading-tight">${Math.abs(b).toFixed(2)}</p>
+                                                        <p className="text-[11px] font-medium text-rose-600 uppercase tracking-wide">owes</p>
+                                                        <p className="text-[19px] font-medium text-rose-600 leading-tight">${Math.abs(b).toFixed(2)}</p>
                                                     </>
                                                 ) : b > 0 ? (
                                                     <>
-                                                        <p className="text-[11px] font-medium text-[#108c73] uppercase tracking-wide">gets back</p>
-                                                        <p className="text-[19px] font-medium text-[#108c73] leading-tight">${b.toFixed(2)}</p>
+                                                        <p className="text-[11px] font-medium text-slate-900 uppercase tracking-wide">gets back</p>
+                                                        <p className="text-[19px] font-medium text-slate-900 leading-tight">${b.toFixed(2)}</p>
                                                     </>
                                                 ) : (
                                                     <p className="text-[15px] font-medium text-gray-400 mt-2">settled up</p>
@@ -755,10 +762,10 @@ export default function GroupDetails() {
                                     </div>
                                     <div className="flex-1 pr-4">
                                         <h5 className="text-[17px] text-gray-800 font-medium">Simplify group debts</h5>
-                                        <p className="text-[14px] text-gray-500 leading-snug mt-1">Automatically combines debts to reduce the total number of repayments between group members. <br /><span className="text-[#108c73] font-medium">Learn more</span></p>
+                                        <p className="text-[14px] text-gray-500 leading-snug mt-1">Automatically combines debts to reduce the total number of repayments between group members. <br /><span className="text-slate-900 font-medium">Learn more</span></p>
                                     </div>
                                     <div className="flex-shrink-0 mt-1">
-                                        {simplifyDebts ? <div className="w-12 h-7 bg-[#108c73] rounded-full relative transition-colors"><div className="w-6 h-6 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm"></div></div> : <div className="w-12 h-7 bg-gray-200 rounded-full relative transition-colors"><div className="w-6 h-6 bg-white rounded-full absolute left-0.5 top-0.5 shadow-sm"></div></div>}
+                                        {simplifyDebts ? <div className="w-12 h-7 bg-slate-900 rounded-full relative transition-colors"><div className="w-6 h-6 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm"></div></div> : <div className="w-12 h-7 bg-gray-200 rounded-full relative transition-colors"><div className="w-6 h-6 bg-white rounded-full absolute left-0.5 top-0.5 shadow-sm"></div></div>}
                                     </div>
                                 </div>
 
@@ -805,7 +812,7 @@ export default function GroupDetails() {
                                 setSettleUpDate(saved);
                             } catch { /* silently ignore */ }
                             setShowCustomizeGroup(false);
-                        }} className="text-[#108c73] font-bold text-[16px] px-2 hover:opacity-70 transition">
+                        }} className="text-slate-900 font-bold text-[16px] px-2 hover:opacity-70 transition">
                             Done
                         </button>
                     </div>
@@ -822,7 +829,7 @@ export default function GroupDetails() {
                                     type="text"
                                     value={newGroupName}
                                     onChange={(e) => setNewGroupName(e.target.value)}
-                                    className="w-full text-[18px] text-gray-900 border-b border-gray-300 pb-1.5 focus:border-[#108c73] focus:border-b-2 outline-none transition-colors"
+                                    className="w-full text-[18px] text-gray-900 border-b border-gray-300 pb-1.5 focus:border-slate-900 focus:border-b-2 outline-none transition-colors"
                                     autoFocus
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
@@ -837,7 +844,7 @@ export default function GroupDetails() {
                         {/* Settle-up Date */}
                         <div className="mt-8">
                             <label className="text-[13px] font-bold text-gray-500 mb-3 block">Settle-up date</label>
-                            <div className="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-3 focus-within:border-[#108c73] transition bg-white">
+                            <div className="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-3 focus-within:border-slate-900 transition bg-white">
                                 <Calendar className="w-5 h-5 text-gray-400 flex-shrink-0" />
                                 <input
                                     type="date"
@@ -872,13 +879,13 @@ export default function GroupDetails() {
                                         <div key={type.id} className="relative flex-1">
                                             <button
                                                 onClick={() => setGroupType(type.id)}
-                                                className={`w-full py-3.5 flex flex-col items-center gap-2 border rounded-xl transition relative z-10 ${isSelected ? 'border-[#108c73] bg-[#e6f4ef]' : 'border-gray-200 hover:bg-gray-50 bg-white'}`}
+                                                className={`w-full py-3.5 flex flex-col items-center gap-2 border rounded-xl transition relative z-10 ${isSelected ? 'border-slate-900 bg-[#e6f4ef]' : 'border-gray-200 hover:bg-gray-50 bg-white'}`}
                                             >
-                                                <type.Icon className={`w-[26px] h-[26px] ${isSelected ? 'text-[#108c73]' : 'text-gray-700'}`} strokeWidth={1.5} />
-                                                <span className={`text-[13px] ${isSelected ? 'font-bold text-[#108c73]' : 'font-medium text-gray-700'}`}>{type.label}</span>
+                                                <type.Icon className={`w-[26px] h-[26px] ${isSelected ? 'text-slate-900' : 'text-gray-700'}`} strokeWidth={1.5} />
+                                                <span className={`text-[13px] ${isSelected ? 'font-bold text-slate-900' : 'font-medium text-gray-700'}`}>{type.label}</span>
                                             </button>
                                             {isSelected && (
-                                                <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-[11px] h-[11px] bg-[#e6f4ef] transform rotate-45 border-b border-r border-[#108c73] z-0"></div>
+                                                <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-[11px] h-[11px] bg-[#e6f4ef] transform rotate-45 border-b border-r border-slate-900 z-0"></div>
                                             )}
                                         </div>
                                     )
@@ -895,7 +902,7 @@ export default function GroupDetails() {
                     <div className="bg-white rounded-t-3xl overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-[0_-10px_40px_rgb(0,0,0,0.1)]" onClick={e => e.stopPropagation()}>
                         <div className="p-5 flex items-center justify-between border-b border-gray-100 pb-6">
                             <div className="flex items-center gap-4 max-w-[70%]">
-                                <div className="w-14 h-14 bg-[#126b70] text-white rounded-full flex items-center justify-center text-2xl font-medium uppercase shadow-sm flex-shrink-0">
+                                <div className="w-14 h-14 bg-slate-950 text-white rounded-full flex items-center justify-center text-2xl font-medium uppercase shadow-sm flex-shrink-0">
                                     {selectedMemberModal.username?.charAt(0)}
                                 </div>
                                 <div className="truncate">
@@ -906,13 +913,13 @@ export default function GroupDetails() {
                             <div className="text-right flex-shrink-0">
                                 {balances[selectedMemberModal._id] < 0 ? (
                                     <>
-                                        <p className="text-[11px] font-medium text-[#e25b22] uppercase tracking-wide">owes</p>
-                                        <p className="text-[20px] font-medium text-[#e25b22] leading-none mt-0.5">${Math.abs(balances[selectedMemberModal._id]).toFixed(2)}</p>
+                                        <p className="text-[11px] font-medium text-rose-600 uppercase tracking-wide">owes</p>
+                                        <p className="text-[20px] font-medium text-rose-600 leading-none mt-0.5">${Math.abs(balances[selectedMemberModal._id]).toFixed(2)}</p>
                                     </>
                                 ) : balances[selectedMemberModal._id] > 0 ? (
                                     <>
-                                        <p className="text-[11px] font-medium text-[#108c73] uppercase tracking-wide">gets back</p>
-                                        <p className="text-[20px] font-medium text-[#108c73] leading-none mt-0.5">${balances[selectedMemberModal._id].toFixed(2)}</p>
+                                        <p className="text-[11px] font-medium text-slate-900 uppercase tracking-wide">gets back</p>
+                                        <p className="text-[20px] font-medium text-slate-900 leading-none mt-0.5">${balances[selectedMemberModal._id].toFixed(2)}</p>
                                     </>
                                 ) : (
                                     <p className="text-[16px] font-medium text-gray-400">settled up</p>
@@ -973,7 +980,7 @@ export default function GroupDetails() {
                                 <LinkIcon className="w-[28px] h-[28px] text-white absolute transform -rotate-45" strokeWidth={2} />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <a href={inviteLinkUrl} target="_blank" rel="noreferrer" className="text-[#108c73] font-medium text-[16px] underline leading-snug break-all block decoration-1 text-left decoration-[#108c73]/40 underline-offset-2">
+                                <a href={inviteLinkUrl} target="_blank" rel="noreferrer" className="text-slate-900 font-medium text-[16px] underline leading-snug break-all block decoration-1 text-left decoration-slate-900/40 underline-offset-2">
                                     {inviteLinkUrl}
                                 </a>
                             </div>
@@ -1071,15 +1078,15 @@ export default function GroupDetails() {
                                     <div key={member._id} className="w-full flex flex-col border-b border-gray-50 bg-white">
                                         <div onClick={() => setExpandedBalances(prev => ({ ...prev, [member._id]: !prev[member._id] }))} className="flex items-center justify-between px-5 py-5 w-full hover:bg-gray-50 transition cursor-pointer relative z-10">
                                             <div className="flex items-center gap-4 flex-1 min-w-0 pr-4">
-                                                <div className="w-[46px] h-[46px] bg-[#126b70] text-white rounded-full flex items-center justify-center text-[20px] font-medium uppercase shadow-sm flex-shrink-0 relative z-20">
+                                                <div className="w-[46px] h-[46px] bg-slate-950 text-white rounded-full flex items-center justify-center text-[20px] font-medium uppercase shadow-sm flex-shrink-0 relative z-20">
                                                     {member.username?.charAt(0)}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-[16px] text-gray-800 font-medium leading-snug truncate">
                                                         {displayName} {b < 0 ? (
-                                                            <>owes <span className="text-[#e25b22]">${Math.abs(b).toFixed(2)}</span></>
+                                                            <>owes <span className="text-rose-600">${Math.abs(b).toFixed(2)}</span></>
                                                         ) : b > 0 ? (
-                                                            <>gets back <span className="text-[#108c73]">${b.toFixed(2)}</span></>
+                                                            <>gets back <span className="text-slate-900">${b.toFixed(2)}</span></>
                                                         ) : (
                                                             <span className="text-gray-500 font-normal">is settled up</span>
                                                         )}
@@ -1104,7 +1111,7 @@ export default function GroupDetails() {
                                                     const isCurrentUserExpanded = member._id === user.id || member._id === user._id;
 
                                                     // Colors are relative to the expanded member. If the expanded member owes, it's orange. If they get back, it's green.
-                                                    const amountColorCls = detail.debtor._id === member._id ? 'text-[#e25b22]' : 'text-[#108c73]';
+                                                    const amountColorCls = detail.debtor._id === member._id ? 'text-rose-600' : 'text-emerald-500';
                                                     const otherPerson = detail.debtor._id === member._id ? detail.creditor : detail.debtor;
 
                                                     // Render buttons: if the logged in user is the one receiving money in this pair, [Request]. Everything else is [Remind...] [Settle up].
@@ -1116,7 +1123,7 @@ export default function GroupDetails() {
 
                                                             <div className="flex-1 pb-4 pt-1.5 pr-5 ml-[76px]">
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className="w-[30px] h-[30px] bg-[#126b70] opacity-90 text-white rounded-full flex items-center justify-center text-[13px] font-medium uppercase shadow-sm flex-shrink-0">
+                                                                    <div className="w-[30px] h-[30px] bg-slate-950 opacity-90 text-white rounded-full flex items-center justify-center text-[13px] font-medium uppercase shadow-sm flex-shrink-0">
                                                                         {otherPerson.username?.charAt(0)}
                                                                     </div>
 
@@ -1139,7 +1146,7 @@ export default function GroupDetails() {
                                                                                     setReminderEmailBody(`Hi ${personToRemind.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${currSym}${detail.amount.toFixed(2)} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. 🙏\n\nThank you!`);
                                                                                     setShowReminderModal(true);
                                                                                 }}
-                                                                                className="bg-[#108c73] text-white font-bold px-4 py-2 rounded-[6px] text-[14.5px] shadow-sm flex-1 min-w-0 truncate hover:bg-[#0e7c65] transition leading-none">Request</button>
+                                                                                className="bg-slate-900 text-white font-bold px-4 py-2 rounded-[6px] text-[14.5px] shadow-sm flex-1 min-w-0 truncate hover:bg-[#0e7c65] transition leading-none">Request</button>
                                                                             <button
                                                                                 onClick={() => {
                                                                                     const personToRemind = detail.debtor;
@@ -1324,8 +1331,8 @@ export default function GroupDetails() {
                                     <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
                                         {/* Insight Card 1 */}
                                         <div className="min-w-[160px] flex-1 bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm">
-                                            <div className="w-8 h-8 rounded-full bg-[#e5f0ea] flex items-center justify-center mb-3">
-                                                <TrendingUp className="w-4 h-4 text-[#108c73]" />
+                                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                                                <TrendingUp className="w-4 h-4 text-slate-900" />
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Spender</p>
                                             <p className="text-[16px] text-gray-900 font-medium leading-tight">{topUserName}</p>
@@ -1403,8 +1410,8 @@ export default function GroupDetails() {
                                 }}
                                 className="flex items-center gap-4 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 transition rounded-[14px] border border-gray-200 border-b-[2px]"
                             >
-                                <div className="w-10 h-10 rounded-full bg-[#e5f0ea] flex items-center justify-center">
-                                    <FileSpreadsheet className="w-5 h-5 text-[#108c73]" />
+                                <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center">
+                                    <FileSpreadsheet className="w-5 h-5 text-slate-900" />
                                 </div>
                                 <div className="flex flex-col text-left">
                                     <span className="text-[16px] text-gray-800 font-bold">CSV Spreadsheet</span>
@@ -1441,7 +1448,7 @@ export default function GroupDetails() {
                                     setShowGroupNoteModal(false);
                                 } catch { alert('Failed to save note.'); }
                             }}
-                            className="ml-auto text-[#108c73] font-bold text-[16px] hover:opacity-80 transition"
+                            className="ml-auto text-slate-900 font-bold text-[16px] hover:opacity-80 transition"
                         >
                             Save
                         </button>
@@ -1550,7 +1557,7 @@ export default function GroupDetails() {
 
                                 {settleList.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center flex-1 text-center py-16">
-                                        <CheckCircle2 className="w-14 h-14 text-[#108c73] mb-4" />
+                                        <CheckCircle2 className="w-14 h-14 text-slate-900 mb-4" />
                                         <p className="text-[18px] font-bold text-gray-800">All settled up!</p>
                                         <p className="text-gray-500 mt-1">You have no outstanding balances in this group.</p>
                                     </div>
@@ -1573,10 +1580,10 @@ export default function GroupDetails() {
                                             <p className="text-[13px] text-gray-500 truncate">{row.member.email}</p>
                                         </div>
                                         <div className="text-right flex-shrink-0">
-                                            <p className={`text-[12px] font-semibold uppercase tracking-wide ${row.iOwe ? 'text-[#e25b22]' : 'text-[#108c73]'}`}>
+                                            <p className={`text-[12px] font-semibold uppercase tracking-wide ${row.iOwe ? 'text-rose-600' : 'text-emerald-500'}`}>
                                                 {row.iOwe ? 'you owe' : 'owes you'}
                                             </p>
-                                            <p className={`text-[20px] font-bold leading-tight ${row.iOwe ? 'text-[#e25b22]' : 'text-[#108c73]'}`}>
+                                            <p className={`text-[20px] font-bold leading-tight ${row.iOwe ? 'text-rose-600' : 'text-emerald-500'}`}>
                                                 ${row.amount.toFixed(2)}
                                             </p>
                                         </div>
@@ -1589,7 +1596,7 @@ export default function GroupDetails() {
                         {groupSettleStep === 2 && settleUpTarget && (
                             <div className="flex flex-col flex-1 px-5 pt-8">
                                 <div className="bg-gray-50 rounded-2xl p-5 mb-8 flex items-center gap-4 border border-gray-100">
-                                    <div className="w-12 h-12 rounded-full bg-[#e25b22] flex items-center justify-center text-white text-xl font-bold uppercase flex-shrink-0">
+                                    <div className="w-12 h-12 rounded-full bg-[#e11d48] flex items-center justify-center text-white text-xl font-bold uppercase flex-shrink-0">
                                         {settleUpTarget.member.username.charAt(0)}
                                     </div>
                                     <div>
@@ -1617,16 +1624,16 @@ export default function GroupDetails() {
                                     </div>
                                     <button
                                         onClick={() => { setGroupSettleMode('cash'); setGroupSettleStep(3); }}
-                                        className="flex items-center gap-4 p-4 rounded-2xl border-2 border-[#108c73] bg-[#f0faf7] hover:bg-[#e5f7f2] transition text-left"
+                                        className="flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-900 bg-slate-50 hover:bg-slate-200 transition text-left"
                                     >
                                         <div className="w-12 h-12 rounded-xl bg-[#d1f0e7] flex items-center justify-center">
-                                            <Banknote className="w-6 h-6 text-[#108c73]" />
+                                            <Banknote className="w-6 h-6 text-slate-900" />
                                         </div>
                                         <div className="flex-1">
                                             <p className="text-[16px] font-bold text-gray-800">Pay with Cash</p>
                                             <p className="text-[13px] text-gray-500">Record a cash payment</p>
                                         </div>
-                                        <ChevronRight className="w-5 h-5 text-[#108c73]" />
+                                        <ChevronRight className="w-5 h-5 text-slate-900" />
                                     </button>
                                 </div>
                             </div>
@@ -1636,7 +1643,7 @@ export default function GroupDetails() {
                         {groupSettleStep === 3 && settleUpTarget && groupSettleMode === 'cash' && (
                             <div className="flex flex-col flex-1 px-5 pt-8">
                                 <div className="flex items-center gap-3 mb-8">
-                                    <div className="w-10 h-10 rounded-full bg-[#108c73] flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center">
                                         <Banknote className="w-5 h-5 text-white" />
                                     </div>
                                     <div>
@@ -1649,16 +1656,16 @@ export default function GroupDetails() {
                                 <button
                                     onClick={() => handleGroupCashSettle(false)}
                                     disabled={isGroupSettling}
-                                    className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#108c73] bg-[#f0faf7] hover:bg-[#e5f7f2] transition mb-4 disabled:opacity-50"
+                                    className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-slate-900 bg-slate-50 hover:bg-slate-200 transition mb-4 disabled:opacity-50"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <CheckCircle2 className="w-6 h-6 text-[#108c73]" />
+                                        <CheckCircle2 className="w-6 h-6 text-slate-900" />
                                         <div className="text-left">
                                             <p className="text-[15px] font-bold text-gray-800">Full settlement</p>
                                             <p className="text-[13px] text-gray-500">Pay the entire balance</p>
                                         </div>
                                     </div>
-                                    <span className="text-[17px] font-bold text-[#108c73]">${settleUpTarget.amount.toFixed(2)}</span>
+                                    <span className="text-[17px] font-bold text-slate-900">${settleUpTarget.amount.toFixed(2)}</span>
                                 </button>
 
                                 {/* Divider */}
@@ -1671,7 +1678,7 @@ export default function GroupDetails() {
                                 {/* Partial input */}
                                 <div className="mt-4">
                                     <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay</label>
-                                    <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-[#108c73] rounded-xl px-4 py-3 transition bg-white">
+                                    <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-slate-900 rounded-xl px-4 py-3 transition bg-white">
                                         <DollarSign className="w-5 h-5 text-gray-400 flex-shrink-0" />
                                         <input
                                             type="number"
@@ -1690,7 +1697,7 @@ export default function GroupDetails() {
                                 <button
                                     onClick={() => handleGroupCashSettle(true)}
                                     disabled={isGroupSettling || !groupPartialAmount || parseFloat(groupPartialAmount) <= 0}
-                                    className="mt-6 w-full bg-[#108c73] text-white py-4 rounded-2xl text-[16px] font-bold shadow-md hover:bg-[#0d7a63] transition disabled:opacity-40"
+                                    className="mt-6 w-full bg-slate-900 text-white py-4 rounded-2xl text-[16px] font-bold shadow-md hover:bg-slate-950 transition disabled:opacity-40"
                                 >
                                     {isGroupSettling ? 'Recording...' : 'Pay with Cash'}
                                 </button>
@@ -1793,9 +1800,9 @@ export default function GroupDetails() {
                                 {/* ── Option 2: Share ─────────────────── */}
                                 <button
                                     onClick={handleShare}
-                                    className="w-full flex items-center gap-4 bg-[#f0faf7] border-2 border-[#d1f0e7] hover:bg-[#e6f7f3] rounded-2xl px-4 py-4 transition text-left"
+                                    className="w-full flex items-center gap-4 bg-slate-50 border-2 border-[#d1f0e7] hover:bg-[#e6f7f3] rounded-2xl px-4 py-4 transition text-left"
                                 >
-                                    <div className="w-9 h-9 rounded-xl bg-[#108c73] flex items-center justify-center flex-shrink-0">
+                                    <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center flex-shrink-0">
                                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                         </svg>

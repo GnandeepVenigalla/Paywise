@@ -76,7 +76,7 @@ export default function AddFriendExpense() {
     return (
         <div className="min-h-screen bg-gray-50 p-4">
             <div className="max-w-md mx-auto bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100">
-                <header className="bg-teal-600 p-6 flex items-center text-white relative">
+                <header className="bg-slate-900 p-6 flex items-center text-white relative">
                     <button onClick={() => navigate(-1)} className="absolute left-4 p-2 rounded-full hover:bg-white/20 transition">
                         <ArrowLeft className="w-6 h-6" />
                     </button>
@@ -88,7 +88,7 @@ export default function AddFriendExpense() {
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
                         <input
                             type="text"
-                            className="w-full text-lg border-b-2 border-gray-200 focus:border-teal-500 py-2 outline-none transition-colors bg-transparent"
+                            className="w-full text-lg border-b-2 border-gray-200 focus:border-slate-800 py-2 outline-none transition-colors bg-transparent"
                             value={description}
                             onChange={e => setDescription(e.target.value)}
                             placeholder="e.g. Movie Tickets"
@@ -127,9 +127,9 @@ export default function AddFriendExpense() {
                                     key={opt.value}
                                     type="button"
                                     onClick={() => setSplitMethod(opt.value)}
-                                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 text-left transition ${splitMethod === opt.value ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 text-left transition ${splitMethod === opt.value ? 'border-slate-800 bg-slate-50 text-slate-950' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                                 >
-                                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${splitMethod === opt.value ? 'border-teal-500 bg-teal-500' : 'border-gray-300'}`} />
+                                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${splitMethod === opt.value ? 'border-slate-800 bg-slate-800' : 'border-gray-300'}`} />
                                     <span className="font-medium text-[15px]">{opt.label}</span>
                                 </button>
                             ))}
@@ -140,7 +140,7 @@ export default function AddFriendExpense() {
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Who Paid?</label>
                             <select
-                                className="w-full text-lg border-2 border-gray-200 focus:border-teal-500 rounded-xl py-3 px-4 outline-none transition-colors bg-white appearance-none"
+                                className="w-full text-lg border-2 border-gray-200 focus:border-slate-800 rounded-xl py-3 px-4 outline-none transition-colors bg-white appearance-none"
                                 value={paidBy}
                                 onChange={e => setPaidBy(e.target.value)}
                             >
@@ -153,7 +153,7 @@ export default function AddFriendExpense() {
                     <button
                         type="submit"
                         disabled={isLoading || !description || !amount}
-                        className="w-full bg-teal-600 text-white font-bold py-4 rounded-xl mt-8 flex items-center justify-center gap-2 hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-teal-500/30"
+                        className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl mt-8 flex items-center justify-center gap-2 hover:bg-slate-950 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-800/30"
                     >
                         {isLoading ? 'Saving...' : <><CheckCircle2 className="w-5 h-5" /> Save Expense</>}
                     </button>
