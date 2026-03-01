@@ -17,6 +17,19 @@ export default function ScanBill() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [cameraState, setCameraState] = useState('loading'); // 'loading', 'active', 'error'
+    const [hasPermission, setHasPermission] = useState(localStorage.getItem('camera_granted') === 'true');
+
+    const requestPermission = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(track => track.stop()); // Just checking permission
+            setHasPermission(true);
+            localStorage.setItem('camera_granted', 'true');
+            setCameraState('loading');
+        } catch (err) {
+            setCameraState('error');
+        }
+    };
 
     const capture = useCallback(() => {
         if (webcamRef.current) {
@@ -127,6 +140,28 @@ export default function ScanBill() {
                                     Open Native Camera
                                 </button>
                             </div>
+                        ) : !hasPermission ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-black absolute inset-0 z-0">
+                                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6">
+                                    <Camera className="w-10 h-10 text-white/40" />
+                                </div>
+                                <h3 className="text-2xl font-bold mb-3">Enable Camera Access</h3>
+                                <p className="text-gray-400 mb-10 max-w-xs text-[15px] leading-relaxed">
+                                    To scan receipts and extract totals automatically, Paywise needs permission to use your camera.
+                                </p>
+                                <button
+                                    onClick={requestPermission}
+                                    className="w-full max-w-xs py-4.5 px-8 rounded-2xl bg-white text-black font-black text-lg hover:bg-gray-100 transition shadow-[0_10px_30px_rgba(255,255,255,0.1)] flex items-center justify-center gap-3 active:scale-95 transition-transform"
+                                >
+                                    Enable Camera
+                                </button>
+                                <button
+                                    onClick={() => galleryInputRef.current?.click()}
+                                    className="mt-6 text-gray-500 font-bold hover:text-white transition"
+                                >
+                                    Upload from gallery instead
+                                </button>
+                            </div>
                         ) : (
                             <>
                                 {cameraState === 'loading' && (
@@ -142,7 +177,11 @@ export default function ScanBill() {
                                     className="w-full h-full object-cover absolute inset-0 z-0"
                                     playsInline
                                     onUserMedia={() => setCameraState('active')}
-                                    onUserMediaError={() => setCameraState('error')}
+                                    onUserMediaError={() => {
+                                        setCameraState('error');
+                                        setHasPermission(false);
+                                        localStorage.removeItem('camera_granted');
+                                    }}
                                 />
                                 {/* Overlay grid for scanning */}
                                 <div className="absolute inset-0 pointer-events-none border-[40px] border-black/50 transition-all z-10">
