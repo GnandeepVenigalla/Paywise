@@ -1,10 +1,11 @@
 import { useEffect, useState, useContext, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, CreditCard, Receipt, Folder, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2 } from 'lucide-react';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
+import ExpenseItem from '../components/UI/ExpenseItem';
 export default function FriendDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -438,55 +439,46 @@ export default function FriendDetails() {
                                 return displayItems.map(item => {
                                     const dateObj = new Date(item.date);
                                     let monthYear = dateObj.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-                                    const monthShort = dateObj.toLocaleDateString("en-US", { month: "short" });
-                                    const day = ("0" + dateObj.getDate()).slice(-2);
-
-                                    if (isNaN(dateObj.getTime())) {
-                                        monthYear = 'Unknown Date';
-                                    }
+                                    if (isNaN(dateObj.getTime())) monthYear = 'Unknown Date';
 
                                     const showHeader = monthYear !== lastMonth;
                                     lastMonth = monthYear;
 
-                                    let amountColor, amountLabel, amountValue;
-                                    let title = item.isGroupSummary ? item.group.name : item.description;
-                                    let subtitle = "";
-                                    let paidAmount = item.isGroupSummary ? null : item.amount;
+                                    const isPaidByMe = item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id;
+                                    let userSplit = 0;
 
                                     if (item.isGroupSummary) {
-                                        amountColor = item.balance > 0 ? "text-emerald-500" : (item.balance < 0 ? "text-rose-600" : "text-gray-500");
-                                        amountLabel = item.balance > 0 ? "you lent" : (item.balance < 0 ? "you borrowed" : "settled");
-                                        amountValue = "$" + Math.abs(item.balance).toFixed(2);
-                                        subtitle = `${item.count} Shared Group Action${item.count !== 1 ? 's' : ''}`;
+                                        userSplit = item.balance;
                                     } else {
-                                        const isPaidByMe = item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id;
-                                        const groupNameText = item.group ? ` in "${item.group.name}"` : "";
-                                        subtitle = isPaidByMe
-                                            ? `You paid $${paidAmount.toFixed(2)}${groupNameText}`
-                                            : `${item.paidBy?.username || friend.username} paid $${paidAmount.toFixed(2)}${groupNameText}`;
-
                                         if (isPaidByMe) {
-                                            const fSplit = item.splits.find(s => s.user._id === friend._id || s.user === friend._id);
-                                            const splitAmt = fSplit ? fSplit.amount : 0;
-                                            amountColor = splitAmt > 0 ? "text-emerald-500" : "text-gray-500";
-                                            amountLabel = splitAmt > 0 ? "you lent" : "not involved";
-                                            amountValue = "$" + splitAmt.toFixed(2);
+                                            const fSplit = item.splits?.find(s => (s.user._id || s.user) === (friend._id || friend));
+                                            userSplit = fSplit ? fSplit.amount : 0;
                                         } else {
-                                            const mySplit = item.splits.find(s => s.user._id === user.id || s.user === user.id || s.user._id === user._id || s.user === user._id);
-                                            const splitAmt = mySplit ? mySplit.amount : 0;
-                                            amountColor = splitAmt > 0 ? "text-rose-600" : "text-gray-500";
-                                            amountLabel = splitAmt > 0 ? "you borrowed" : "not involved";
-                                            amountValue = "$" + splitAmt.toFixed(2);
+                                            const mySplit = item.splits?.find(s => (s.user._id || s.user) === (user.id || user._id));
+                                            userSplit = mySplit ? -mySplit.amount : 0;
                                         }
                                     }
 
                                     return (
-                                        <div key={item._id}>
-                                            {showHeader && <h4 className="text-[13px] font-bold text-gray-700 mt-6 mb-3">{monthYear}</h4>}
-                                            <div
+                                        <div key={item._id || Math.random()}>
+                                            {showHeader && (
+                                                <div className="px-5 py-3 bg-gray-50/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50">
+                                                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">{monthYear}</span>
+                                                </div>
+                                            )}
+                                            <ExpenseItem
+                                                description={item.isGroupSummary ? `Group Action: ${item.group.name}` : item.description}
+                                                amount={item.amount || Math.abs(item.balance)}
+                                                date={item.date}
+                                                payerName={item.isGroupSummary ? 'Multiple' : (isPaidByMe ? 'You' : (item.paidBy?.username || friend.username))}
+                                                userSplit={userSplit}
+                                                currencySymbol={currSym}
+                                                isGroup={!!item.group}
+                                                groupName={item.group?.name}
                                                 onClick={() => {
                                                     if (item.isGroupSummary) {
-                                                        navigate(`/group/${item.group._id}`);
+                                                        const groupUrl = `#/group/${item.group.id}`;
+                                                        window.location.href = groupUrl;
                                                     } else {
                                                         setSelectedExpense(item);
                                                         setIsEditingExpense(false);
@@ -494,29 +486,10 @@ export default function FriendDetails() {
                                                         setEditAmount(item.amount.toString());
                                                         setEditItems(item.items || []);
                                                         setSelectedMemberIdsForEdit([user.id]);
+                                                        setShowExpenseModal(true);
                                                     }
                                                 }}
-                                                className="flex items-center py-2.5 cursor-pointer hover:bg-gray-50 bg-white transition -mx-4 px-4 active:bg-gray-100"
-                                            >
-                                                <div className="flex flex-col items-center justify-center min-w-[32px] opacity-70">
-                                                    <span className="text-gray-500 text-[11px] font-medium leading-none mb-0.5">{monthShort}</span>
-                                                    <span className="text-gray-500 text-[17px] font-light leading-none">{day}</span>
-                                                </div>
-
-                                                <div className={`w-10 h-10 ml-3 ${item.isGroupSummary ? 'bg-gray-200 text-gray-500' : 'bg-slate-50 text-slate-900'} flex items-center justify-center flex-shrink-0`}>
-                                                    {item.isGroupSummary ? <Folder className="w-5 h-5 opacity-80" /> : <Receipt className="w-5 h-5 opacity-90" />}
-                                                </div>
-
-                                                <div className="flex-1 min-w-0 px-3">
-                                                    <h4 className="font-medium text-gray-800 text-[16px] leading-tight truncate">{title}</h4>
-                                                    <p className="text-[13px] text-gray-500 truncate mt-0.5">{subtitle}</p>
-                                                </div>
-
-                                                <div className="text-right flex flex-col justify-center flex-shrink-0">
-                                                    <p className={`text-[11px] font-medium opacity-80 ${amountColor}`}>{amountLabel}</p>
-                                                    <p className={`text-[16px] leading-tight font-medium ${amountColor}`}>{amountValue}</p>
-                                                </div>
-                                            </div>
+                                            />
                                         </div>
                                     );
                                 });
