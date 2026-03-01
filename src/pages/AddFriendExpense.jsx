@@ -60,6 +60,7 @@ export default function AddFriendExpense() {
             await api.post('/expenses', {
                 description,
                 amount: parseFloat(amount),
+                currency: user?.defaultCurrency || 'USD',
                 group: null, // explicit individual expense
                 paidBy: paidBy,
                 splits: splitsArray

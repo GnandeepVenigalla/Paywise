@@ -3,7 +3,7 @@ import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     LogOut, Camera, ChevronRight,
-    Bell, Shield, DollarSign, Settings, HelpCircle
+    Bell, Shield, DollarSign, Settings, HelpCircle, UserX
 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import Avatar from '../components/UI/Avatar';
@@ -59,6 +59,13 @@ export default function Account() {
                     label: 'Privacy & Security',
                     sub: 'How we protect your data',
                     to: '/account/privacy',
+                },
+                {
+                    icon: <UserX className="w-5 h-5 text-slate-900" />,
+                    bg: 'bg-rose-50',
+                    label: 'Blocked Users',
+                    sub: 'Manage people you have blocked',
+                    to: '/account/blocked',
                 },
             ],
         },
@@ -161,7 +168,7 @@ export default function Account() {
 
             <div className="text-center text-[11px] text-gray-300 mt-12 mb-6 pointer-events-none uppercase tracking-widest">
                 <p>Crafted with love by GD Enterprises</p>
-                <p className="mt-1.5 opacity-60">Paywise V1.2.7 · © 2026</p>
+                <p className="mt-1.5 opacity-60">Paywise V1.2.8 · © 2026</p>
             </div>
 
             <BottomNav />

@@ -1,17 +1,21 @@
-import { useEffect, useState, useContext, useMemo } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder } from 'lucide-react';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
-import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
+import { useAppSettings } from '../hooks/useAppSettings';
 import ExpenseItem from '../components/UI/ExpenseItem';
+import { useMonthlySpending } from '../hooks/useMonthlySpending';
+import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS } from '../utils/formatters';
+import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, toggleItemAssignment } from '../utils/expenseUtils';
+
 export default function FriendDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { api, user } = useContext(AuthContext);
+    const currSym = CURRENCY_SYMBOLS[user?.defaultCurrency || 'USD'] || '$';
     const { hideBalance } = useAppSettings();
-    const currSym = getCurrencySymbol(user?.defaultCurrency || 'USD');
     const [friend, setFriend] = useState(null);
     const [expenses, setExpenses] = useState([]);
     const [balance, setBalance] = useState(0);
@@ -44,45 +48,8 @@ export default function FriendDetails() {
     const [isReporting, setIsReporting] = useState(false);
     const [isBlocking, setIsBlocking] = useState(false);
 
-
-    const monthlySpending = useMemo(() => {
-        if (!expenses || expenses.length === 0) return [];
-
-        const monthMap = {};
-
-        expenses.forEach(exp => {
-            if (exp.description && exp.description.toLowerCase().includes('payment')) return;
-            if (exp.isGroupSummary) return; // ignore grouped summaries for pure 1-on-1 chart logic
-
-            const d = new Date(exp.date);
-            const key = `${d.getFullYear()}-${("0" + (d.getMonth() + 1)).slice(-2)}`;
-            const monthLabel = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            const shortMonth = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-
-            if (!monthMap[key]) {
-                monthMap[key] = {
-                    key,
-                    label: monthLabel,
-                    shortMonth,
-                    totalSpent: 0,
-                    userShare: 0,
-                    timestamp: new Date(d.getFullYear(), d.getMonth(), 1).getTime(),
-                    expensesList: []
-                };
-            }
-
-            monthMap[key].totalSpent += exp.amount;
-            monthMap[key].expensesList.push(exp);
-
-            const userSplit = exp.splits.find(s => (s.user._id || s.user) === user.id || (s.user._id || s.user) === user._id);
-            if (userSplit) {
-                monthMap[key].userShare += userSplit.amount;
-            }
-        });
-
-        const sorted = Object.values(monthMap).sort((a, b) => a.timestamp - b.timestamp);
-        return sorted;
-    }, [expenses, user]);
+    // Extract monthly spending aggregation logic to custom hook
+    const monthlySpending = useMonthlySpending(expenses, user);
 
     useEffect(() => {
         if (monthlySpending.length > 0) {
@@ -138,34 +105,13 @@ export default function FriendDetails() {
         e.preventDefault();
         setIsSavingEdit(true);
 
-        // Recalculate splits if items exist
-        let calculatedSplits = null;
-        if (editItems.length > 0) {
-            const userSplits = {};
-            editItems.forEach(item => {
-                if (item.assignedTo && item.assignedTo.length > 0) {
-                    const splitAmount = item.price / item.assignedTo.length;
-                    item.assignedTo.forEach(member => {
-                        const mId = member._id || member;
-                        userSplits[mId] = (userSplits[mId] || 0) + splitAmount;
-                    });
-                }
-            });
-            calculatedSplits = Object.keys(userSplits).map(userId => ({
-                user: userId,
-                amount: userSplits[userId]
-            }));
-        }
+        const calculatedSplits = calculateSplitsFromItems(editItems);
 
         try {
             await api.put(`/expenses/${selectedExpense._id}`, {
                 description: editDescription,
                 amount: Number(editAmount),
-                items: editItems.map(i => ({
-                    name: i.name,
-                    price: i.price,
-                    assignedTo: i.assignedTo.map(u => u._id || u)
-                })),
+                items: normalizeItemsForSave(editItems),
                 splits: calculatedSplits || undefined
             });
             setIsEditingExpense(false);
@@ -184,28 +130,12 @@ export default function FriendDetails() {
             return;
         }
 
-        setEditItems(prev => prev.map(item => {
-            if (item._id === itemId || item.id === itemId) {
-                const itemAssignedIds = (item.assignedTo || []).map(u => u._id || u);
-                const allSelectedAreAssigned = selectedMemberIdsForEdit.every(id => itemAssignedIds.includes(id));
+        const members = [
+            { _id: user.id || user._id, username: 'You' },
+            { _id: friend._id, username: friend.username }
+        ];
 
-                if (allSelectedAreAssigned && itemAssignedIds.length > 0) {
-                    const newAssigned = item.assignedTo.filter(u => !selectedMemberIdsForEdit.includes(u._id || u));
-                    return { ...item, assignedTo: newAssigned };
-                } else {
-                    const alreadyAssignedIds = new Set(itemAssignedIds);
-                    const members = [
-                        { _id: user.id || user._id, username: 'You' },
-                        { _id: friend._id, username: friend.username }
-                    ];
-                    const membersToAdd = members.filter(m =>
-                        selectedMemberIdsForEdit.includes(m._id) && !alreadyAssignedIds.has(m._id)
-                    );
-                    return { ...item, assignedTo: [...(item.assignedTo || []), ...membersToAdd] };
-                }
-            }
-            return item;
-        }));
+        setEditItems(prev => toggleItemAssignment(prev, itemId, selectedMemberIdsForEdit, members));
     };
 
     const toggleEditMemberSelection = (memberId) => {
@@ -245,13 +175,13 @@ export default function FriendDetails() {
             return;
         }
         if (amt > Math.abs(balance)) {
-            alert(`Amount cannot exceed $${Math.abs(balance).toFixed(2)}.`);
+            alert(`Amount cannot exceed ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}.`);
             return;
         }
         setIsSettling(true);
         try {
             await api.post('/expenses', {
-                description: isPartial ? `Partial cash payment of $${amt.toFixed(2)}` : 'Cash settle up',
+                description: isPartial ? `Partial cash payment of ${formatCurrency(amt, user?.defaultCurrency)}` : 'Cash settle up',
                 amount: amt,
                 group: null,
                 paidBy: balance > 0 ? friend._id : (user.id || user._id),
@@ -353,7 +283,7 @@ export default function FriendDetails() {
                                         {balance > 0 ? 'owes you' : 'you owe'}
                                     </span>
                                     <span className={`text-2xl font-black tracking-tight ${balance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                        {balance > 0 ? '+' : '-'}{currSym}{Math.abs(balance).toFixed(2)}
+                                        {balance > 0 ? '+' : '-'}{formatCurrency(balance, user?.defaultCurrency)}
                                     </span>
                                 </div>
                             ) : (
@@ -389,7 +319,7 @@ export default function FriendDetails() {
                                         <p key={idx} className="text-[13.5px] text-gray-600 flex justify-between items-center">
                                             <span>{(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes you' : 'you owe'} in {item.name === 'non-group expenses' ? item.name : `"${item.name}"`}</span>
                                             <span className={`font-bold ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                {currSym}{Math.abs(item.balance).toFixed(2)}
+                                                {formatCurrency(item.balance, user?.defaultCurrency)}
                                             </span>
                                         </p>
                                     ));
@@ -437,27 +367,12 @@ export default function FriendDetails() {
                             {(() => {
                                 let lastMonth = '';
                                 return displayItems.map(item => {
-                                    const dateObj = new Date(item.date);
-                                    let monthYear = dateObj.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-                                    if (isNaN(dateObj.getTime())) monthYear = 'Unknown Date';
-
+                                    const monthYear = formatMonthYear(item.date);
                                     const showHeader = monthYear !== lastMonth;
                                     lastMonth = monthYear;
 
                                     const isPaidByMe = item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id;
-                                    let userSplit = 0;
-
-                                    if (item.isGroupSummary) {
-                                        userSplit = item.balance;
-                                    } else {
-                                        if (isPaidByMe) {
-                                            const fSplit = item.splits?.find(s => (s.user._id || s.user) === (friend._id || friend));
-                                            userSplit = fSplit ? fSplit.amount : 0;
-                                        } else {
-                                            const mySplit = item.splits?.find(s => (s.user._id || s.user) === (user.id || user._id));
-                                            userSplit = mySplit ? -mySplit.amount : 0;
-                                        }
-                                    }
+                                    const userSplit = getUserExpenseSplit(item, user, friend?._id || friend);
 
                                     return (
                                         <div key={item._id || Math.random()}>
@@ -472,7 +387,8 @@ export default function FriendDetails() {
                                                 date={item.date}
                                                 payerName={item.isGroupSummary ? 'Multiple' : (isPaidByMe ? 'You' : (item.paidBy?.username || friend.username))}
                                                 userSplit={userSplit}
-                                                currencySymbol={currSym}
+                                                targetCurrency={user?.defaultCurrency || 'USD'}
+                                                sourceCurrency={item.currency || 'USD'}
                                                 isGroup={!!item.group}
                                                 groupName={item.group?.name}
                                                 onClick={() => {
@@ -620,7 +536,7 @@ export default function FriendDetails() {
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                <span className="font-bold text-gray-900">${item.price.toFixed(2)}</span>
+                                                                <span className="font-bold text-gray-900">{formatCurrency(item.price, user?.defaultCurrency, selectedExpense.currency)}</span>
                                                             </div>
                                                         );
                                                     })}
@@ -643,7 +559,7 @@ export default function FriendDetails() {
                                                 {selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />}
                                             </div>
                                             <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
-                                            <p className="text-3xl font-bold text-slate-900 mt-2">${selectedExpense.amount.toFixed(2)}</p>
+                                            <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense.amount, user?.defaultCurrency, selectedExpense.currency)}</p>
                                             <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
                                             {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
                                                 <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
@@ -660,7 +576,7 @@ export default function FriendDetails() {
                                                         <span className="font-semibold text-gray-700 text-sm">
                                                             {split.user._id === user.id ? 'You' : (split.user.username || friend.username)}
                                                         </span>
-                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">${split.amount.toFixed(2)}</span>
+                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split.amount, user?.defaultCurrency, selectedExpense.currency)}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -841,7 +757,7 @@ export default function FriendDetails() {
                                     </div>
                                     <div className="flex items-center gap-3 mt-1 relative">
                                         <div className="w-[6px] h-[20px] bg-[#5ab3ed] rounded-full" />
-                                        <span className="text-[36px] font-light text-[#3b93c8] leading-none">${monthlySpending[selectedMonthIndex].totalSpent.toFixed(2)}</span>
+                                        <span className="text-[36px] font-light text-[#3b93c8] leading-none">{formatCurrency(monthlySpending[selectedMonthIndex].totalSpent, user?.defaultCurrency)}</span>
                                     </div>
                                 </div>
 
@@ -853,7 +769,7 @@ export default function FriendDetails() {
                                     <div className="flex flex-col mt-1 relative">
                                         <div className="flex items-center gap-3">
                                             <div className="w-[6px] h-[20px] bg-[#145a85] rounded-full" />
-                                            <span className="text-[36px] font-light text-[#1b71a2] leading-none">${monthlySpending[selectedMonthIndex].userShare.toFixed(2)}</span>
+                                            <span className="text-[36px] font-light text-[#1b71a2] leading-none">{formatCurrency(monthlySpending[selectedMonthIndex].userShare, user?.defaultCurrency)}</span>
                                         </div>
                                         <p className="text-[14px] text-gray-500 mt-2 ml-4 relative">
                                             {monthlySpending[selectedMonthIndex].totalSpent > 0 ? Math.round((monthlySpending[selectedMonthIndex].userShare / monthlySpending[selectedMonthIndex].totalSpent) * 100) : 0}% of all shared expenses
@@ -900,7 +816,7 @@ export default function FriendDetails() {
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Payer</p>
                                             <p className="text-[16px] text-gray-900 font-medium leading-tight">{topPayerString}</p>
-                                            <p className="text-[14px] text-gray-500 mt-0.5">${topAmt.toFixed(2)}</p>
+                                            <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, user?.defaultCurrency)}</p>
                                         </div>
 
                                         {/* Insight Card 2 */}
@@ -910,7 +826,7 @@ export default function FriendDetails() {
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Largest Expense</p>
                                             <p className="text-[16px] text-gray-900 font-medium leading-tight truncate">{maxExp.description}</p>
-                                            <p className="text-[14px] text-gray-500 mt-0.5">${maxExp.amount.toFixed(2)}</p>
+                                            <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(maxExp.amount, user?.defaultCurrency, maxExp.currency)}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1203,7 +1119,7 @@ export default function FriendDetails() {
                                 </div>
                                 <div>
                                     <p className="text-[13px] text-gray-500 font-medium">Amount to settle</p>
-                                    <p className="text-[22px] font-bold text-gray-900">${Math.abs(balance).toFixed(2)}</p>
+                                    <p className="text-[22px] font-bold text-gray-900">{formatCurrency(balance, user?.defaultCurrency)}</p>
                                     <p className="text-[13px] text-gray-500 mt-0.5">
                                         {balance < 0
                                             ? `You owe ${friend.username}`
@@ -1272,7 +1188,7 @@ export default function FriendDetails() {
                                         <p className="text-[13px] text-gray-500">Pay the entire balance</p>
                                     </div>
                                 </div>
-                                <span className="text-[17px] font-bold text-slate-900">${Math.abs(balance).toFixed(2)}</span>
+                                <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balance, user?.defaultCurrency)}</span>
                             </button>
 
                             {/* Divider */}
@@ -1292,13 +1208,13 @@ export default function FriendDetails() {
                                         min="0.01"
                                         step="0.01"
                                         max={Math.abs(balance)}
-                                        placeholder={`Max $${Math.abs(balance).toFixed(2)}`}
+                                        placeholder={`Max ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}`}
                                         value={partialAmount}
                                         onChange={e => setPartialAmount(e.target.value)}
                                         className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
                                     />
                                 </div>
-                                <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: ${Math.abs(balance - (parseFloat(partialAmount) || 0)).toFixed(2)}</p>
+                                <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(Math.abs(balance - (parseFloat(partialAmount) || 0)), user?.defaultCurrency)}</p>
                             </div>
 
                             <button

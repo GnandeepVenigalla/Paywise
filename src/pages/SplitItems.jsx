@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ArrowLeft, Check, Users, Receipt, DollarSign } from 'lucide-react';
 import logoImg from '../assets/logo.png';
+import { formatCurrency } from '../utils/formatters';
 
 export default function SplitItems() {
     const { id } = useParams();
@@ -177,6 +178,7 @@ export default function SplitItems() {
             await api.post('/expenses', {
                 description,
                 amount: totalAmount, // or totalAssigned? usually receipt total
+                currency: user?.defaultCurrency || 'USD',
                 group: isFriend ? null : id,
                 paidBy: paidBy,
                 splits: splitsArray,
@@ -309,7 +311,7 @@ export default function SplitItems() {
 
                                 <div className="flex items-center gap-4">
                                     <span className={`text-xl font-extrabold ${isAssigned ? 'text-slate-950' : 'text-gray-900'}`}>
-                                        ${item.price.toFixed(2)}
+                                        {formatCurrency(item.price, user?.defaultCurrency)}
                                     </span>
 
                                     <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all shadow-sm ${isAssigned
@@ -337,10 +339,10 @@ export default function SplitItems() {
             <footer className="bg-white border-t border-gray-200 p-5 pb-8 fixed bottom-0 w-full max-w-lg left-1/2 -translate-x-1/2 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-20">
                 <div className="flex justify-between items-center mb-1">
                     <span className="text-gray-500 font-semibold text-sm uppercase tracking-wider">Assigned Total</span>
-                    <span className="text-gray-900 font-extrabold text-2xl">${assignedTotal.toFixed(2)}</span>
+                    <span className="text-gray-900 font-extrabold text-2xl">{formatCurrency(assignedTotal, user?.defaultCurrency)}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs text-gray-400 font-medium">
-                    <span>Receipt Total: ${total.toFixed(2)}</span>
+                    <span>Receipt Total: {formatCurrency(total, user?.defaultCurrency)}</span>
                     <span>{items.filter(i => i.assignedTo.length > 0).length} of {items.length} items</span>
                 </div>
 

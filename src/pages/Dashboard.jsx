@@ -4,17 +4,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Wallet, Layers, Plus, Upload, UserPlus, ChevronRight, Eye } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
-import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
+import { useAppSettings } from '../hooks/useAppSettings';
 import SplitwiseMigrationBanner from '../components/SplitwiseMigrationBanner';
+import { formatCurrency } from '../utils/formatters';
 
 export default function Dashboard() {
     const { user, api } = useContext(AuthContext);
     const navigate = useNavigate();
-    const { hideBalance, monthlyBudget, defaultCurrency } = {
-        ...useAppSettings(),
-        defaultCurrency: user?.defaultCurrency || 'USD',
-    };
-    const currSym = getCurrencySymbol(user?.defaultCurrency || 'USD');
+    const { hideBalance, monthlyBudget } = useAppSettings();
 
     const [groups, setGroups] = useState([]);
     const [totalOwed, setTotalOwed] = useState(0);   // positive = owed to me
@@ -162,9 +159,9 @@ export default function Dashboard() {
                                             <p className="text-sm text-gray-500 mt-0.5">{group.members.length} member{group.members.length !== 1 && 's'}</p>
                                         </div>
                                         {myBal !== 0 && (
-                                            <p className={`text-[15px] font-bold flex-shrink-0 ${hideBalance ? 'privacy-blur' : ''} ${myBal > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                {myBal > 0 ? '+' : '-'}{currSym}{Math.abs(myBal).toFixed(2)}
-                                            </p>
+                                            <div className={`text-[15px] font-bold flex-shrink-0 ${hideBalance ? 'privacy-blur' : ''} ${myBal > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                {myBal > 0 ? '+' : '-'}{formatCurrency(myBal, user?.defaultCurrency)}
+                                            </div>
                                         )}
                                     </div>
                                 </Link>

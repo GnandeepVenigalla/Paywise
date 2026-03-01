@@ -1,5 +1,5 @@
-import React from 'react';
 import { Receipt, CreditCard } from 'lucide-react';
+import { formatCurrency } from '../../utils/formatters';
 
 const ExpenseItem = ({
     description,
@@ -7,7 +7,8 @@ const ExpenseItem = ({
     date,
     payerName,
     userSplit,
-    currencySymbol = '$',
+    targetCurrency = 'USD',
+    sourceCurrency = 'USD',
     onClick,
     isGroup = false,
     groupName
@@ -45,12 +46,12 @@ const ExpenseItem = ({
 
             <div className="text-right flex-shrink-0 ml-4">
                 <p className="text-[17px] font-black text-gray-900 leading-none mb-1">
-                    {currencySymbol}{parseFloat(amount).toFixed(2)}
+                    {formatCurrency(amount, targetCurrency, sourceCurrency)}
                 </p>
                 <p className={`text-[12px] font-bold uppercase tracking-tight ${userSplit > 0 ? 'text-emerald-500' : userSplit < 0 ? 'text-rose-500' : 'text-gray-400'}`}>
                     {userSplit > 0 ? 'You are owed' : userSplit < 0 ? 'You owe' : 'Settled'}
                     <span className="ml-1 font-black">
-                        {currencySymbol}{Math.abs(userSplit).toFixed(2)}
+                        {formatCurrency(Math.abs(userSplit), targetCurrency, sourceCurrency)}
                     </span>
                 </p>
             </div>

@@ -47,6 +47,8 @@ const PrivateRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />;
 };
 
+import BlockedUsers from './pages/BlockedUsers';
+
 function App() {
   return (
     <Router>
@@ -73,6 +75,7 @@ function App() {
               <Route path="/account/privacy" element={<PrivateRoute><PrivacySecurity /></PrivateRoute>} />
               <Route path="/account/currency" element={<PrivateRoute><CurrencySettings /></PrivateRoute>} />
               <Route path="/account/app-settings" element={<PrivateRoute><AppSettings /></PrivateRoute>} />
+              <Route path="/account/blocked" element={<PrivateRoute><BlockedUsers /></PrivateRoute>} />
               <Route path="/invite" element={<PrivateRoute><InviteFriend /></PrivateRoute>} />
               <Route path="/join/:id" element={<JoinGroup />} />
               <Route path="/group/:id" element={<PrivateRoute><GroupDetails /></PrivateRoute>} />
