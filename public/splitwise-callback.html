@@ -1,21 +1,219 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="utf-8" />
-    <title>Paywise - Redirecting...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paywise – Migrating from Splitwise</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .logo {
+            width: 64px;
+            height: 64px;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            padding: 10px;
+            margin-bottom: 32px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 28px;
+            padding: 36px 28px;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.08);
+            max-width: 320px;
+            width: 100%;
+        }
+
+        .icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 32px;
+        }
+
+        .icon.loading {
+            background: #f1f5f9;
+        }
+
+        .icon.success {
+            background: #ecfdf5;
+        }
+
+        .icon.error {
+            background: #fef2f2;
+        }
+
+        h2 {
+            font-size: 22px;
+            font-weight: 800;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+
+        p {
+            font-size: 14px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #0f172a;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .btn {
+            display: block;
+            margin-top: 24px;
+            background: #0f172a;
+            color: white;
+            border: none;
+            border-radius: 16px;
+            padding: 14px 24px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            width: 100%;
+        }
+
+        .btn.secondary {
+            background: #f1f5f9;
+            color: #374151;
+            margin-top: 10px;
+        }
+
+        .stat {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-top: 16px;
+            font-size: 13px;
+            color: #374151;
+            font-weight: 600;
+        }
+    </style>
 </head>
 
 <body>
-    <p>Redirecting to Paywise...</p>
+    <img class="logo" src="https://gnandeepvenigalla.github.io/Paywise/logo.png" alt="Paywise" />
+
+    <div class="card" id="card">
+        <div class="icon loading">
+            <div class="spinner"></div>
+        </div>
+        <h2>Connecting to Splitwise...</h2>
+        <p>Please wait, we're setting up your migration.</p>
+    </div>
+
     <script>
-        // Splitwise redirects here with ?code=XYZ as a query param.
-        // Since Paywise uses HashRouter, the app lives at /#/route
-        // We forward the code into the hash so React can pick it up.
-        var search = window.location.search; // "?code=XYZ"
-        // Build: https://gnandeepvenigalla.github.io/Paywise/#/splitwise-callback?code=XYZ
-        var base = window.location.origin + '/Paywise/';
-        window.location.replace(base + '#/splitwise-callback' + search);
+        var PAYWISE_HOME = 'https://gnandeepvenigalla.github.io/Paywise/#/dashboard';
+        var API_BASE     = 'https://paywise-backend-lemon.vercel.app/api';
+        var REDIRECT_URI = 'https://gnandeepvenigalla.github.io/Paywise/splitwise-callback.html';
+
+        function setState(type, title, body, extra) {
+            var card = document.getElementById('card');
+            var icon = type === 'loading' ? '<div class="spinner"></div>'
+                     : type === 'success' ? '✅'
+                     : '❌';
+            card.innerHTML =
+                '<div class="icon ' + type + '">' + icon + '</div>' +
+                '<h2>' + title + '</h2>' +
+                '<p>' + body + '</p>' +
+                (extra || '');
+        }
+
+        // ---------- Read the authorization code ----------
+        var params = new URLSearchParams(window.location.search);
+        var code = params.get('code');
+
+        if (!code) {
+            // No code – user visited the page directly without OAuth
+            setState('error',
+                'No Authorization Code',
+                'This page is only accessible after authorizing Paywise on Splitwise. Please go back and try again.',
+                '<a href="' + PAYWISE_HOME + '" class="btn">Back to Paywise</a>'
+            );
+        } else {
+            // We have the code – call the migration API directly
+            var token = localStorage.getItem('token');
+
+            if (!token) {
+                setState('error',
+                    'Not Logged In',
+                    'Your Paywise session has expired. Please log in again and retry the migration.',
+                    '<a href="https://gnandeepvenigalla.github.io/Paywise/#/login" class="btn">Log in to Paywise</a>'
+                );
+            } else {
+                setState('loading', 'Migrating Your Data...', 'Fetching your groups and expenses from Splitwise. This may take a moment.');
+
+                fetch(API_BASE + '/splitwise/migrate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ code: code, redirectUri: REDIRECT_URI })
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.groupsCount !== undefined || data.msg === 'Migration successful') {
+                        var stats = '<div class="stat">✅ ' + (data.groupsCount || 0) + ' groups · ' + (data.expensesCount || 0) + ' expenses imported</div>';
+                        setState('success',
+                            'Migration Complete! 🎉',
+                            'Your Splitwise data is now in Paywise.',
+                            stats + '<a href="' + PAYWISE_HOME + '" class="btn">View Dashboard</a>'
+                        );
+                    } else {
+                        setState('error',
+                            'Migration Failed',
+                            data.msg || 'An unexpected error occurred. Please try again.',
+                            '<a href="' + PAYWISE_HOME + '" class="btn">Back to Paywise</a>'
+                        );
+                    }
+                })
+                .catch(function(err) {
+                    setState('error',
+                        'Connection Error',
+                        'Could not reach the Paywise server. Please try again.',
+                        '<a href="' + PAYWISE_HOME + '" class="btn secondary">Back to Paywise</a>'
+                    );
+                });
+            }
+        }
     </script>
 </body>
 
