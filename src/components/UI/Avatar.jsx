@@ -14,7 +14,7 @@ const Avatar = ({
         xl: 'w-24 h-24 text-[32px] rounded-3xl'
     };
 
-    const baseStyles = 'shrink-0 overflow-hidden flex items-center justify-center font-black uppercase text-white shadow-sm transition-transform hover:scale-105';
+    const baseStyles = 'relative shrink-0 overflow-hidden flex items-center justify-center font-black uppercase text-white shadow-sm transition-transform hover:scale-105';
 
     const colors = [
         { p: 'bg-[#02182B]', s: 'bg-[#04345C]', t: 'bg-[#124B75]', q: 'bg-[#6B9AB7]' },

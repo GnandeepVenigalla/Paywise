@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -13,6 +13,64 @@ import Button from '../components/UI/Button';
 export default function Account() {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
+    const [kitties, setKitties] = useState([]);
+
+    const kittyImages = [
+        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50534.png`,
+        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50541.png`,
+        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50525.png`,
+        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50480.png`,
+        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50433.png`
+    ];
+
+    const spawnKitty = () => {
+        const id = Date.now();
+        const src = kittyImages[Math.floor(Math.random() * kittyImages.length)];
+
+        const edges = ['bottom', 'top', 'left', 'right'];
+        const edge = edges[Math.floor(Math.random() * edges.length)];
+
+        let style = { width: '180px', height: 'auto', zIndex: 60 };
+        let animationClass = '';
+
+        const offset = Math.floor(Math.random() * 60) + 10;
+
+        switch (edge) {
+            case 'bottom':
+                style.bottom = '-20px';
+                style.left = `${offset}%`;
+                style.transform = `rotate(${Math.floor(Math.random() * 40) - 20}deg)`;
+                animationClass = 'animate-in slide-in-from-bottom-[100%] duration-700';
+                break;
+            case 'top':
+                style.top = '-20px';
+                style.left = `${offset}%`;
+                style.transform = `rotate(${180 + Math.floor(Math.random() * 40) - 20}deg)`;
+                animationClass = 'animate-in slide-in-from-top-[100%] duration-700';
+                break;
+            case 'left':
+                style.left = '-20px';
+                style.top = `${offset}%`;
+                style.transform = `rotate(${90 + Math.floor(Math.random() * 40) - 20}deg)`;
+                animationClass = 'animate-in slide-in-from-left-[100%] duration-700';
+                break;
+            case 'right':
+                style.right = '-20px';
+                style.top = `${offset}%`;
+                style.transform = `rotate(${-90 + Math.floor(Math.random() * 40) - 20}deg)`;
+                animationClass = 'animate-in slide-in-from-right-[100%] duration-700';
+                break;
+            default:
+                break;
+        }
+
+        const newKitty = { id, src, style, animationClass };
+        setKitties((prev) => [...prev, newKitty]);
+
+        setTimeout(() => {
+            setKitties((prev) => prev.filter(k => k.id !== id));
+        }, 3500);
+    };
 
     const CURRENCY_SYMBOLS = {
         USD: '$', EUR: '€', GBP: '£', INR: '₹', JPY: '¥',
@@ -166,9 +224,30 @@ export default function Account() {
                 </Button>
             </main>
 
-            <div className="text-center text-[11px] text-gray-300 mt-12 mb-6 pointer-events-none uppercase tracking-widest">
-                <p>Crafted with love by GD Enterprises</p>
-                <p className="mt-1.5 opacity-60">Paywise V1.2.8 · © 2026</p>
+            <div className="text-center mt-12 mb-6">
+                <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
+                    <p>Crafted with love by <span className="text-slate-900 font-bold">GD Enterprises</span></p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.2.9 · © 2026</p>
+                </div>
+                <div
+                    onClick={spawnKitty}
+                    className="mt-3 text-emerald-600 font-medium text-[14px] cursor-pointer hover:underline inline-block select-none"
+                >
+                    GD Kitties!
+                </div>
+            </div>
+
+            {/* Render Kitties */}
+            <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
+                {kitties.map((kitty) => (
+                    <img
+                        key={kitty.id}
+                        src={kitty.src}
+                        alt="kitten"
+                        className={`absolute ${kitty.animationClass} object-contain transition-all`}
+                        style={kitty.style}
+                    />
+                ))}
             </div>
 
             <BottomNav />
