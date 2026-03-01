@@ -92,35 +92,7 @@ export default function Dashboard() {
             <main className="px-4 pt-6 max-w-md mx-auto">
                 <SplitwiseMigrationBanner />
 
-                {/* ── Net Balance Card ───────────── */}
-                {totalOwed !== 0 && (
-                    <div className={`rounded-3xl p-6 mb-6 shadow-sm border ${budgetExceeded ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100'}`}>
-                        <div className="flex items-center justify-between mb-2">
-                            <p className="text-[13px] font-semibold text-gray-500 uppercase tracking-wide">
-                                Current Standing
-                            </p>
-                            {hideBalance && (
-                                <div className="flex items-center gap-1 text-gray-400 text-[12px]">
-                                    <Eye className="w-3.5 h-3.5" />
-                                    <span>hover to reveal</span>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <p className={`text-3xl font-black tracking-tight ${balanceColor} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                {totalOwed > 0 ? '+' : (totalOwed < 0 ? '-' : '')}{currSym}{Math.abs(totalOwed).toFixed(2)}
-                            </p>
-                            <div className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg ${totalOwed > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                {totalOwed > 0 ? 'You are owed' : 'You owe'}
-                            </div>
-                        </div>
-                        {budgetExceeded && (
-                            <p className="text-[12px] text-orange-600 font-semibold mt-3 flex items-center gap-1">
-                                <span>⚠️</span> Monthly budget of {currSym}{monthlyBudget} exceeded
-                            </p>
-                        )}
-                    </div>
-                )}
+
 
                 {/* Invite Friends Banner */}
                 <Link to="/invite" className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-800 text-white px-5 py-4 rounded-3xl shadow-lg shadow-slate-800/20 mb-8 hover:from-slate-900 hover:to-slate-900 transition-all transform hover:-translate-y-1">
