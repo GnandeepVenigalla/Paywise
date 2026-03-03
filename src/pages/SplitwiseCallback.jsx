@@ -50,7 +50,7 @@ export default function SplitwiseCallback() {
         setStatus('migrating');
         // Must EXACTLY match the redirect_uri used in the authorization request.
         // The backend always sends the production GitHub Pages URL.
-        const redirectUri = 'https://gnandeepvenigalla.github.io/Paywise/splitwise-callback.html';
+        const redirectUri = 'https://www.paywiseapp.com/splitwise-callback.html';
 
         try {
             const res = await api.post('/splitwise/migrate', { code, redirectUri });
