@@ -3,17 +3,19 @@ import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     LogOut, Camera, ChevronRight,
-    Bell, Shield, DollarSign, Settings, HelpCircle, UserX
+    Bell, Shield, DollarSign, Settings, HelpCircle, UserX, Download, X
 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import Avatar from '../components/UI/Avatar';
 import Card from '../components/UI/Card';
 import Button from '../components/UI/Button';
+import { useInstallApp } from '../hooks/useInstallApp';
 
 export default function Account() {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
     const [kitties, setKitties] = useState([]);
+    const { isInstallable, promptInstall, isIosPromptVisible, hideIosPrompt } = useInstallApp();
 
     const kittyImages = [
         `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50534.png`,
@@ -81,7 +83,22 @@ export default function Account() {
         ? `${user.defaultCurrency} (${CURRENCY_SYMBOLS[user.defaultCurrency] || user.defaultCurrency})`
         : 'USD ($)';
 
+    const appSettingsGroup = isInstallable ? [{
+        label: 'App',
+        items: [
+            {
+                icon: <Download className="w-5 h-5 text-emerald-600" />,
+                bg: 'bg-emerald-50',
+                label: 'Install App',
+                sub: 'Add Paywise to your Home Screen',
+                to: null,
+                onClick: promptInstall,
+            }
+        ]
+    }] : [];
+
     const menuGroups = [
+        ...appSettingsGroup,
         {
             label: 'Preferences',
             items: [
@@ -227,7 +244,7 @@ export default function Account() {
             <div className="text-center mt-12 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <span className="text-slate-900 font-bold">GD Enterprises</span></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.3.0 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.3.1 · © 2026</p>
                 </div>
                 <div
                     onClick={spawnKitty}
@@ -249,6 +266,45 @@ export default function Account() {
                     />
                 ))}
             </div>
+
+            {/* iOS Install Prompt */}
+            {isIosPromptVisible && (
+                <div className="fixed inset-0 z-[100] bg-black/60 flex flex-col justify-end animate-in fade-in duration-300">
+                    <div className="bg-white w-full rounded-t-3xl p-6 pb-8 relative animate-in slide-in-from-bottom-[100%] duration-300 shadow-xl max-w-lg mx-auto">
+                        <button
+                            onClick={hideIosPrompt}
+                            className="absolute top-4 right-4 p-2 bg-gray-100/80 rounded-full text-gray-500 hover:bg-gray-200 transition"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                        <div className="flex items-center gap-4 mb-5">
+                            <div className="w-14 h-14 bg-[#1e293b] rounded-2xl flex items-center justify-center p-2.5 shadow-md">
+                                <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="w-full h-full object-contain" />
+                            </div>
+                            <div>
+                                <h3 className="text-[19px] font-black text-gray-900 leading-tight">Install Paywise</h3>
+                                <p className="text-gray-500 font-medium text-sm mt-0.5">Add to Home Screen</p>
+                            </div>
+                        </div>
+                        <p className="text-gray-600 mb-5 text-[15px] leading-relaxed font-medium">
+                            Install Paywise on your iPhone or iPad for a full app experience.
+                        </p>
+                        <ol className="list-decimal pl-6 pr-2 text-gray-800 text-[15px] space-y-3.5 font-bold mb-8">
+                            <li>Tap the <span className="text-blue-500 mx-1">Share</span> icon at the bottom of Safari.</li>
+                            <li>Scroll down and select <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-900 mx-1 border border-gray-200 whitespace-nowrap">Add to Home Screen</span>.</li>
+                            <li>Tap <span className="text-blue-500 mx-1">Add</span> in the top right.</li>
+                        </ol>
+                        <Button
+                            variant="primary"
+                            fullWidth
+                            className="!rounded-2xl !py-3.5 text-lg shadow-md max-w-sm mx-auto flex"
+                            onClick={hideIosPrompt}
+                        >
+                            Got it
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             <BottomNav />
         </div>

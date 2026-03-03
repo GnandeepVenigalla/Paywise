@@ -48,44 +48,47 @@ const PrivateRoute = ({ children }) => {
 };
 
 import BlockedUsers from './pages/BlockedUsers';
+import InstallGate from './components/InstallGate';
 
 function App() {
   return (
     <Router>
       <AuthProvider>
         <ThemeApplier />
-        <div className="min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden bg-gray-50 text-gray-900 font-sans relative">
-          <BiometricGate>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/resetpassword/:resettoken" element={<ResetPassword />} />
-              <Route path="/splitwise-callback" element={<PrivateRoute><SplitwiseCallback /></PrivateRoute>} />
-              <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-              <Route path="/friends" element={<PrivateRoute><Friends /></PrivateRoute>} />
-              <Route path="/friend/:id" element={<PrivateRoute><FriendDetails /></PrivateRoute>} />
-              <Route path="/friend/:id/add" element={<PrivateRoute><AddFriendExpense /></PrivateRoute>} />
-              <Route path="/friend/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
-              <Route path="/friend/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
-              <Route path="/activity" element={<PrivateRoute><Activity /></PrivateRoute>} />
-              <Route path="/account" element={<PrivateRoute><Account /></PrivateRoute>} />
-              <Route path="/account/settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
-              <Route path="/account/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
-              <Route path="/account/privacy" element={<PrivateRoute><PrivacySecurity /></PrivateRoute>} />
-              <Route path="/account/currency" element={<PrivateRoute><CurrencySettings /></PrivateRoute>} />
-              <Route path="/account/app-settings" element={<PrivateRoute><AppSettings /></PrivateRoute>} />
-              <Route path="/account/blocked" element={<PrivateRoute><BlockedUsers /></PrivateRoute>} />
-              <Route path="/invite" element={<PrivateRoute><InviteFriend /></PrivateRoute>} />
-              <Route path="/join/:id" element={<JoinGroup />} />
-              <Route path="/group/:id" element={<PrivateRoute><GroupDetails /></PrivateRoute>} />
-              <Route path="/group/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
-              <Route path="/group/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
-              <Route path="/group/:id/add" element={<PrivateRoute><AddExpense /></PrivateRoute>} />
-              <Route path="/" element={<Navigate to="/dashboard" />} />
-            </Routes>
-          </BiometricGate>
-        </div>
+        <InstallGate>
+          <div className="min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden bg-gray-50 text-gray-900 font-sans relative">
+            <BiometricGate>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/resetpassword/:resettoken" element={<ResetPassword />} />
+                <Route path="/splitwise-callback" element={<PrivateRoute><SplitwiseCallback /></PrivateRoute>} />
+                <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                <Route path="/friends" element={<PrivateRoute><Friends /></PrivateRoute>} />
+                <Route path="/friend/:id" element={<PrivateRoute><FriendDetails /></PrivateRoute>} />
+                <Route path="/friend/:id/add" element={<PrivateRoute><AddFriendExpense /></PrivateRoute>} />
+                <Route path="/friend/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
+                <Route path="/friend/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
+                <Route path="/activity" element={<PrivateRoute><Activity /></PrivateRoute>} />
+                <Route path="/account" element={<PrivateRoute><Account /></PrivateRoute>} />
+                <Route path="/account/settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
+                <Route path="/account/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
+                <Route path="/account/privacy" element={<PrivateRoute><PrivacySecurity /></PrivateRoute>} />
+                <Route path="/account/currency" element={<PrivateRoute><CurrencySettings /></PrivateRoute>} />
+                <Route path="/account/app-settings" element={<PrivateRoute><AppSettings /></PrivateRoute>} />
+                <Route path="/account/blocked" element={<PrivateRoute><BlockedUsers /></PrivateRoute>} />
+                <Route path="/invite" element={<PrivateRoute><InviteFriend /></PrivateRoute>} />
+                <Route path="/join/:id" element={<JoinGroup />} />
+                <Route path="/group/:id" element={<PrivateRoute><GroupDetails /></PrivateRoute>} />
+                <Route path="/group/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
+                <Route path="/group/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
+                <Route path="/group/:id/add" element={<PrivateRoute><AddExpense /></PrivateRoute>} />
+                <Route path="/" element={<Navigate to="/dashboard" />} />
+              </Routes>
+            </BiometricGate>
+          </div>
+        </InstallGate>
       </AuthProvider>
     </Router>
   );
