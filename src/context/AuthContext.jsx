@@ -40,15 +40,48 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = async (email, password) => {
-        const res = await api.post('/auth/login', { email, password });
-        localStorage.setItem('token', res.data.token);
-        setUser(res.data.user);
+        try {
+            const res = await api.post('/auth/login', { email, password });
+            localStorage.setItem('token', res.data.token);
+            setUser(res.data.user);
+            return res.data;
+        } catch (err) {
+            if (err.response?.data?.requireOtp) {
+                return err.response.data;
+            }
+            throw err;
+        }
     };
 
-    const register = async (username, email, password) => {
-        const res = await api.post('/auth/register', { username, email, password });
+    const register = async (username, email, phone, password) => {
+        let defaultCurrency = 'USD';
+        try {
+            // Intelligently ping their location safely from their browser to figure out native currency
+            const locRes = await fetch('http://ip-api.com/json/?fields=currency');
+            const data = await locRes.json();
+            if (data && data.currency && data.currency.length === 3) {
+                defaultCurrency = data.currency.toUpperCase();
+                console.log(`[Paywise] Geolocation matched. Registering default currency as ${defaultCurrency}`);
+            }
+        } catch (err) {
+            console.warn('[Paywise] Couldn\'t reach geolocation API. Defaulting base to USD.');
+        }
+
+        const res = await api.post('/auth/register', { username, email, phone, password, defaultCurrency });
+
+        if (res.data.requireOtp) {
+            return res.data;
+        }
         localStorage.setItem('token', res.data.token);
         setUser(res.data.user);
+        return res.data;
+    };
+
+    const verifyOtp = async (email, otp) => {
+        const res = await api.post('/auth/verify-otp', { email, otp });
+        localStorage.setItem('token', res.data.token);
+        setUser(res.data.user);
+        return res.data;
     };
 
     const logout = () => {
@@ -57,7 +90,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, api, sessionAuthenticated, setSessionAuthenticated }}>
+        <AuthContext.Provider value={{ user, setUser, loading, login, register, verifyOtp, logout, api, sessionAuthenticated, setSessionAuthenticated }}>
             {children}
         </AuthContext.Provider>
     );
