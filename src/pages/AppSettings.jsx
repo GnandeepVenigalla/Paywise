@@ -38,7 +38,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export default function AppSettings() {
-    const { user, api, setUser } = useContext(AuthContext);
+    const { user, api, setUser, logout } = useContext(AuthContext);
     const navigate = useNavigate();
     const [settings, setSettings] = useState(DEFAULT_SETTINGS);
     const [saving, setSaving] = useState(false);
@@ -186,6 +186,22 @@ export default function AppSettings() {
     const handleClearCache = () => {
         localStorage.removeItem('paywise_cache');
         alert('Cache cleared successfully!');
+    };
+
+    const handleDeleteAccount = async () => {
+        if (deleteInput !== 'DELETE') return;
+        setSaving(true);
+        try {
+            await api.delete('/auth/account');
+            alert('Your account has been permanently deleted.');
+            logout();
+            navigate('/register');
+        } catch (err) {
+            alert('Failed to delete account. Please contact support.');
+            console.error(err);
+        } finally {
+            setSaving(false);
+        }
     };
 
     // ─── Toggle component ─────────────────────────────────────
@@ -509,11 +525,11 @@ export default function AppSettings() {
                             className="w-full border-2 border-gray-200 focus:border-rose-400 rounded-xl px-4 py-3 text-[16px] outline-none transition mb-4"
                         />
                         <button
-                            disabled={deleteInput !== 'DELETE'}
+                            disabled={deleteInput !== 'DELETE' || saving}
                             className="w-full bg-rose-500 text-white py-4 rounded-2xl font-bold text-[16px] mb-3 disabled:opacity-30 transition"
-                            onClick={() => alert('Account deletion coming soon — this will be handled by the backend team.')}
+                            onClick={handleDeleteAccount}
                         >
-                            Permanently Delete Account
+                            {saving ? 'Deleting...' : 'Permanently Delete Account'}
                         </button>
                         <button
                             onClick={() => { setShowDeleteConfirm(false); setDeleteInput(''); }}

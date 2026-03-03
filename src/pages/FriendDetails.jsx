@@ -336,10 +336,10 @@ export default function FriendDetails() {
                             onClick={() => {
                                 if (!friend) return;
                                 // Build a professional pre-filled email draft
-                                const absAmt = Math.abs(balance).toFixed(2);
+                                const absAmtFormatted = formatCurrency(Math.abs(balance), user?.defaultCurrency);
                                 const draft = balance > 0
-                                    ? `Hi ${friend.username},\n\nI hope you're doing well! I just wanted to send a quick, friendly reminder that you have an outstanding balance of ${currSym}${absAmt} on Paywise.\n\nWhenever you get a chance, please settle up — you can do it directly in the app.\n\nThanks so much! 😊\n\n${user.username}`
-                                    : `Hi ${friend.username},\n\nJust a heads-up — I have a balance of ${currSym}${absAmt} that I owe you on Paywise. I'll take care of it soon!\n\nThanks,\n${user.username}`;
+                                    ? `Hi ${friend.username},\n\nI hope you're doing well! I just wanted to send a quick, friendly reminder that you have an outstanding balance of ${absAmtFormatted} on Paywise.\n\nWhenever you get a chance, please settle up — you can do it directly in the app.\n\nThanks so much! 😊\n\n${user.username}`
+                                    : `Hi ${friend.username},\n\nJust a heads-up — I have a balance of ${absAmtFormatted} that I owe you on Paywise. I'll take care of it soon!\n\nThanks,\n${user.username}`;
                                 setReminderEmailBody(draft);
                                 setShowReminderModal(true);
                             }}
@@ -757,7 +757,9 @@ export default function FriendDetails() {
                                     </div>
                                     <div className="flex items-center gap-3 mt-1 relative">
                                         <div className="w-[6px] h-[20px] bg-[#5ab3ed] rounded-full" />
-                                        <span className="text-[36px] font-light text-[#3b93c8] leading-none">{formatCurrency(monthlySpending[selectedMonthIndex].totalSpent, user?.defaultCurrency)}</span>
+                                        <span className="text-[36px] font-light text-[#3b93c8] leading-none">
+                                            {formatCurrency(monthlySpending[selectedMonthIndex].totalSpent, user?.defaultCurrency, user?.defaultCurrency)}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -769,7 +771,9 @@ export default function FriendDetails() {
                                     <div className="flex flex-col mt-1 relative">
                                         <div className="flex items-center gap-3">
                                             <div className="w-[6px] h-[20px] bg-[#145a85] rounded-full" />
-                                            <span className="text-[36px] font-light text-[#1b71a2] leading-none">{formatCurrency(monthlySpending[selectedMonthIndex].userShare, user?.defaultCurrency)}</span>
+                                            <span className="text-[36px] font-light text-[#1b71a2] leading-none">
+                                                {formatCurrency(monthlySpending[selectedMonthIndex].userShare, user?.defaultCurrency, user?.defaultCurrency)}
+                                            </span>
                                         </div>
                                         <p className="text-[14px] text-gray-500 mt-2 ml-4 relative">
                                             {monthlySpending[selectedMonthIndex].totalSpent > 0 ? Math.round((monthlySpending[selectedMonthIndex].userShare / monthlySpending[selectedMonthIndex].totalSpent) * 100) : 0}% of all shared expenses
@@ -787,9 +791,13 @@ export default function FriendDetails() {
                             const maxExp = curMonthExpenses.reduce((max, e) => e.amount > max.amount ? e : max, curMonthExpenses[0]);
 
                             const spenderMap = {};
+                            const targetCurr = user?.defaultCurrency || 'USD';
+                            const { convertAmount: conv } = require('../utils/formatters');
+
                             curMonthExpenses.forEach(e => {
                                 const pid = e.paidBy._id || e.paidBy;
-                                spenderMap[pid] = (spenderMap[pid] || 0) + e.amount;
+                                const convertedAmt = conv(e.amount, e.currency || 'USD', targetCurr);
+                                spenderMap[pid] = (spenderMap[pid] || 0) + convertedAmt;
                             });
 
                             let topAmt = 0;
@@ -816,7 +824,7 @@ export default function FriendDetails() {
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Payer</p>
                                             <p className="text-[16px] text-gray-900 font-medium leading-tight">{topPayerString}</p>
-                                            <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, user?.defaultCurrency)}</p>
+                                            <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, user?.defaultCurrency, user?.defaultCurrency)}</p>
                                         </div>
 
                                         {/* Insight Card 2 */}
@@ -971,14 +979,10 @@ export default function FriendDetails() {
             {/* REMINDERS MODAL                            */}
             {/* ---------------------------------------- */}
             {showReminderModal && (() => {
-                const absAmt = Math.abs(balance).toFixed(2);
-                const currSymR = user?.defaultCurrency === 'INR' ? '₹'
-                    : user?.defaultCurrency === 'EUR' ? '€'
-                        : user?.defaultCurrency === 'GBP' ? '£'
-                            : '$';
+                const formattedAmt = formatCurrency(Math.abs(balance), user?.defaultCurrency);
                 const shareText = balance > 0
-                    ? `Hi ${friend?.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${currSymR}${absAmt} on Paywise.\n\nPlease settle up when you get a chance. You can pay directly in the Paywise app. 🙏\n\nThank you!`
-                    : `Hi ${friend?.username}! 👋\n\nJust letting you know — I owe you ${currSymR}${absAmt} on Paywise and will take care of it soon!\n\nThanks for your patience,\n${user.username}`;
+                    ? `Hi ${friend?.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${formattedAmt} on Paywise.\n\nPlease settle up when you get a chance. You can pay directly in the Paywise app. 🙏\n\nThank you!`
+                    : `Hi ${friend?.username}! 👋\n\nJust letting you know — I owe you ${formattedAmt} on Paywise and will take care of it soon!\n\nThanks for your patience,\n${user.username}`;
 
                 const handleEmailSend = () => {
                     const subject = encodeURIComponent(`Payment Reminder — Paywise`);
@@ -1017,8 +1021,8 @@ export default function FriendDetails() {
                                     <h3 className="text-[18px] font-bold text-gray-900">Send a Reminder</h3>
                                     <p className="text-[13px] text-gray-400 mt-0.5">
                                         {balance > 0
-                                            ? `${friend?.username} owes you ${currSymR}${absAmt}`
-                                            : `You owe ${friend?.username} ${currSymR}${absAmt}`}
+                                            ? `${friend?.username} owes you ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}`
+                                            : `You owe ${friend?.username} ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}`}
                                     </p>
                                 </div>
                                 <button onClick={() => setShowReminderModal(false)} className="ml-auto p-2 text-gray-400 hover:bg-gray-100 rounded-full transition">

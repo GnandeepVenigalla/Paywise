@@ -1318,7 +1318,9 @@ export default function GroupDetails() {
                                         </div>
                                         <div className="flex items-center gap-3 mt-1 relative">
                                             <div className="w-[6px] h-[20px] bg-[#5ab3ed] rounded-full" />
-                                            <span className="text-[36px] font-light text-[#3b93c8] leading-none">${monthlySpending[selectedMonthIndex].totalSpent.toFixed(2)}</span>
+                                            <span className="text-[36px] font-light text-[#3b93c8] leading-none">
+                                                {formatCurrency(monthlySpending[selectedMonthIndex].totalSpent, user?.defaultCurrency, user?.defaultCurrency)}
+                                            </span>
                                         </div>
                                     </div>
 
@@ -1330,7 +1332,9 @@ export default function GroupDetails() {
                                         <div className="flex flex-col mt-1 relative">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-[6px] h-[20px] bg-[#145a85] rounded-full" />
-                                                <span className="text-[36px] font-light text-[#1b71a2] leading-none">${monthlySpending[selectedMonthIndex].userShare.toFixed(2)}</span>
+                                                <span className="text-[36px] font-light text-[#1b71a2] leading-none">
+                                                    {formatCurrency(monthlySpending[selectedMonthIndex].userShare, user?.defaultCurrency, user?.defaultCurrency)}
+                                                </span>
                                             </div>
                                             <p className="text-[14px] text-gray-500 mt-2 ml-4 relative">
                                                 {monthlySpending[selectedMonthIndex].totalSpent > 0 ? Math.round((monthlySpending[selectedMonthIndex].userShare / monthlySpending[selectedMonthIndex].totalSpent) * 100) : 0}% of total group spending
@@ -1348,9 +1352,11 @@ export default function GroupDetails() {
                                 const maxExp = curMonthExpenses.reduce((max, e) => e.amount > max.amount ? e : max, curMonthExpenses[0]);
 
                                 const spenderMap = {};
+                                const targetCurr = user?.defaultCurrency || 'USD';
                                 curMonthExpenses.forEach(e => {
                                     const pid = e.paidBy._id || e.paidBy;
-                                    spenderMap[pid] = (spenderMap[pid] || 0) + e.amount;
+                                    const convertedAmt = convertAmount(e.amount, e.currency || 'USD', targetCurr);
+                                    spenderMap[pid] = (spenderMap[pid] || 0) + convertedAmt;
                                 });
 
                                 let topId = null;
@@ -1377,7 +1383,7 @@ export default function GroupDetails() {
                                                 </div>
                                                 <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Spender</p>
                                                 <p className="text-[16px] text-gray-900 font-medium leading-tight">{topUserName}</p>
-                                                <p className="text-[14px] text-gray-500 mt-0.5">${topAmt.toFixed(2)}</p>
+                                                <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, user?.defaultCurrency, user?.defaultCurrency)}</p>
                                             </div>
 
                                             {/* Insight Card 2 */}
@@ -1387,7 +1393,7 @@ export default function GroupDetails() {
                                                 </div>
                                                 <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Largest Expense</p>
                                                 <p className="text-[16px] text-gray-900 font-medium leading-tight truncate">{maxExp.description}</p>
-                                                <p className="text-[14px] text-gray-500 mt-0.5">${maxExp.amount.toFixed(2)}</p>
+                                                <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(maxExp.amount, user?.defaultCurrency, maxExp.currency)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1556,13 +1562,17 @@ export default function GroupDetails() {
                         if (!settleUpTarget) return;
                         const amt = isPartial ? parseFloat(groupPartialAmount) : settleUpTarget.amount;
                         if (isNaN(amt) || amt <= 0) { alert('Please enter a valid amount.'); return; }
-                        if (amt > settleUpTarget.amount) { alert(`Amount cannot exceed $${settleUpTarget.amount.toFixed(2)}.`); return; }
+                        if (amt > settleUpTarget.amount) {
+                            const maxFmt = formatCurrency(settleUpTarget.amount, user?.defaultCurrency);
+                            alert(`Amount cannot exceed ${maxFmt}.`);
+                            return;
+                        }
                         setIsGroupSettling(true);
                         try {
                             const payerId = settleUpTarget.iOwe ? myId : settleUpTarget.member._id;
                             const receiverId = settleUpTarget.iOwe ? settleUpTarget.member._id : myId;
                             await api.post('/expenses', {
-                                description: isPartial ? `Partial cash payment of $${amt.toFixed(2)}` : 'Cash settle up',
+                                description: isPartial ? `Partial cash payment of ${formatCurrency(amt, user?.defaultCurrency)}` : 'Cash settle up',
                                 amount: amt,
                                 group: id,
                                 paidBy: payerId,
@@ -1631,7 +1641,7 @@ export default function GroupDetails() {
                                                     {row.iOwe ? 'you owe' : 'owes you'}
                                                 </p>
                                                 <p className={`text-[20px] font-bold leading-tight ${row.iOwe ? 'text-rose-600' : 'text-emerald-500'}`}>
-                                                    ${row.amount.toFixed(2)}
+                                                    {formatCurrency(row.amount, user?.defaultCurrency)}
                                                 </p>
                                             </div>
                                         </button>
@@ -1648,7 +1658,7 @@ export default function GroupDetails() {
                                         </div>
                                         <div>
                                             <p className="text-[13px] text-gray-500 font-medium">Amount to settle</p>
-                                            <p className="text-[22px] font-bold text-gray-900">${settleUpTarget.amount.toFixed(2)}</p>
+                                            <p className="text-[22px] font-bold text-gray-900">{formatCurrency(settleUpTarget.amount, user?.defaultCurrency)}</p>
                                             <p className="text-[13px] text-gray-500 mt-0.5">
                                                 {settleUpTarget.iOwe
                                                     ? `You owe ${settleUpTarget.member.username}`
@@ -1761,9 +1771,9 @@ export default function GroupDetails() {
             {
                 showReminderModal && selectedReminderMember && (() => {
                     const m = selectedReminderMember;
-                    const absAmt = m.amount.toFixed(2);
+                    const formattedAmt = formatCurrency(m.amount, user?.defaultCurrency);
 
-                    const shareText = `Hi ${m.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${currSym}${absAmt} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. You can pay directly in the Paywise app. 🙏\n\nThank you!`;
+                    const shareText = `Hi ${m.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${formattedAmt} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. You can pay directly in the Paywise app. 🙏\n\nThank you!`;
 
                     const handleEmailSend = () => {
                         const subject = encodeURIComponent(`Payment Reminder — ${group.name}`);
