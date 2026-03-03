@@ -6,7 +6,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [tailwindcss(), react(), basicSsl()],
-  base: '/Paywise/',
+  base: './',
   server: {
     proxy: {
       '/api': {
