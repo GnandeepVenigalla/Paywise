@@ -212,9 +212,11 @@ export default function GroupDetails() {
         e.preventDefault();
         setInviteError('');
         try {
-            const res = await api.post(`/groups/${id}/members`, { email: emailToInvite });
+            const isEmail = emailToInvite.includes('@');
+            const payload = isEmail ? { email: emailToInvite } : { phone: emailToInvite };
+            const res = await api.post(`/groups/${id}/members`, payload);
 
-            if (res.data.msg === 'Invitation email sent!') {
+            if (res.data.msg === 'Invitation email sent!' || res.data.msg === 'Invitation email sent to ghost user!') {
                 alert('User not registered yet, but we sent them a Paywise email invitation!');
             } else {
                 alert('User successfully added to your group!');
@@ -344,14 +346,14 @@ export default function GroupDetails() {
                 {/* Invite Members form */}
                 {showInvite && (
                     <form onSubmit={inviteMember} className="bg-gray-50 p-5 shadow-inner border-b border-gray-200 animate-in fade-in zoom-in-95">
-                        <label className="block text-sm font-semibold text-gray-800 mb-2">Invite friend by email</label>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">Invite friend by email or phone</label>
                         <div className="flex gap-2">
                             <input
-                                type="email"
+                                type="text"
                                 className="flex-1 py-2.5 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f172a] focus:border-transparent outline-none transition-all shadow-sm"
                                 value={emailToInvite}
                                 onChange={e => setEmailToInvite(e.target.value)}
-                                placeholder="friend@example.com"
+                                placeholder="email or phone number"
                                 required
                             />
                             <button type="submit" className="bg-slate-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-slate-950 transition shadow-sm">

@@ -7,18 +7,50 @@ export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const { login } = useContext(AuthContext);
+    const [success, setSuccess] = useState('');
+    const [isOtpMode, setIsOtpMode] = useState(false);
+    const [otp, setOtp] = useState('');
+    const { login, verifyOtp, api } = useContext(AuthContext);
     const navigate = useNavigate();
 
-    const handleSubmit = async (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
+        setError('');
         try {
-            await login(email, password);
-            navigate('/dashboard');
+            const res = await login(email, password);
+            if (res && res.requireOtp) {
+                setIsOtpMode(true);
+                setSuccess(res.msg || 'A new verification code was sent.');
+            } else {
+                navigate('/dashboard');
+            }
         } catch (err) {
             setError(err.response?.data?.msg || 'Login failed');
         }
     };
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        setError('');
+        try {
+            await verifyOtp(email, otp);
+            navigate('/dashboard');
+        } catch (err) {
+            setError(err.response?.data?.msg || 'Invalid verification code');
+        }
+    };
+
+    const handleResendOtp = async () => {
+        setError('');
+        setSuccess('');
+        try {
+            const res = await api.post('/auth/resend-otp', { email });
+            setSuccess(res.data.msg || 'Code resent successfully!');
+        } catch (err) {
+            setError(err.response?.data?.msg || 'Failed to resend code');
+        }
+    };
+
 
     return (
         <div className="flex bg-gray-50 flex-col items-center justify-center min-h-[100dvh] px-5 py-8">
@@ -33,55 +65,94 @@ export default function Login() {
 
                 {error && <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center">{error}</div>}
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Mail className="h-5 w-5 text-gray-400" />
-                        </div>
-                        <input
-                            type="email"
-                            className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
-                            placeholder="Email address"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                    </div>
+                {success && <div className="mb-4 bg-green-50 text-green-700 p-3 rounded-lg text-sm text-center font-medium">{success}</div>}
 
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Lock className="h-5 w-5 text-gray-400" />
+                {!isOtpMode ? (
+                    <form onSubmit={handleLogin} className="space-y-6">
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Mail className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="email"
+                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
+                                placeholder="Email address"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                            />
                         </div>
-                        <input
-                            type="password"
-                            className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
-                            placeholder="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </div>
 
-                    <div className="flex justify-end mt-2 mb-6 text-sm">
-                        <Link to="/forgot-password" className="font-semibold text-slate-900 hover:text-slate-800 transition-colors">
-                            Forgot your password?
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Lock className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="password"
+                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+                        </div>
+
+                        <div className="flex justify-end mt-2 mb-6 text-sm">
+                            <Link to="/forgot-password" className="font-semibold text-slate-900 hover:text-slate-800 transition-colors">
+                                Forgot your password?
+                            </Link>
+                        </div>
+
+                        <button
+                            type="submit"
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-950 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-800 transition-all"
+                        >
+                            Sign In
+                        </button>
+                    </form>
+                ) : (
+                    <form onSubmit={handleVerifyOtp} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="text-center mb-2">
+                            <p className="text-sm font-medium text-gray-600 mb-1">Enter the 6-digit code sent to</p>
+                            <p className="text-md font-bold text-slate-900">{email}</p>
+                        </div>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Lock className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none tracking-widest text-center text-lg font-bold"
+                                placeholder="000000"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value)}
+                                required
+                                maxLength="6"
+                            />
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={otp.length < 6}
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-950 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Verify Account
+                        </button>
+
+                        <p className="text-center text-sm text-gray-600 cursor-pointer hover:underline pt-2" onClick={handleResendOtp}>
+                            Didn't receive a code? Resend
+                        </p>
+                    </form>
+                )}
+
+                {!isOtpMode && (
+                    <p className="mt-8 text-center text-sm text-gray-600">
+                        Don't have an account?{' '}
+                        <Link to="/register" className="font-semibold text-slate-900 hover:text-slate-800 transition-colors">
+                            Sign up
                         </Link>
-                    </div>
-
-                    <button
-                        type="submit"
-                        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-950 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-800 transition-all"
-                    >
-                        Sign In
-                    </button>
-                </form>
-
-                <p className="mt-8 text-center text-sm text-gray-600">
-                    Don't have an account?{' '}
-                    <Link to="/register" className="font-semibold text-slate-900 hover:text-slate-800 transition-colors">
-                        Sign up
-                    </Link>
-                </p>
+                    </p>
+                )}
             </div>
         </div>
     );

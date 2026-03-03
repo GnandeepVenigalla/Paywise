@@ -33,9 +33,19 @@ export default function Friends() {
     const handleSearch = async (e) => {
         const q = e.target.value;
         setSearchQuery(q);
-        if (q.length > 2) {
+        // Clear results if input is cleared
+        if (!q) {
+            setSearchResults([]);
+            return;
+        }
+
+        // Only search if it looks like a full email or phone number (to reduce unnecessary API calls)
+        const isEmail = q.includes('@') && q.includes('.');
+        const isPhone = q.length >= 10 && /^\d+$/.test(q.replace(/[^\d]/g, ''));
+
+        if (isEmail || isPhone) {
             try {
-                const res = await api.get(`/auth/users?q=${q}`);
+                const res = await api.get(`/auth/users?q=${encodeURIComponent(q)}`);
                 // Filter out current user and existing friends
                 const friendIds = friends.map(f => f.id);
                 const results = res.data.filter(u => u._id !== user.id && !friendIds.includes(u._id));
@@ -92,7 +102,7 @@ export default function Friends() {
                                 type="text"
                                 value={searchQuery}
                                 onChange={handleSearch}
-                                placeholder="Search by email or username..."
+                                placeholder="Enter exact email or phone number..."
                                 className="w-full bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-4 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm"
                                 autoFocus
                             />
@@ -119,8 +129,8 @@ export default function Friends() {
                                         </button>
                                     </div>
                                 ))
-                            ) : searchQuery.length > 2 ? (
-                                <p className="text-center text-sm text-gray-500 py-8">No matching users found.</p>
+                            ) : searchQuery.length > 5 ? (
+                                <p className="text-center text-sm text-gray-500 py-8">No matching users found for "{searchQuery}". Make sure you entered the full exact email or phone number.</p>
                             ) : null}
                         </div>
                     </div>
