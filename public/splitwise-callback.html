@@ -129,7 +129,7 @@
 </head>
 
 <body>
-    <img class="logo" src="https://gnandeepvenigalla.github.io/Paywise/logo.png" alt="Paywise" />
+    <img class="logo" src="./logo.png" alt="Paywise" />
 
     <div class="card" id="card">
         <div class="icon loading">
@@ -140,9 +140,9 @@
     </div>
 
     <script>
-        var PAYWISE_HOME = 'https://gnandeepvenigalla.github.io/Paywise/#/dashboard';
+        var PAYWISE_HOME = 'https://www.paywiseapp.com/#/dashboard';
         var API_BASE = 'https://paywise-backend-lemon.vercel.app/api';
-        var REDIRECT_URI = 'https://gnandeepvenigalla.github.io/Paywise/splitwise-callback.html';
+        var REDIRECT_URI = 'https://www.paywiseapp.com/splitwise-callback.html';
 
         function setState(type, title, body, extra) {
             var card = document.getElementById('card');
@@ -182,7 +182,7 @@
                 setState('error',
                     'Not Logged In',
                     'Your Paywise session has expired. Please log in again and retry the migration.',
-                    '<a href="https://gnandeepvenigalla.github.io/Paywise/#/login" class="btn">Log in to Paywise</a>'
+                    '<a href="https://www.paywiseapp.com/#/login" class="btn">Log in to Paywise</a>'
                 );
             } else {
                 setState('loading', 'Migrating Your Data...', 'Fetching your groups and expenses from Splitwise. This may take a moment.');
