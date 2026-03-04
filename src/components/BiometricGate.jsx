@@ -11,6 +11,17 @@ export default function BiometricGate({ children }) {
     const biometricEnabled = user?.appSettings?.biometricLock;
     const credentialId = user?.appSettings?.biometricCredentialId;
 
+    const base64urlToUint8Array = (base64url) => {
+        const padding = '='.repeat((4 - base64url.length % 4) % 4);
+        const base64 = (base64url + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    };
+
     const handleVerify = async () => {
         if (!window.PublicKeyCredential) {
             setSessionAuthenticated(true); // Fallback if browser doesn't support it anymore
@@ -31,7 +42,7 @@ export default function BiometricGate({ children }) {
                     userVerification: "required",
                     allowCredentials: credentialId ? [
                         {
-                            id: new TextEncoder().encode(credentialId),
+                            id: base64urlToUint8Array(credentialId),
                             type: 'public-key',
                             transports: ['internal']
                         }
