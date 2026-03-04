@@ -13,9 +13,10 @@ export default function GroupDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { api, user } = useContext(AuthContext);
-    const currSym = CURRENCY_SYMBOLS[user?.defaultCurrency || 'USD'] || '$';
     const { hideBalance } = useAppSettings();
     const [group, setGroup] = useState(null);
+    const displayCurrency = group?.currency || user?.defaultCurrency || 'USD';
+    const currSym = CURRENCY_SYMBOLS[displayCurrency] || '$';
     const [expenses, setExpenses] = useState([]);
     const [balances, setBalances] = useState({});
     const [emailToInvite, setEmailToInvite] = useState('');
@@ -41,6 +42,7 @@ export default function GroupDetails() {
     const [groupType, setGroupType] = useState('Home');
     const [settleUpDate, setSettleUpDate] = useState('');
     const [draftSettleDate, setDraftSettleDate] = useState('');
+    const [draftGroupCurrency, setDraftGroupCurrency] = useState('');
     const [showInviteLink, setShowInviteLink] = useState(false);
     const [showGroupBalances, setShowGroupBalances] = useState(false);
     const [expandedBalances, setExpandedBalances] = useState({});
@@ -88,7 +90,7 @@ export default function GroupDetails() {
         expenses.forEach(exp => {
             const creditorId = String(exp.paidBy?._id || exp.paidBy);
             const sourceCurr = exp.currency || 'USD';
-            const targetCurr = user?.defaultCurrency || 'USD';
+            const targetCurr = displayCurrency || 'USD';
             exp.splits.forEach(split => {
                 const debtorId = String(split.user?._id || split.user);
                 if (debtorId !== creditorId && pairwise[debtorId] && pairwise[debtorId][creditorId] !== undefined) {
@@ -99,23 +101,74 @@ export default function GroupDetails() {
         });
 
         const memberIds = allAssociatedMembers.map(m => String(m._id || m));
-        for (let i = 0; i < memberIds.length; i++) {
-            for (let j = i + 1; j < memberIds.length; j++) {
-                const a = memberIds[i];
-                const b = memberIds[j];
-                const aOwesB = pairwise[a][b] || 0;
-                const bOwesA = pairwise[b][a] || 0;
-                if (aOwesB > bOwesA) {
-                    pairwise[a][b] = aOwesB - bOwesA;
-                    pairwise[b][a] = 0;
-                } else {
-                    pairwise[b][a] = bOwesA - aOwesB;
-                    pairwise[a][b] = 0;
+
+        if (simplifyDebts) {
+            let netBalances = {};
+            memberIds.forEach(id => netBalances[id] = 0);
+
+            // Calculate exact net balance for each person
+            memberIds.forEach(a => {
+                memberIds.forEach(b => {
+                    if (a !== b) {
+                        netBalances[a] -= pairwise[a][b];
+                        netBalances[b] += pairwise[a][b];
+                    }
+                });
+            });
+
+            // Reset pairwise to 0
+            memberIds.forEach(a => {
+                memberIds.forEach(b => {
+                    if (a !== b) pairwise[a][b] = 0;
+                });
+            });
+
+            let debtors = [];
+            let creditors = [];
+
+            for (const [id, balance] of Object.entries(netBalances)) {
+                if (balance < -0.005) debtors.push({ id, amount: -balance });
+                else if (balance > 0.005) creditors.push({ id, amount: balance });
+            }
+
+            debtors.sort((a, b) => b.amount - a.amount);
+            creditors.sort((a, b) => b.amount - a.amount);
+
+            let i = 0, j = 0;
+            while (i < debtors.length && j < creditors.length) {
+                const debtor = debtors[i];
+                const creditor = creditors[j];
+                const amount = Math.min(debtor.amount, creditor.amount);
+
+                if (amount > 0.005) {
+                    pairwise[debtor.id][creditor.id] = amount;
+                }
+
+                debtor.amount -= amount;
+                creditor.amount -= amount;
+
+                if (debtor.amount < 0.005) i++;
+                if (creditor.amount < 0.005) j++;
+            }
+        } else {
+            for (let i = 0; i < memberIds.length; i++) {
+                for (let j = i + 1; j < memberIds.length; j++) {
+                    const a = memberIds[i];
+                    const b = memberIds[j];
+                    const aOwesB = pairwise[a][b] || 0;
+                    const bOwesA = pairwise[b][a] || 0;
+                    if (aOwesB > bOwesA) {
+                        pairwise[a][b] = aOwesB - bOwesA;
+                        pairwise[b][a] = 0;
+                    } else {
+                        pairwise[b][a] = bOwesA - aOwesB;
+                        pairwise[a][b] = 0;
+                    }
                 }
             }
         }
         return pairwise;
-    }, [group, expenses, user]);
+    }, [group, expenses, user, simplifyDebts]);
 
     const formatName = (username) => {
         if (!username) return 'Unknown';
@@ -129,7 +182,7 @@ export default function GroupDetails() {
     const handleUpdateGroupName = async () => {
         if (!newGroupName.trim()) return;
         try {
-            await api.put(`/groups/${id}`, { name: newGroupName });
+            await api.put(`/groups/${id}`, { name: newGroupName, currency: draftGroupCurrency || null });
             setIsEditingGroupName(false);
             fetchGroup();
         } catch (err) {
@@ -195,6 +248,7 @@ export default function GroupDetails() {
             setExpenses(res.data.expenses);
             setBalances(res.data.balances);
             setGroupNote(res.data.group.note || '');
+            setDraftGroupCurrency(res.data.group.currency || '');
             if (res.data.group.settleUpDate) {
                 setSettleUpDate(res.data.group.settleUpDate.slice(0, 10));
                 setDraftSettleDate(res.data.group.settleUpDate.slice(0, 10));
@@ -318,6 +372,7 @@ export default function GroupDetails() {
                                 onClick={() => {
                                     setNewGroupName(group.name);
                                     setDraftSettleDate(settleUpDate);
+                                    setDraftGroupCurrency(group.currency || '');
                                     setShowCustomizeGroup(true);
                                 }}
                                 className="bg-transparent text-white text-[13px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-white/60 hover:bg-white/10 transition"
@@ -373,7 +428,7 @@ export default function GroupDetails() {
                             <p className="text-[17px] font-bold text-gray-800">
                                 You are owed{' '}
                                 <span className={`text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                    {formatCurrency(myBalance, user?.defaultCurrency)}
+                                    {formatCurrency(myBalance, displayCurrency)}
                                 </span>
                                 {' '}overall
                             </p>
@@ -381,7 +436,7 @@ export default function GroupDetails() {
                             <p className="text-[17px] font-bold text-gray-800">
                                 You owe{' '}
                                 <span className={`text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                    {formatCurrency(myBalance, user?.defaultCurrency)}
+                                    {formatCurrency(myBalance, displayCurrency)}
                                 </span>
                                 {' '}overall
                             </p>
@@ -402,18 +457,18 @@ export default function GroupDetails() {
                                         {first && (
                                             <p className="text-[14px] text-gray-500">
                                                 {first.b > 0 ? (
-                                                    <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(first.b, user?.defaultCurrency)}</span></>
+                                                    <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(first.b, displayCurrency)}</span></>
                                                 ) : (
-                                                    <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(first.b, user?.defaultCurrency)}</span></>
+                                                    <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(first.b, displayCurrency)}</span></>
                                                 )}
                                             </p>
                                         )}
                                         {second && (
                                             <p className="text-[14px] text-gray-500">
                                                 {second.b > 0 ? (
-                                                    <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(second.b, user?.defaultCurrency)}</span></>
+                                                    <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(second.b, displayCurrency)}</span></>
                                                 ) : (
-                                                    <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(second.b, user?.defaultCurrency)}</span></>
+                                                    <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(second.b, displayCurrency)}</span></>
                                                 )}
                                             </p>
                                         )}
@@ -487,7 +542,7 @@ export default function GroupDetails() {
                                                 date={item.date}
                                                 payerName={isPaidByMe ? 'You' : (item.paidBy?.username || 'Someone')}
                                                 userSplit={userSplit}
-                                                targetCurrency={user?.defaultCurrency || 'USD'}
+                                                targetCurrency={displayCurrency || 'USD'}
                                                 sourceCurrency={item.currency || 'USD'}
                                                 onClick={() => {
                                                     setSelectedExpense(item);
@@ -641,7 +696,7 @@ export default function GroupDetails() {
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                <span className="font-bold text-gray-900">{formatCurrency(item.price, user?.defaultCurrency, selectedExpense.currency)}</span>
+                                                                <span className="font-bold text-gray-900">{formatCurrency(item.price, displayCurrency, selectedExpense.currency)}</span>
                                                             </div>
                                                         );
                                                     })}
@@ -664,7 +719,7 @@ export default function GroupDetails() {
                                                 <Receipt className="w-8 h-8" />
                                             </div>
                                             <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
-                                            <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense.amount, user?.defaultCurrency, selectedExpense.currency)}</p>
+                                            <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense.amount, displayCurrency, selectedExpense.currency)}</p>
                                             <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
                                             {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
                                                 <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
@@ -680,7 +735,7 @@ export default function GroupDetails() {
                                                         <span className="font-semibold text-gray-700 text-sm">
                                                             {split.user?._id === user.id ? 'You' : (split.user?.username || 'Someone')}
                                                         </span>
-                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split.amount, user?.defaultCurrency, selectedExpense.currency)}</span>
+                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split.amount, displayCurrency, selectedExpense.currency)}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -729,7 +784,7 @@ export default function GroupDetails() {
                                     <h3 className="text-[20px] font-medium text-gray-900 truncate">{group.name}</h3>
                                 </div>
                                 <button
-                                    onClick={() => { setNewGroupName(group.name); setShowCustomizeGroup(true); }}
+                                    onClick={() => { setNewGroupName(group.name); setDraftGroupCurrency(group.currency || ''); setShowCustomizeGroup(true); }}
                                     className="text-slate-900 font-bold text-[15px] px-2 flex-shrink-0">
                                     Edit
                                 </button>
@@ -766,12 +821,12 @@ export default function GroupDetails() {
                                                     {b < 0 ? (
                                                         <>
                                                             <p className="text-[11px] font-medium text-rose-600 uppercase tracking-wide">owes</p>
-                                                            <p className="text-[19px] font-medium text-rose-600 leading-tight">{formatCurrency(b, user?.defaultCurrency)}</p>
+                                                            <p className="text-[19px] font-medium text-rose-600 leading-tight">{formatCurrency(b, displayCurrency)}</p>
                                                         </>
                                                     ) : b > 0 ? (
                                                         <>
                                                             <p className="text-[11px] font-medium text-slate-900 uppercase tracking-wide">gets back</p>
-                                                            <p className="text-[19px] font-medium text-slate-900 leading-tight">{formatCurrency(b, user?.defaultCurrency)}</p>
+                                                            <p className="text-[19px] font-medium text-slate-900 leading-tight">{formatCurrency(b, displayCurrency)}</p>
                                                         </>
                                                     ) : (
                                                         <p className="text-[15px] font-medium text-gray-400 mt-2">settled up</p>
@@ -895,6 +950,27 @@ export default function GroupDetails() {
                                     </button>
                                 )}
                                 <p className="text-[12px] text-gray-400 mt-2">Set a target date by when everyone should settle up. Visible to all group members.</p>
+                            </div>
+
+                            {/* Group Currency Selection */}
+                            <div className="mt-8">
+                                <label className="text-[13px] font-bold text-gray-500 mb-3 block">Group currency</label>
+                                <div className="flex items-center gap-3 border-2 border-slate-50 dark:border-slate-800 rounded-2xl px-5 py-4 focus-within:border-slate-900 transition-all bg-white shadow-sm">
+                                    <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center font-black text-[12px] text-slate-800 flex-shrink-0">
+                                        {draftGroupCurrency ? CURRENCY_SYMBOLS[draftGroupCurrency] : CURRENCY_SYMBOLS[user?.defaultCurrency || 'USD']}
+                                    </div>
+                                    <select
+                                        value={draftGroupCurrency}
+                                        onChange={e => setDraftGroupCurrency(e.target.value)}
+                                        className="flex-1 outline-none text-[16px] text-gray-900 font-bold bg-transparent cursor-pointer appearance-none"
+                                    >
+                                        <option value="">Default (Viewer's Choice)</option>
+                                        {Object.keys(CURRENCY_SYMBOLS).map(code => (
+                                            <option key={code} value={code}>{code} - {CURRENCY_SYMBOLS[code]}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <p className="text-[12px] text-gray-400 mt-2">Lock in a specific currency for trips. Balances will show in this currency for everyone.</p>
                             </div>
 
                             {/* Group Type Selector */}
@@ -1319,7 +1395,7 @@ export default function GroupDetails() {
                                         <div className="flex items-center gap-3 mt-1 relative">
                                             <div className="w-[6px] h-[20px] bg-[#5ab3ed] rounded-full" />
                                             <span className="text-[36px] font-light text-[#3b93c8] leading-none">
-                                                {formatCurrency(monthlySpending[selectedMonthIndex].totalSpent, user?.defaultCurrency, user?.defaultCurrency)}
+                                                {formatCurrency(monthlySpending[selectedMonthIndex].totalSpent, displayCurrency, displayCurrency)}
                                             </span>
                                         </div>
                                     </div>
@@ -1333,7 +1409,7 @@ export default function GroupDetails() {
                                             <div className="flex items-center gap-3">
                                                 <div className="w-[6px] h-[20px] bg-[#145a85] rounded-full" />
                                                 <span className="text-[36px] font-light text-[#1b71a2] leading-none">
-                                                    {formatCurrency(monthlySpending[selectedMonthIndex].userShare, user?.defaultCurrency, user?.defaultCurrency)}
+                                                    {formatCurrency(monthlySpending[selectedMonthIndex].userShare, displayCurrency, displayCurrency)}
                                                 </span>
                                             </div>
                                             <p className="text-[14px] text-gray-500 mt-2 ml-4 relative">
@@ -1352,7 +1428,7 @@ export default function GroupDetails() {
                                 const maxExp = curMonthExpenses.reduce((max, e) => e.amount > max.amount ? e : max, curMonthExpenses[0]);
 
                                 const spenderMap = {};
-                                const targetCurr = user?.defaultCurrency || 'USD';
+                                const targetCurr = displayCurrency || 'USD';
                                 curMonthExpenses.forEach(e => {
                                     const pid = e.paidBy._id || e.paidBy;
                                     const convertedAmt = convertAmount(e.amount, e.currency || 'USD', targetCurr);
@@ -1383,7 +1459,7 @@ export default function GroupDetails() {
                                                 </div>
                                                 <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Spender</p>
                                                 <p className="text-[16px] text-gray-900 font-medium leading-tight">{topUserName}</p>
-                                                <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, user?.defaultCurrency, user?.defaultCurrency)}</p>
+                                                <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, displayCurrency, displayCurrency)}</p>
                                             </div>
 
                                             {/* Insight Card 2 */}
@@ -1393,7 +1469,7 @@ export default function GroupDetails() {
                                                 </div>
                                                 <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Largest Expense</p>
                                                 <p className="text-[16px] text-gray-900 font-medium leading-tight truncate">{maxExp.description}</p>
-                                                <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(maxExp.amount, user?.defaultCurrency, maxExp.currency)}</p>
+                                                <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(maxExp.amount, displayCurrency, maxExp.currency)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1563,7 +1639,7 @@ export default function GroupDetails() {
                         const amt = isPartial ? parseFloat(groupPartialAmount) : settleUpTarget.amount;
                         if (isNaN(amt) || amt <= 0) { alert('Please enter a valid amount.'); return; }
                         if (amt > settleUpTarget.amount) {
-                            const maxFmt = formatCurrency(settleUpTarget.amount, user?.defaultCurrency);
+                            const maxFmt = formatCurrency(settleUpTarget.amount, displayCurrency);
                             alert(`Amount cannot exceed ${maxFmt}.`);
                             return;
                         }
@@ -1572,7 +1648,7 @@ export default function GroupDetails() {
                             const payerId = settleUpTarget.iOwe ? myId : settleUpTarget.member._id;
                             const receiverId = settleUpTarget.iOwe ? settleUpTarget.member._id : myId;
                             await api.post('/expenses', {
-                                description: isPartial ? `Partial cash payment of ${formatCurrency(amt, user?.defaultCurrency)}` : 'Cash settle up',
+                                description: isPartial ? `Partial cash payment of ${formatCurrency(amt, displayCurrency)}` : 'Cash settle up',
                                 amount: amt,
                                 group: id,
                                 paidBy: payerId,
@@ -1641,7 +1717,7 @@ export default function GroupDetails() {
                                                     {row.iOwe ? 'you owe' : 'owes you'}
                                                 </p>
                                                 <p className={`text-[20px] font-bold leading-tight ${row.iOwe ? 'text-rose-600' : 'text-emerald-500'}`}>
-                                                    {formatCurrency(row.amount, user?.defaultCurrency)}
+                                                    {formatCurrency(row.amount, displayCurrency)}
                                                 </p>
                                             </div>
                                         </button>
@@ -1658,7 +1734,7 @@ export default function GroupDetails() {
                                         </div>
                                         <div>
                                             <p className="text-[13px] text-gray-500 font-medium">Amount to settle</p>
-                                            <p className="text-[22px] font-bold text-gray-900">{formatCurrency(settleUpTarget.amount, user?.defaultCurrency)}</p>
+                                            <p className="text-[22px] font-bold text-gray-900">{formatCurrency(settleUpTarget.amount, displayCurrency)}</p>
                                             <p className="text-[13px] text-gray-500 mt-0.5">
                                                 {settleUpTarget.iOwe
                                                     ? `You owe ${settleUpTarget.member.username}`
@@ -1722,7 +1798,7 @@ export default function GroupDetails() {
                                                 <p className="text-[13px] text-gray-500">Pay the entire balance</p>
                                             </div>
                                         </div>
-                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(settleUpTarget.amount, user?.defaultCurrency)}</span>
+                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(settleUpTarget.amount, displayCurrency)}</span>
                                     </button>
 
                                     {/* Divider */}
@@ -1742,13 +1818,13 @@ export default function GroupDetails() {
                                                 min="0.01"
                                                 step="0.01"
                                                 max={settleUpTarget.amount}
-                                                placeholder={`Max ${formatCurrency(settleUpTarget.amount, user?.defaultCurrency)}`}
+                                                placeholder={`Max ${formatCurrency(settleUpTarget.amount, displayCurrency)}`}
                                                 value={groupPartialAmount}
                                                 onChange={e => setGroupPartialAmount(e.target.value)}
                                                 className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
                                             />
                                         </div>
-                                        <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(Math.abs(settleUpTarget.amount - (parseFloat(groupPartialAmount) || 0)), user?.defaultCurrency)}</p>
+                                        <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(Math.abs(settleUpTarget.amount - (parseFloat(groupPartialAmount) || 0)), displayCurrency)}</p>
                                     </div>
 
                                     <button
@@ -1771,7 +1847,7 @@ export default function GroupDetails() {
             {
                 showReminderModal && selectedReminderMember && (() => {
                     const m = selectedReminderMember;
-                    const formattedAmt = formatCurrency(m.amount, user?.defaultCurrency);
+                    const formattedAmt = formatCurrency(m.amount, displayCurrency);
 
                     const shareText = `Hi ${m.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${formattedAmt} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. You can pay directly in the Paywise app. 🙏\n\nThank you!`;
 
