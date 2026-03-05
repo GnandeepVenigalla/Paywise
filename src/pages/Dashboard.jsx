@@ -87,10 +87,6 @@ export default function Dashboard() {
             </header>
 
             <main className="px-4 pt-6 max-w-md mx-auto">
-                <SplitwiseMigrationBanner />
-
-
-
                 {/* Invite Friends Banner */}
                 <Link to="/invite" className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-800 text-white px-5 py-4 rounded-3xl shadow-lg shadow-slate-800/20 mb-8 hover:from-slate-900 hover:to-slate-900 transition-all transform hover:-translate-y-1">
                     <div className="flex items-center gap-4">

@@ -3,7 +3,7 @@ import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     LogOut, Camera, ChevronRight,
-    Bell, Shield, DollarSign, Settings, HelpCircle, UserX, Download, X
+    Bell, Shield, DollarSign, Settings, HelpCircle, UserX, Download, X, UserPlus
 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import Avatar from '../components/UI/Avatar';
@@ -148,6 +148,13 @@ export default function Account() {
             label: 'More',
             items: [
                 {
+                    icon: <UserPlus className="w-5 h-5 text-emerald-600" />,
+                    bg: 'bg-emerald-50',
+                    label: 'Invite Friends',
+                    sub: 'Share Paywise & grow your squad',
+                    to: '/invite',
+                },
+                {
                     icon: <HelpCircle className="w-5 h-5 text-gray-400" />,
                     bg: 'bg-gray-50',
                     label: 'Help & Support',
@@ -244,7 +251,7 @@ export default function Account() {
             <div className="text-center mt-12 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <span className="text-slate-900 font-bold">GD Enterprises</span></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.3.2 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.3.3 · © 2026</p>
                 </div>
                 <div
                     onClick={spawnKitty}
