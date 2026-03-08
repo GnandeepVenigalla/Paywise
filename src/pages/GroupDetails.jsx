@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, UserPlus, Receipt, CreditCard, Camera, Trash2, X, Edit2, LogOut, Check, Settings, Calendar, Users, Scale, Link2, User, Plane, Home, Heart, ClipboardList, Share, Copy, Link as LinkIcon, Link2Off, Expand, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, UserPlus, Receipt, CreditCard, Camera, Trash2, X, Edit2, LogOut, Check, Settings, Calendar, Users, Scale, Link2, User, Plane, Home, Heart, ClipboardList, Share, Copy, Link as LinkIcon, Link2Off, Expand, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Percent } from 'lucide-react';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -544,6 +544,8 @@ export default function GroupDetails() {
                                                 userSplit={userSplit}
                                                 targetCurrency={displayCurrency || 'USD'}
                                                 sourceCurrency={item.currency || 'USD'}
+                                                isLoan={item.isLoan}
+                                                parentLoan={item.parentLoan}
                                                 onClick={() => {
                                                     setSelectedExpense(item);
                                                     setIsEditingExpense(false);
@@ -715,10 +717,22 @@ export default function GroupDetails() {
                                 ) : (
                                     <div>
                                         <div className="text-center mb-6">
-                                            <div className="w-16 h-16 bg-slate-50 text-slate-900 rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner">
-                                                <Receipt className="w-8 h-8" />
+                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner`}>
+                                                {selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? <Percent className="w-8 h-8" /> : <Receipt className="w-8 h-8" />}
                                             </div>
-                                            <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
+                                            <div className="flex items-center justify-center gap-2 mb-1">
+                                                <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
+                                            </div>
+                                            {selectedExpense.isLoan && (
+                                                <div className="flex justify-center mb-2">
+                                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-[0.15em] shadow-sm">Active Loan</span>
+                                                </div>
+                                            )}
+                                            {selectedExpense.parentLoan && (
+                                                <div className="flex justify-center mb-2">
+                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-[0.15em] shadow-sm">Interest Accrual</span>
+                                                </div>
+                                            )}
                                             <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense.amount, displayCurrency, selectedExpense.currency)}</p>
                                             <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
                                             {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (

@@ -19,6 +19,8 @@ export default function AddExpense() {
     const [members, setMembers] = useState([]);
     const [group, setGroup] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isLoan, setIsLoan] = useState(false);
+    const [loanInterestRate, setLoanInterestRate] = useState(0);
 
     // Split State Modals
     const [showSplitModal, setShowSplitModal] = useState(false);
@@ -138,6 +140,8 @@ export default function AddExpense() {
                 group: id,
                 paidBy: payerMode === 'multiple' ? 'multiple' : paidBy,
                 splits: buildSplits(),
+                isLoan: isLoan,
+                loanInterestRate: isLoan ? loanInterestRate : 0
             });
             navigate(`/group/${id}`);
         } catch (err) {
@@ -334,6 +338,44 @@ export default function AddExpense() {
                     ) : (
                         <div className="mt-4 px-4 py-2 border rounded-[6px] text-[14px] shadow-sm bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60">
                             Enter an amount to select split options
+                        </div>
+                    )}
+                </div>
+
+                {/* Loan Option */}
+                <div className="w-full max-w-[280px] mt-8 p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/50">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <Receipt className={`w-5 h-5 ${isLoan ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`} />
+                            <span className="text-[15px] font-bold text-gray-800 dark:text-gray-100">Treat as Loan?</span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={isLoan}
+                                onChange={(e) => setIsLoan(e.target.checked)}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-slate-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                        </label>
+                    </div>
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug">
+                        Loans can have custom interest rates applied automatically.
+                    </p>
+
+                    {isLoan && (
+                        <div className="mt-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <label className="text-[11px] font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest mb-1.5 block">Annual Interest Rate (%)</label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    value={loanInterestRate}
+                                    onChange={(e) => setLoanInterestRate(parseFloat(e.target.value) || 0)}
+                                    className="w-full bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-900/50 rounded-xl py-2 px-3 text-[18px] font-bold text-emerald-900 dark:text-emerald-300 outline-none"
+                                    placeholder="0.0"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-emerald-600/50 dark:text-emerald-400/50">%</span>
+                            </div>
                         </div>
                     )}
                 </div>

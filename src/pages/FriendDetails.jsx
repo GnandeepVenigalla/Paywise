@@ -1,13 +1,13 @@
 import { useEffect, useState, useContext } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder, Percent } from 'lucide-react';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
 import ExpenseItem from '../components/UI/ExpenseItem';
 import { useMonthlySpending } from '../hooks/useMonthlySpending';
-import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS } from '../utils/formatters';
+import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS, convertAmount } from '../utils/formatters';
 import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, toggleItemAssignment } from '../utils/expenseUtils';
 
 export default function FriendDetails() {
@@ -47,6 +47,9 @@ export default function FriendDetails() {
     const [reportDetails, setReportDetails] = useState('');
     const [isReporting, setIsReporting] = useState(false);
     const [isBlocking, setIsBlocking] = useState(false);
+    const [loanInterestEnabled, setLoanInterestEnabled] = useState(false);
+    const [loanInterestRate, setLoanInterestRate] = useState(0);
+    const [isSavingLoanSettings, setIsSavingLoanSettings] = useState(false);
 
     // Extract monthly spending aggregation logic to custom hook
     const monthlySpending = useMonthlySpending(expenses, user);
@@ -99,6 +102,11 @@ export default function FriendDetails() {
         fetchFriendDetails();
         // Load the shared friend note from backend
         api.get(`/auth/friend-note/${id}`).then(res => setFriendNote(res.data.note || '')).catch(() => { });
+        // Load loan interest settings
+        api.get(`/auth/friend-settings/${id}`).then(res => {
+            setLoanInterestEnabled(res.data.interestEnabled);
+            setLoanInterestRate(res.data.interestRate);
+        }).catch(() => { });
     }, [id]);
 
     const handleUpdateExpense = async (e) => {
@@ -196,6 +204,21 @@ export default function FriendDetails() {
             alert('Failed to record settlement.');
         } finally {
             setIsSettling(false);
+        }
+    };
+
+    const handleSaveLoanSettings = async () => {
+        setIsSavingLoanSettings(true);
+        try {
+            await api.put(`/auth/friend-settings/${id}`, {
+                interestEnabled: loanInterestEnabled,
+                interestRate: loanInterestRate
+            });
+            alert('Loan interest settings updated.');
+        } catch (err) {
+            alert('Failed to update loan settings.');
+        } finally {
+            setIsSavingLoanSettings(false);
         }
     };
 
@@ -391,6 +414,8 @@ export default function FriendDetails() {
                                                 sourceCurrency={item.currency || 'USD'}
                                                 isGroup={!!item.group}
                                                 groupName={item.group?.name}
+                                                isLoan={item.isLoan}
+                                                parentLoan={item.parentLoan}
                                                 onClick={() => {
                                                     if (item.isGroupSummary) {
                                                         const groupUrl = `#/group/${item.group.id}`;
@@ -555,10 +580,22 @@ export default function FriendDetails() {
                                 ) : (
                                     <div>
                                         <div className="text-center mb-6">
-                                            <div className={`w-16 h-16 ${selectedExpense.group ? 'bg-slate-50 text-slate-900' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner`}>
-                                                {selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />}
+                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner`}>
+                                                {selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? <Percent className="w-8 h-8" /> : (selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />)}
                                             </div>
-                                            <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
+                                            <div className="flex items-center justify-center gap-2 mb-1">
+                                                <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
+                                            </div>
+                                            {selectedExpense.isLoan && (
+                                                <div className="flex justify-center mb-2">
+                                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-[0.15em] shadow-sm">Active Loan</span>
+                                                </div>
+                                            )}
+                                            {selectedExpense.parentLoan && (
+                                                <div className="flex justify-center mb-2">
+                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-[0.15em] shadow-sm">Interest Accrual</span>
+                                                </div>
+                                            )}
                                             <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense.amount, user?.defaultCurrency, selectedExpense.currency)}</p>
                                             <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
                                             {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
@@ -658,7 +695,61 @@ export default function FriendDetails() {
                                 </button>
                             </div>
                         </div>
+                        {/* Loan Settings section */}
+                        <div className="mt-8 px-6 pb-2 border-b border-gray-100">
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-[15px] font-bold text-gray-800 uppercase tracking-widest">Loan Settings</h4>
+                                <TrendingUp className="w-5 h-5 text-emerald-500" />
+                            </div>
 
+                            <div className="bg-emerald-50/50 rounded-2xl p-5 border border-emerald-100/50 mb-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex flex-col">
+                                        <span className="text-[15px] font-bold text-emerald-900">Enable Loan Interest</span>
+                                        <span className="text-[12px] text-emerald-700/70 font-medium leading-relaxed mt-0.5">Automatically apply interest on the current net balance if {friend?.username} owes you.</span>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={loanInterestEnabled}
+                                            onChange={() => setLoanInterestEnabled(!loanInterestEnabled)}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all"></div>
+                                    </label>
+                                </div>
+
+                                {loanInterestEnabled && (
+                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-[13px] font-bold text-emerald-800 tracking-wide">ANNUAL INTEREST RATE (%)</label>
+                                            <div className="relative">
+                                                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-emerald-600">%</span>
+                                                <input
+                                                    type="number"
+                                                    value={loanInterestRate}
+                                                    onChange={(e) => setLoanInterestRate(parseFloat(e.target.value) || 0)}
+                                                    className="w-full bg-white border border-emerald-200 rounded-xl py-3 px-4 font-black text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none shadow-sm"
+                                                    placeholder="e.g. 5.5"
+                                                    min="0"
+                                                    step="0.1"
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-1">Calculated daily based on {loanInterestRate}% APR</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={handleSaveLoanSettings}
+                                    disabled={isSavingLoanSettings}
+                                    className="w-full mt-6 bg-emerald-600 text-white font-black py-3.5 rounded-xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isSavingLoanSettings ? 'SAVING...' : 'SAVE LOAN SETTINGS'}
+                                    {!isSavingLoanSettings && <Banknote className="w-4 h-4" />}
+                                </button>
+                            </div>
+                        </div>
                         {/* Shared groups section */}
                         <div className="mt-8">
                             <h4 className="px-6 py-2 text-[15px] font-bold text-gray-800">Shared groups</h4>
@@ -792,11 +883,9 @@ export default function FriendDetails() {
 
                             const spenderMap = {};
                             const targetCurr = user?.defaultCurrency || 'USD';
-                            const { convertAmount: conv } = require('../utils/formatters');
-
                             curMonthExpenses.forEach(e => {
                                 const pid = e.paidBy._id || e.paidBy;
-                                const convertedAmt = conv(e.amount, e.currency || 'USD', targetCurr);
+                                const convertedAmt = convertAmount(e.amount, e.currency || 'USD', targetCurr);
                                 spenderMap[pid] = (spenderMap[pid] || 0) + convertedAmt;
                             });
 
