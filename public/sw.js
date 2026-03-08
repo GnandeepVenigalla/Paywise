@@ -11,9 +11,12 @@ self.addEventListener('fetch', (e) => {
     // If the resource is un-fetchable (offline), it will fail normally
     e.respondWith(
         fetch(e.request).catch(() => {
-            // Just returning a dummy response or throwing error for offline 
-            // but this is enough to trick PWA installability requirements
-            return new Response("Offline", { status: 503, statusText: "Offline" });
+            // Add Content-Type to prevent browser downloading it
+            return new Response("Paywise is Offline. Please check your network or wait for server to start.", {
+                status: 503,
+                statusText: "Offline",
+                headers: { 'Content-Type': 'text/plain' }
+            });
         })
     );
 });

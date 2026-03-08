@@ -1,4 +1,4 @@
-import { Receipt, CreditCard } from 'lucide-react';
+import { Receipt, CreditCard, Percent, Banknote } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
 const ExpenseItem = ({
@@ -11,12 +11,16 @@ const ExpenseItem = ({
     sourceCurrency = 'USD',
     onClick,
     isGroup = false,
-    groupName
+    groupName,
+    isLoan = false,
+    parentLoan
 }) => {
     const formattedDate = new Date(date).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric'
     });
+
+    const isInterest = description?.toLowerCase().includes('interest') || !!parentLoan;
 
     return (
         <div
@@ -24,13 +28,21 @@ const ExpenseItem = ({
             className="flex items-center justify-between p-5 hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer border-b border-gray-50 group"
         >
             <div className="flex items-center gap-4 min-w-0">
-                <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-gray-100">
-                    <Receipt className="w-6 h-6" />
+                <div className={`w-12 h-12 ${isLoan ? 'bg-amber-50 text-amber-600' : isInterest ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-400'} rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-gray-100`}>
+                    {isLoan ? <Banknote className="w-6 h-6" /> : isInterest ? <Percent className="w-5 h-5" /> : <Receipt className="w-6 h-6" />}
                 </div>
                 <div className="min-w-0">
-                    <h4 className="font-bold text-gray-900 truncate leading-tight">
-                        {description}
-                    </h4>
+                    <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-gray-900 truncate leading-tight">
+                            {description}
+                        </h4>
+                        {isLoan && (
+                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-black uppercase tracking-widest">Loan</span>
+                        )}
+                        {isInterest && (
+                            <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">Interest</span>
+                        )}
+                    </div>
                     <div className="flex items-center gap-1.5 mt-1 text-[13px] text-gray-400">
                         <span className="font-medium text-gray-500 uppercase tracking-wider">{formattedDate}</span>
                         <span>•</span>
