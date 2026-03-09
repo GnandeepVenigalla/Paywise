@@ -10,12 +10,38 @@ import Avatar from '../components/UI/Avatar';
 import Card from '../components/UI/Card';
 import Button from '../components/UI/Button';
 import { useInstallApp } from '../hooks/useInstallApp';
+import { useRef } from 'react';
 
 export default function Account() {
-    const { user, logout } = useContext(AuthContext);
+    const { user, logout, setUser, api } = useContext(AuthContext);
     const navigate = useNavigate();
     const [kitties, setKitties] = useState([]);
     const { isInstallable, promptInstall, isIosPromptVisible, hideIosPrompt } = useInstallApp();
+    const fileInputRef = useRef(null);
+    const [isUploading, setIsUploading] = useState(false);
+
+    const handleProfilePicUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('image', file);
+        setIsUploading(true);
+
+        try {
+            const res = await api.post('/upload/profile', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            // Update the user context with the new profile picture URL
+            setUser({ ...user, profilePic: res.data.url });
+        } catch (error) {
+            console.error('Upload failed:', error);
+            alert(error.response?.data?.msg || 'Failed to upload image.');
+        } finally {
+            setIsUploading(false);
+            e.target.value = null; // reset input
+        }
+    };
 
     const kittyImages = [
         `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50534.png`,
@@ -178,10 +204,21 @@ export default function Account() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-5">
                             <div className="relative">
-                                <Avatar name={user?.username} size="lg" />
-                                <div className="absolute -bottom-1 -right-1 bg-slate-900 rounded-full p-1.5 border-2 border-white shadow-lg">
-                                    <Camera className="w-3.5 h-3.5 text-white" />
-                                </div>
+                                <Avatar src={user?.profilePic} name={user?.username} size="lg" />
+                                <label 
+                                    htmlFor="profile-upload"
+                                    className={`absolute -bottom-1 -right-1 bg-slate-900 rounded-full p-1.5 border-2 border-white shadow-lg cursor-pointer hover:bg-slate-800 transition flex items-center justify-center z-10 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                                >
+                                    <Camera className="w-3.5 h-3.5 text-white pointer-events-none" />
+                                    <input 
+                                        id="profile-upload"
+                                        type="file" 
+                                        onChange={handleProfilePicUpload} 
+                                        accept="image/*" 
+                                        className="hidden" 
+                                        disabled={isUploading}
+                                    />
+                                </label>
                             </div>
                             <div className="min-w-0">
                                 <h2 className="text-xl font-black text-gray-900 truncate leading-tight">
@@ -251,7 +288,7 @@ export default function Account() {
             <div className="text-center mt-12 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <span className="text-slate-900 font-bold">GD Enterprises</span></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.3.4 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.3.5 · © 2026</p>
                 </div>
                 <div
                     onClick={spawnKitty}

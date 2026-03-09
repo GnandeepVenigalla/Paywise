@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext, useMemo } from 'react';
+import { useEffect, useState, useContext, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ArrowLeft, UserPlus, Receipt, CreditCard, Camera, Trash2, X, Edit2, LogOut, Check, Settings, Calendar, Users, Scale, Link2, User, Plane, Home, Heart, ClipboardList, Share, Copy, Link as LinkIcon, Link2Off, Expand, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Percent } from 'lucide-react';
@@ -48,6 +48,34 @@ export default function GroupDetails() {
     const [expandedBalances, setExpandedBalances] = useState({});
     const [showGroupTotals, setShowGroupTotals] = useState(false);
     const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
+    const [loanInterestEnabled, setLoanInterestEnabled] = useState(false);
+    const [loanInterestRate, setLoanInterestRate] = useState(0);
+    const [isSavingLoanSettings, setIsSavingLoanSettings] = useState(false);
+
+    const groupImageInputRef = useRef(null);
+    const [isUploadingGroupImage, setIsUploadingGroupImage] = useState(false);
+
+    const handleGroupImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !group) return;
+
+        const formData = new FormData();
+        formData.append('image', file);
+        setIsUploadingGroupImage(true);
+
+        try {
+            const res = await api.post(`/upload/group/${group._id || group.id}`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setGroup({ ...group, image: res.data.url });
+        } catch (error) {
+            console.error('Group image upload failed:', error);
+            alert(error.response?.data?.msg || 'Failed to upload group image.');
+        } finally {
+            setIsUploadingGroupImage(false);
+            e.target.value = null; // reset
+        }
+    };
     const [showExportOptions, setShowExportOptions] = useState(false);
     const [showGroupSettleUp, setShowGroupSettleUp] = useState(false);
     const [settleUpTarget, setSettleUpTarget] = useState(null); // { member, amount, iOwe }
@@ -65,7 +93,8 @@ export default function GroupDetails() {
 
 
     // Extract monthly spending aggregation logic to custom hook
-    const monthlySpending = useMonthlySpending(expenses, user);
+    // Pass displayCurrency so all chart amounts are in the group's display currency
+    const monthlySpending = useMonthlySpending(expenses, user, displayCurrency);
 
     useEffect(() => {
         if (monthlySpending.length > 0) {
@@ -546,6 +575,7 @@ export default function GroupDetails() {
                                                 sourceCurrency={item.currency || 'USD'}
                                                 isLoan={item.isLoan}
                                                 parentLoan={item.parentLoan}
+                                                billImage={item.billImage}
                                                 onClick={() => {
                                                     setSelectedExpense(item);
                                                     setIsEditingExpense(false);
@@ -717,8 +747,14 @@ export default function GroupDetails() {
                                 ) : (
                                     <div>
                                         <div className="text-center mb-6">
-                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner`}>
-                                                {selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? <Percent className="w-8 h-8" /> : <Receipt className="w-8 h-8" />}
+                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner overflow-hidden border-2 border-white`}>
+                                                {selectedExpense.billImage ? (
+                                                    <a href={selectedExpense.billImage} target="_blank" rel="noopener noreferrer" className="w-full h-full"> 
+                                                        <img src={selectedExpense.billImage} alt="Bill" className="w-full h-full object-cover" />
+                                                    </a>
+                                                ) : (
+                                                    selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? <Percent className="w-8 h-8" /> : <Receipt className="w-8 h-8" />
+                                                )}
                                             </div>
                                             <div className="flex items-center justify-center gap-2 mb-1">
                                                 <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
@@ -739,6 +775,14 @@ export default function GroupDetails() {
                                                 <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
                                             )}
                                             <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+
+                                            {selectedExpense.billImage && (
+                                                <div className="mt-4 flex justify-center">
+                                                    <a href={selectedExpense.billImage} target="_blank" rel="noopener noreferrer" className="block w-24 h-24 rounded-2xl overflow-hidden shadow-md border-2 border-white hover:opacity-80 transition cursor-pointer bg-gray-100">
+                                                        <img src={selectedExpense.billImage} alt="Receipt" className="w-full h-full object-cover" />
+                                                    </a>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 max-h-48 overflow-y-auto">
@@ -793,7 +837,7 @@ export default function GroupDetails() {
                             <div className="p-5 flex items-center justify-between border-b border-gray-50">
                                 <div className="flex items-center gap-4 max-w-[80%]">
                                     <div className="w-[60px] h-[60px] bg-[#343e42] text-white rounded-[14px] flex items-center justify-center text-3xl font-black shadow-sm object-cover overflow-hidden relative flex-shrink-0">
-                                        {group.name?.charAt(0)}
+                                        {group.image ? <img src={group.image} className="w-full h-full object-cover" /> : group.name?.charAt(0)}
                                     </div>
                                     <h3 className="text-[20px] font-medium text-gray-900 truncate">{group.name}</h3>
                                 </div>
@@ -922,8 +966,17 @@ export default function GroupDetails() {
                         <div className="flex-1 overflow-y-auto p-5 pb-20 mt-2">
                             {/* Group Name Editing */}
                             <div className="flex items-start gap-4">
-                                <div className="w-[72px] h-[72px] bg-[#343e42] text-white rounded-[16px] flex items-center justify-center text-4xl font-black shadow-sm object-cover overflow-hidden relative flex-shrink-0">
-                                    {newGroupName?.charAt(0) || group.name?.charAt(0)}
+                                <div className="relative w-[72px] h-[72px] flex-shrink-0">
+                                    <div className="w-full h-full bg-[#343e42] text-white rounded-[16px] flex items-center justify-center text-4xl font-black shadow-sm object-cover overflow-hidden">
+                                        {group.image ? <img src={group.image} className="w-full h-full object-cover" /> : (newGroupName?.charAt(0) || group.name?.charAt(0))}
+                                    </div>
+                                    <label 
+                                        htmlFor="group-image-upload"
+                                        className={`absolute -bottom-2 -right-2 bg-slate-900 rounded-full p-1.5 border-2 border-white shadow-sm cursor-pointer hover:bg-slate-800 transition flex items-center justify-center z-10 ${isUploadingGroupImage ? 'opacity-50 pointer-events-none' : ''}`}
+                                    >
+                                        <Camera className="w-4 h-4 text-white pointer-events-none" />
+                                        <input id="group-image-upload" type="file" onChange={handleGroupImageUpload} accept="image/*" className="hidden" disabled={isUploadingGroupImage} />
+                                    </label>
                                 </div>
                                 <div className="flex-1 mt-1">
                                     <label className="text-[13px] font-bold text-gray-500 mb-0.5 block">Group name</label>
@@ -1039,12 +1092,12 @@ export default function GroupDetails() {
                                     {balances[selectedMemberModal._id] < 0 ? (
                                         <>
                                             <p className="text-[11px] font-medium text-rose-600 uppercase tracking-wide">owes</p>
-                                            <p className="text-[20px] font-medium text-rose-600 leading-none mt-0.5">${Math.abs(balances[selectedMemberModal._id]).toFixed(2)}</p>
+                                            <p className="text-[20px] font-medium text-rose-600 leading-none mt-0.5">{formatCurrency(Math.abs(balances[selectedMemberModal._id]), user?.defaultCurrency)}</p>
                                         </>
                                     ) : balances[selectedMemberModal._id] > 0 ? (
                                         <>
                                             <p className="text-[11px] font-medium text-slate-900 uppercase tracking-wide">gets back</p>
-                                            <p className="text-[20px] font-medium text-slate-900 leading-none mt-0.5">${balances[selectedMemberModal._id].toFixed(2)}</p>
+                                            <p className="text-[20px] font-medium text-slate-900 leading-none mt-0.5">{formatCurrency(balances[selectedMemberModal._id], user?.defaultCurrency)}</p>
                                         </>
                                     ) : (
                                         <p className="text-[16px] font-medium text-gray-400">settled up</p>
@@ -1213,9 +1266,9 @@ export default function GroupDetails() {
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-[16px] text-gray-800 font-medium leading-snug truncate">
                                                             {displayName} {b < 0 ? (
-                                                                <>owes <span className="text-rose-600">${Math.abs(b).toFixed(2)}</span></>
+                                                                <>owes <span className="text-rose-600">{formatCurrency(Math.abs(b), user?.defaultCurrency)}</span></>
                                                             ) : b > 0 ? (
-                                                                <>gets back <span className="text-slate-900">${b.toFixed(2)}</span></>
+                                                                <>gets back <span className="text-slate-900">{formatCurrency(b, user?.defaultCurrency)}</span></>
                                                             ) : (
                                                                 <span className="text-gray-500 font-normal">is settled up</span>
                                                             )}
@@ -1257,7 +1310,7 @@ export default function GroupDetails() {
                                                                         </div>
 
                                                                         <p className="text-[15px] text-gray-700 font-medium leading-normal pr-2">
-                                                                            <span className="text-gray-800">{formatName(detail.debtor.username)}</span> owes <span className={amountColorCls}>${detail.amount.toFixed(2)}</span> to <span className="text-gray-800">{formatName(detail.creditor.username)}</span>
+                                                                            <span className="text-gray-800">{formatName(detail.debtor.username)}</span> owes <span className={amountColorCls}>{formatCurrency(detail.amount, user?.defaultCurrency)}</span> to <span className="text-gray-800">{formatName(detail.creditor.username)}</span>
                                                                         </p>
                                                                     </div>
 
@@ -1272,7 +1325,7 @@ export default function GroupDetails() {
                                                                                             amount: detail.amount,
                                                                                             email: personToRemind.email
                                                                                         });
-                                                                                        setReminderEmailBody(`Hi ${personToRemind.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${currSym}${detail.amount.toFixed(2)} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. 🙏\n\nThank you!`);
+                                                                                        setReminderEmailBody(`Hi ${personToRemind.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${formatCurrency(detail.amount, user?.defaultCurrency)} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. 🙏\n\nThank you!`);
                                                                                         setShowReminderModal(true);
                                                                                     }}
                                                                                     className="bg-slate-900 text-white font-bold px-4 py-2 rounded-[6px] text-[14.5px] shadow-sm flex-1 min-w-0 truncate hover:bg-[#0e7c65] transition leading-none">Request</button>
@@ -1284,7 +1337,7 @@ export default function GroupDetails() {
                                                                                             amount: detail.amount,
                                                                                             email: personToRemind.email
                                                                                         });
-                                                                                        setReminderEmailBody(`Hi ${personToRemind.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${currSym}${detail.amount.toFixed(2)} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. 🙏\n\nThank you!`);
+                                                                                        setReminderEmailBody(`Hi ${personToRemind.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${formatCurrency(detail.amount, user?.defaultCurrency)} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. 🙏\n\nThank you!`);
                                                                                         setShowReminderModal(true);
                                                                                     }}
                                                                                     className="bg-white border border-gray-200 text-gray-700 font-extrabold px-3 py-2 rounded-[6px] text-[14.5px] shadow-sm flex-shrink-0 hover:bg-gray-50 transition leading-none">...</button>
@@ -1299,7 +1352,7 @@ export default function GroupDetails() {
                                                                                             amount: detail.amount,
                                                                                             email: personToRemind.email
                                                                                         });
-                                                                                        setReminderEmailBody(`Hi ${personToRemind.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${currSym}${detail.amount.toFixed(2)} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. 🙏\n\nThank you!`);
+                                                                                        setReminderEmailBody(`Hi ${personToRemind.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${formatCurrency(detail.amount, user?.defaultCurrency)} in our group "${group.name}" on Paywise.\n\nPlease settle up when you get a chance. 🙏\n\nThank you!`);
                                                                                         setShowReminderModal(true);
                                                                                     }}
                                                                                     className="bg-white border border-gray-200 text-gray-700 font-bold px-4 py-2 rounded-[6px] text-[14.5px] shadow-sm flex-1 min-w-0 truncate hover:bg-gray-50 transition leading-none">Remind...</button>
@@ -1377,14 +1430,14 @@ export default function GroupDetails() {
                                                 const heightPercent = Math.max((m.totalSpent / maxGroupSpent) * 100, 5); // 5% minimum bar height
 
                                                 return (
-                                                    <div key={m.key} className="flex flex-col items-center justify-end h-full">
+                                                    <div key={m.key} className="flex flex-col items-center justify-end h-full relative">
                                                         <div
-                                                            className={`w-[32px] rounded-t-lg transition-all ${isSelected ? 'bg-[#3b93c8]' : 'bg-gray-100'}`}
+                                                            className={`w-[32px] rounded-t-lg transition-all relative overflow-hidden ${isSelected ? 'bg-[#3b93c8]' : 'bg-gray-100'}`}
                                                             style={{ height: `${heightPercent}%` }}
                                                         >
                                                             {/* user share inner bar (splitwise usually just uses total spent, we'll keep it simple) */}
                                                             {isSelected && (
-                                                                <div className="w-full bg-[#1b71a2] rounded-t-lg absolute bottom-0" style={{ height: Math.max((m.userShare / (m.totalSpent || 1)) * 100, 5) + '%' }} />
+                                                                <div className="w-full bg-[#1b71a2] absolute bottom-0" style={{ height: Math.max((m.userShare / (m.totalSpent || 1)) * 100, 5) + '%' }} />
                                                             )}
                                                         </div>
                                                         <span className={`text-[12px] font-bold mt-2 absolute -bottom-6 ${isSelected ? 'text-gray-900' : 'text-gray-400'}`}>{m.shortMonth}</span>

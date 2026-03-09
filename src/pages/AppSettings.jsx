@@ -89,7 +89,23 @@ export default function AppSettings() {
         }
     }, [user]);
 
-    const update = (key, value) => setSettings(prev => ({ ...prev, [key]: value }));
+    const update = (key, value) => {
+        setSettings(prev => ({ ...prev, [key]: value }));
+        // Apply theme immediately for live preview
+        if (key === 'theme') {
+            const root = document.documentElement;
+            root.classList.remove('theme-light', 'theme-dark', 'dark');
+            if (value === 'dark') {
+                root.classList.add('theme-dark', 'dark');
+            } else if (value === 'light') {
+                root.classList.add('theme-light');
+            } else {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (prefersDark) root.classList.add('theme-dark', 'dark');
+                else root.classList.add('theme-light');
+            }
+        }
+    };
 
     const handleSave = async () => {
         setSaving(true);

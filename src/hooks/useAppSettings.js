@@ -28,18 +28,34 @@ export function useAppSettings() {
     useEffect(() => {
         const root = document.documentElement;
         // Remove existing theme classes
-        root.classList.remove('theme-light', 'theme-dark');
+        root.classList.remove('theme-light', 'theme-dark', 'dark');
         root.classList.toggle('high-contrast', settings.highContrastMode);
 
-        if (settings.theme === 'light') {
+        const applyDark = () => {
+            root.classList.add('theme-dark', 'dark');
+        };
+        const applyLight = () => {
             root.classList.add('theme-light');
+        };
+
+        if (settings.theme === 'light') {
+            applyLight();
         } else if (settings.theme === 'dark') {
-            root.classList.add('theme-dark');
+            applyDark();
         } else {
             // System: use prefers-color-scheme
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            if (prefersDark) root.classList.add('theme-dark');
-            else root.classList.add('theme-light');
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            if (mediaQuery.matches) applyDark();
+            else applyLight();
+
+            // Also listen for system preference changes in realtime
+            const handler = (e) => {
+                root.classList.remove('theme-light', 'theme-dark', 'dark');
+                if (e.matches) applyDark();
+                else applyLight();
+            };
+            mediaQuery.addEventListener('change', handler);
+            return () => mediaQuery.removeEventListener('change', handler);
         }
     }, [settings.theme, settings.highContrastMode]);
 

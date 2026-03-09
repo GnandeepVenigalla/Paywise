@@ -104,8 +104,12 @@ export default function Activity() {
                                     className="block bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:bg-gray-50 transition active:scale-[0.99]"
                                 >
                                     <div className="flex gap-4">
-                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isPaidByMe ? 'bg-slate-50 text-slate-900' : 'bg-rose-50 text-rose-600'}`}>
-                                            <Icon className="w-6 h-6" />
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isPaidByMe ? 'bg-slate-50 text-slate-900' : 'bg-rose-50 text-rose-600'} overflow-hidden`}>
+                                            {expense.billImage ? (
+                                                <img src={expense.billImage} alt="Bill" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Icon className="w-6 h-6" />
+                                            )}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="text-sm font-bold text-gray-900 truncate">{displayMessage}</h4>

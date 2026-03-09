@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Make Tailwind's dark: variant respond to the .dark class on <html> */
+@variant dark (&:where(.dark, .dark *));
+
 @layer base {
   body {
     background-color: #f9fafb;

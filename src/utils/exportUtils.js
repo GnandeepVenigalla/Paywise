@@ -1,5 +1,5 @@
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Reusable export utility function
 export const exportExpenses = (expenses, format, entityName, currentUser) => {
@@ -62,7 +62,7 @@ export const exportExpenses = (expenses, format, entityName, currentUser) => {
 
         doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 30);
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 40,
             head: [headers],
             body: rows,

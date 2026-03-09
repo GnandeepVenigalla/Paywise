@@ -68,15 +68,15 @@ export default function Notifications() {
                 className="flex items-center justify-between py-4 cursor-pointer"
                 onClick={() => toggleSetting(key)}
             >
-                <span className="text-[17px] text-[#333333] flex-1">{label}</span>
+                <span className="text-[17px] text-[#333333] dark:text-gray-200 flex-1">{label}</span>
                 <div className="flex-shrink-0 w-8 flex justify-end">
                     {isActive ? (
-                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="black" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="2" y="4" width="20" height="16" rx="2" fill="black" />
-                            <path d="M22 7L13.03 12.7C12.41 13.09 11.59 13.09 10.97 12.7L2 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="4" width="20" height="16" rx="2" className="fill-black dark:fill-white" />
+                            <path d="M22 7L13.03 12.7C12.41 13.09 11.59 13.09 10.97 12.7L2 7" className="stroke-white dark:stroke-slate-900" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     ) : (
-                        <Mail className="w-8 h-8 text-[#a9a9a9]" strokeWidth={1.5} />
+                        <Mail className="w-8 h-8 text-[#a9a9a9] dark:text-gray-500" strokeWidth={1.5} />
                     )}
                 </div>
             </div>
@@ -84,12 +84,12 @@ export default function Notifications() {
     };
 
     return (
-        <div className="min-h-screen bg-white pb-24 font-sans flex flex-col">
-            <header className="pt-6 pb-4 px-4 bg-white sticky top-0 z-10 flex items-center justify-between">
-                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-[#333333] hover:bg-gray-100 rounded-full transition">
+        <div className="min-h-screen bg-white dark:bg-slate-900 pb-24 font-sans flex flex-col">
+            <header className="pt-6 pb-4 px-4 bg-white dark:bg-slate-900 sticky top-0 z-10 flex items-center justify-between">
+                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-[#333333] dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition">
                     <ChevronLeft className="w-7 h-7" strokeWidth={1.5} />
                 </button>
-                <h1 className="text-[19px] font-normal text-[#333333] absolute left-1/2 -translate-x-1/2">Notification settings</h1>
+                <h1 className="text-[19px] font-normal text-[#333333] dark:text-white absolute left-1/2 -translate-x-1/2">Notification settings</h1>
                 <div className="w-8"></div> {/* Spacer */}
             </header>
 
@@ -103,7 +103,7 @@ export default function Notifications() {
                 ) : (
                     <>
                         <div className="mt-6 mb-8">
-                            <h2 className="text-[13px] font-bold text-[#888888] tracking-wider mb-2">GROUPS AND FRIENDS</h2>
+                            <h2 className="text-[13px] font-bold text-[#888888] dark:text-gray-400 tracking-wider mb-2">GROUPS AND FRIENDS</h2>
                             <div className="flex flex-col">
                                 {renderToggle("When someone adds me to a group", "addedToGroup")}
                                 {renderToggle("When someone adds me as a friend", "addedAsFriend")}
@@ -111,7 +111,7 @@ export default function Notifications() {
                         </div>
 
                         <div className="mb-8">
-                            <h2 className="text-[13px] font-bold text-[#888888] tracking-wider mb-2">EXPENSES</h2>
+                            <h2 className="text-[13px] font-bold text-[#888888] dark:text-gray-400 tracking-wider mb-2">EXPENSES</h2>
                             <div className="flex flex-col">
                                 {renderToggle("When an expense is added", "expenseAdded")}
                                 {renderToggle("When an expense is edited/deleted", "expenseEdited")}
@@ -122,10 +122,10 @@ export default function Notifications() {
                         </div>
 
                         <div className="mb-8">
-                            <h2 className="text-[13px] font-bold text-[#888888] tracking-wider mb-2">NEWS AND UPDATES</h2>
+                            <h2 className="text-[13px] font-bold text-[#888888] dark:text-gray-400 tracking-wider mb-2">NEWS AND UPDATES</h2>
                             <div className="flex flex-col">
                                 {renderToggle("Monthly summary of my activity", "monthlySummary")}
-                                {renderToggle("Major Splitwise news and updates", "majorUpdates")}
+                                {renderToggle("Major Paywise news and updates", "majorUpdates")}
                             </div>
                         </div>
 

@@ -78,11 +78,18 @@ export default function InstallGate({ children }) {
                 )}
 
                 {!isIos && !isInstallable && (
-                    <p className="text-sm text-gray-400 mt-5 flex items-center gap-2 justify-center w-full">
+                    <p className="text-sm text-gray-400 mt-4 flex items-center gap-2 justify-center w-full">
                         <MonitorSmartphone className="w-4 h-4" />
                         Install via browser menu
                     </p>
                 )}
+
+                <button 
+                    onClick={() => setIsStandalone(true)} 
+                    className="mt-6 text-[14px] font-medium text-gray-400 hover:text-gray-600 transition underline decoration-gray-300 underline-offset-4"
+                >
+                    Skip for now, use in browser
+                </button>
             </div>
 
             <p className="text-gray-400 text-xs font-medium uppercase tracking-widest mt-8">

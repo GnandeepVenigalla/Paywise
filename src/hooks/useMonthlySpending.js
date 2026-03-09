@@ -5,14 +5,16 @@ import { convertAmount } from '../utils/formatters';
  * Custom hook to aggregate expenses into monthly spending data
  * @param {Array} expenses - List of expense objects
  * @param {Object} user - The current user object (for identifying splits)
- * @returns {Array} - Array of simplified month-based spending data
+ * @param {string} displayCurrency - ISO currency code to convert all amounts into (for the chart)
+ * @returns {Array} - Array of simplified month-based spending data, all amounts in displayCurrency
  */
-export const useMonthlySpending = (expenses, user) => {
+export const useMonthlySpending = (expenses, user, displayCurrency) => {
     return useMemo(() => {
         if (!expenses || expenses.length === 0) return [];
 
         const monthMap = {};
-        const targetCurr = user?.defaultCurrency || 'USD';
+        // Use explicitly passed displayCurrency, fall back to user default, then USD
+        const targetCurr = displayCurrency || user?.defaultCurrency || 'USD';
 
         expenses.forEach(exp => {
             // Exclude payments and grouped summaries from the chart logic
@@ -26,6 +28,7 @@ export const useMonthlySpending = (expenses, user) => {
             const key = `${d.getFullYear()}-${("0" + (d.getMonth() + 1)).slice(-2)}`;
             const monthLabel = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
             const shortMonth = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+            // Use the expense's own recorded currency as the source; fall back to USD
             const sourceCurr = exp.currency || 'USD';
 
             if (!monthMap[key]) {
@@ -36,11 +39,12 @@ export const useMonthlySpending = (expenses, user) => {
                     totalSpent: 0,
                     userShare: 0,
                     timestamp: new Date(d.getFullYear(), d.getMonth(), 1).getTime(),
-                    expensesList: []
+                    expensesList: [],
+                    currency: targetCurr, // store which currency these totals are in
                 };
             }
 
-            // Convert and add amount
+            // Convert totalSpent from expense currency to target display currency
             const convertedTotal = convertAmount(exp.amount, sourceCurr, targetCurr);
             monthMap[key].totalSpent += convertedTotal;
             monthMap[key].expensesList.push(exp);
@@ -49,6 +53,7 @@ export const useMonthlySpending = (expenses, user) => {
             const uId = user?.id || user?._id;
             const userSplit = exp.splits?.find(s => (s.user._id || s.user) === uId);
             if (userSplit) {
+                // Split amount is stored in the expense's currency, convert to target
                 const convertedShare = convertAmount(userSplit.amount, sourceCurr, targetCurr);
                 monthMap[key].userShare += convertedShare;
             }
@@ -56,5 +61,5 @@ export const useMonthlySpending = (expenses, user) => {
 
         // Sort by timestamp (chronological)
         return Object.values(monthMap).sort((a, b) => a.timestamp - b.timestamp);
-    }, [expenses, user]);
+    }, [expenses, user, displayCurrency]);
 };
