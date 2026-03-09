@@ -13,7 +13,8 @@ const ExpenseItem = ({
     isGroup = false,
     groupName,
     isLoan = false,
-    parentLoan
+    parentLoan,
+    billImage
 }) => {
     const formattedDate = new Date(date).toLocaleDateString('en-US', {
         month: 'short',
@@ -28,8 +29,12 @@ const ExpenseItem = ({
             className="flex items-center justify-between p-5 hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer border-b border-gray-50 group"
         >
             <div className="flex items-center gap-4 min-w-0">
-                <div className={`w-12 h-12 ${isLoan ? 'bg-amber-50 text-amber-600' : isInterest ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-400'} rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-gray-100`}>
-                    {isLoan ? <Banknote className="w-6 h-6" /> : isInterest ? <Percent className="w-5 h-5" /> : <Receipt className="w-6 h-6" />}
+                <div className={`w-12 h-12 ${isLoan ? 'bg-amber-50 text-amber-600' : isInterest ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-400'} rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-gray-100 overflow-hidden`}>
+                    {billImage ? (
+                        <img src={billImage} alt="Bill" className="w-full h-full object-cover" />
+                    ) : (
+                        isLoan ? <Banknote className="w-6 h-6" /> : isInterest ? <Percent className="w-5 h-5" /> : <Receipt className="w-6 h-6" />
+                    )}
                 </div>
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">

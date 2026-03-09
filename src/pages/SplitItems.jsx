@@ -16,6 +16,7 @@ export default function SplitItems() {
     const [selectedMemberIds, setSelectedMemberIds] = useState([]); // Default for assigning items
     const [paidBy, setPaidBy] = useState(user.id);
     const [isLoading, setIsLoading] = useState(false);
+    const [saveReceipt, setSaveReceipt] = useState(true);
 
     useEffect(() => {
         fetchGroup();
@@ -175,7 +176,7 @@ export default function SplitItems() {
         const isFriend = location.pathname.includes('/friend/');
 
         try {
-            await api.post('/expenses', {
+            const expRes = await api.post('/expenses', {
                 description,
                 amount: totalAmount, // or totalAssigned? usually receipt total
                 currency: user?.defaultCurrency || 'USD',
@@ -188,6 +189,22 @@ export default function SplitItems() {
                     assignedTo: i.assignedTo
                 }))
             });
+
+            // If an image was scanned, upload it as a bill image for this expense
+            if (location.state?.imageSrc && saveReceipt) {
+                try {
+                    const fetchRes = await fetch(location.state.imageSrc);
+                    const blob = await fetchRes.blob();
+                    const formData = new FormData();
+                    formData.append('image', blob, 'receipt.jpg');
+                    await api.post(`/upload/bill/${expRes.data._id}`, formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                } catch (imgErr) {
+                    console.error('Failed to upload receipt image:', imgErr);
+                }
+            }
+
             navigate(isFriend ? `/friend/${id}` : `/group/${id}`);
         } catch (err) {
             console.error(err);
@@ -276,6 +293,30 @@ export default function SplitItems() {
                         ))}
                     </select>
                 </div>
+
+                {/* Receipt Preview & Toggle */}
+                {location.state?.imageSrc && (
+                    <div className="mt-2 flex items-center justify-between bg-slate-50 border border-slate-100 p-2 rounded-xl mb-1">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden border border-white shadow-sm flex-shrink-0">
+                                <img src={location.state.imageSrc} alt="Scan preview" className="w-full h-full object-cover" />
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">Receipt Scanned</p>
+                                <p className="text-[10px] text-slate-500 font-medium leading-none">Save with expense?</p>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer scale-90">
+                            <input
+                                type="checkbox"
+                                checked={saveReceipt}
+                                onChange={(e) => setSaveReceipt(e.target.checked)}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-900"></div>
+                        </label>
+                    </div>
+                )}
             </header>
 
             <main className="flex-1 p-4 pb-24 overflow-y-auto">

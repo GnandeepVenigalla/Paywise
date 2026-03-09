@@ -14,10 +14,10 @@ export const CURRENCY_SYMBOLS = {
  * Loaded initially with static defaults as fallback.
  */
 export const EXCHANGE_RATES = {
-    USD: 1, EUR: 0.92, GBP: 0.79, INR: 83.12, JPY: 150.15,
-    CAD: 1.35, AUD: 1.52, CNY: 7.19, CHF: 0.88, MXN: 17.05,
-    BRL: 4.97, KRW: 1332.50, SGD: 1.34, HKD: 7.82, SEK: 10.35,
-    NOK: 10.55, DKK: 6.85, NZD: 1.63, ZAR: 19.10, AED: 3.67,
+    USD: 1,       EUR: 0.866,  GBP: 0.751,  INR: 92.01,  JPY: 158.33,
+    CAD: 1.360,   AUD: 1.433,  CNY: 6.914,  CHF: 0.781,  MXN: 17.90,
+    BRL: 5.254,   KRW: 1483.8, SGD: 1.282,  HKD: 7.820,  SEK: 9.260,
+    NOK: 9.643,   DKK: 6.462,  NZD: 1.708,  ZAR: 16.74,  AED: 3.673,
 };
 
 // Dynamically fetch live global rates on client load to seamlessly transition to real conversions
@@ -55,7 +55,7 @@ export const convertAmount = (amount, from = 'USD', to = 'USD') => {
 export const formatCurrency = (amount, targetCurrency = 'USD', sourceCurrency = 'USD') => {
     const converted = convertAmount(amount, sourceCurrency, targetCurrency);
     const symbol = CURRENCY_SYMBOLS[targetCurrency] || targetCurrency || '$';
-    return `${symbol}${Math.abs(converted).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${symbol}${Math.abs(converted).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 };
 
 /**

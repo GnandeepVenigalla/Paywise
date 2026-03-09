@@ -1,7 +1,7 @@
 import { useState, useContext, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { X, Receipt, Check, ChevronRight, ChevronLeft, AlignJustify } from 'lucide-react';
+import { X, Receipt, Check, ChevronRight, ChevronLeft, AlignJustify, Camera, Trash2 } from 'lucide-react';
 import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
 import Avatar from '../components/UI/Avatar';
 
@@ -21,6 +21,8 @@ export default function AddExpense() {
     const [isLoading, setIsLoading] = useState(false);
     const [isLoan, setIsLoan] = useState(false);
     const [loanInterestRate, setLoanInterestRate] = useState(0);
+    const [billImage, setBillImage] = useState(null);
+    const [billImagePreview, setBillImagePreview] = useState(null);
 
     // Split State Modals
     const [showSplitModal, setShowSplitModal] = useState(false);
@@ -133,7 +135,7 @@ export default function AddExpense() {
         setIsLoading(true);
 
         try {
-            await api.post('/expenses', {
+            const expRes = await api.post('/expenses', {
                 description,
                 amount: parsedAmount,
                 currency: user?.defaultCurrency || 'USD',
@@ -143,6 +145,19 @@ export default function AddExpense() {
                 isLoan: isLoan,
                 loanInterestRate: isLoan ? loanInterestRate : 0
             });
+
+            if (billImage) {
+                try {
+                    const formData = new FormData();
+                    formData.append('image', billImage);
+                    await api.post(`/upload/bill/${expRes.data._id}`, formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                } catch (imgErr) {
+                    console.error('Failed to upload bill image:', imgErr);
+                }
+            }
+
             navigate(`/group/${id}`);
         } catch (err) {
             console.error(err);
@@ -338,6 +353,49 @@ export default function AddExpense() {
                     ) : (
                         <div className="mt-4 px-4 py-2 border rounded-[6px] text-[14px] shadow-sm bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60">
                             Enter an amount to select split options
+                        </div>
+                    )}
+                </div>
+
+                {/* Bill Image Attachment */}
+                <div className="w-full max-w-[280px] mt-6">
+                    {!billImagePreview ? (
+                        <label 
+                            htmlFor="manual-group-bill-upload"
+                            className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-2xl text-gray-400 dark:text-gray-500 hover:border-emerald-300 dark:hover:border-emerald-800 hover:text-emerald-500 transition-all cursor-pointer bg-gray-50/50 dark:bg-slate-900/50"
+                        >
+                            <Camera className="w-5 h-5" />
+                            <span className="text-[14px] font-bold">Attach receipt</span>
+                            <input 
+                                id="manual-group-bill-upload"
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                        setBillImage(file);
+                                        setBillImagePreview(URL.createObjectURL(file));
+                                    }
+                                }}
+                            />
+                        </label>
+                    ) : (
+                        <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-lg border-2 border-white dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                            <img src={billImagePreview} alt="Receipt preview" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/20" />
+                            <button 
+                                onClick={() => {
+                                    setBillImage(null);
+                                    setBillImagePreview(null);
+                                }}
+                                className="absolute top-2 right-2 p-1.5 bg-white/90 dark:bg-slate-800/90 rounded-full text-rose-500 shadow-md hover:scale-110 active:scale-95 transition"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                            <div className="absolute bottom-2 left-3 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full">
+                                <span className="text-[10px] font-black text-white uppercase tracking-widest">Receipt Attached</span>
+                            </div>
                         </div>
                     )}
                 </div>

@@ -52,7 +52,9 @@ export default function FriendDetails() {
     const [isSavingLoanSettings, setIsSavingLoanSettings] = useState(false);
 
     // Extract monthly spending aggregation logic to custom hook
-    const monthlySpending = useMonthlySpending(expenses, user);
+    // Pass user.defaultCurrency so chart amounts are consistently converted
+    const displayCurrency = user?.defaultCurrency || 'USD';
+    const monthlySpending = useMonthlySpending(expenses, user, displayCurrency);
 
     useEffect(() => {
         if (monthlySpending.length > 0) {
@@ -416,6 +418,7 @@ export default function FriendDetails() {
                                                 groupName={item.group?.name}
                                                 isLoan={item.isLoan}
                                                 parentLoan={item.parentLoan}
+                                                billImage={item.billImage}
                                                 onClick={() => {
                                                     if (item.isGroupSummary) {
                                                         const groupUrl = `#/group/${item.group.id}`;
@@ -580,8 +583,14 @@ export default function FriendDetails() {
                                 ) : (
                                     <div>
                                         <div className="text-center mb-6">
-                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner`}>
-                                                {selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? <Percent className="w-8 h-8" /> : (selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />)}
+                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner overflow-hidden border-2 border-white`}>
+                                                {selectedExpense.billImage ? (
+                                                    <a href={selectedExpense.billImage} target="_blank" rel="noopener noreferrer" className="w-full h-full"> 
+                                                        <img src={selectedExpense.billImage} alt="Bill" className="w-full h-full object-cover" />
+                                                    </a>
+                                                ) : (
+                                                    selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? <Percent className="w-8 h-8" /> : (selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />)
+                                                )}
                                             </div>
                                             <div className="flex items-center justify-center gap-2 mb-1">
                                                 <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
@@ -603,6 +612,14 @@ export default function FriendDetails() {
                                             )}
                                             {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
                                             <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+
+                                            {selectedExpense.billImage && (
+                                                <div className="mt-4 flex justify-center">
+                                                    <a href={selectedExpense.billImage} target="_blank" rel="noopener noreferrer" className="block w-24 h-24 rounded-2xl overflow-hidden shadow-md border-2 border-white hover:opacity-80 transition cursor-pointer bg-gray-100">
+                                                        <img src={selectedExpense.billImage} alt="Receipt" className="w-full h-full object-cover" />
+                                                    </a>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 max-h-48 overflow-y-auto">
@@ -819,13 +836,13 @@ export default function FriendDetails() {
                                             const heightPercent = Math.max((m.totalSpent / maxGroupSpent) * 100, 5);
 
                                             return (
-                                                <div key={m.key} className="flex flex-col items-center justify-end h-full">
+                                                <div key={m.key} className="flex flex-col items-center justify-end h-full relative">
                                                     <div
-                                                        className={`w-[32px] rounded-t-lg transition-all ${isSelected ? 'bg-[#3b93c8]' : 'bg-gray-100'}`}
+                                                        className={`w-[32px] rounded-t-lg transition-all relative overflow-hidden ${isSelected ? 'bg-[#3b93c8]' : 'bg-gray-100'}`}
                                                         style={{ height: `${heightPercent}%` }}
                                                     >
                                                         {isSelected && (
-                                                            <div className="w-full bg-[#1b71a2] rounded-t-lg absolute bottom-0" style={{ height: Math.max((m.userShare / (m.totalSpent || 1)) * 100, 5) + '%' }} />
+                                                            <div className="w-full bg-[#1b71a2] absolute bottom-0" style={{ height: Math.max((m.userShare / (m.totalSpent || 1)) * 100, 5) + '%' }} />
                                                         )}
                                                     </div>
                                                     <span className={`text-[12px] font-bold mt-2 absolute -bottom-6 ${isSelected ? 'text-gray-900' : 'text-gray-400'}`}>{m.shortMonth}</span>
@@ -849,7 +866,7 @@ export default function FriendDetails() {
                                     <div className="flex items-center gap-3 mt-1 relative">
                                         <div className="w-[6px] h-[20px] bg-[#5ab3ed] rounded-full" />
                                         <span className="text-[36px] font-light text-[#3b93c8] leading-none">
-                                            {formatCurrency(monthlySpending[selectedMonthIndex].totalSpent, user?.defaultCurrency, user?.defaultCurrency)}
+                                            {formatCurrency(monthlySpending[selectedMonthIndex].totalSpent, displayCurrency, displayCurrency)}
                                         </span>
                                     </div>
                                 </div>
@@ -863,7 +880,7 @@ export default function FriendDetails() {
                                         <div className="flex items-center gap-3">
                                             <div className="w-[6px] h-[20px] bg-[#145a85] rounded-full" />
                                             <span className="text-[36px] font-light text-[#1b71a2] leading-none">
-                                                {formatCurrency(monthlySpending[selectedMonthIndex].userShare, user?.defaultCurrency, user?.defaultCurrency)}
+                                                {formatCurrency(monthlySpending[selectedMonthIndex].userShare, displayCurrency, displayCurrency)}
                                             </span>
                                         </div>
                                         <p className="text-[14px] text-gray-500 mt-2 ml-4 relative">
@@ -882,10 +899,9 @@ export default function FriendDetails() {
                             const maxExp = curMonthExpenses.reduce((max, e) => e.amount > max.amount ? e : max, curMonthExpenses[0]);
 
                             const spenderMap = {};
-                            const targetCurr = user?.defaultCurrency || 'USD';
                             curMonthExpenses.forEach(e => {
                                 const pid = e.paidBy._id || e.paidBy;
-                                const convertedAmt = convertAmount(e.amount, e.currency || 'USD', targetCurr);
+                                const convertedAmt = convertAmount(e.amount, e.currency || 'USD', displayCurrency);
                                 spenderMap[pid] = (spenderMap[pid] || 0) + convertedAmt;
                             });
 
@@ -913,7 +929,7 @@ export default function FriendDetails() {
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Payer</p>
                                             <p className="text-[16px] text-gray-900 font-medium leading-tight">{topPayerString}</p>
-                                            <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, user?.defaultCurrency, user?.defaultCurrency)}</p>
+                                            <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, displayCurrency, displayCurrency)}</p>
                                         </div>
 
                                         {/* Insight Card 2 */}
@@ -923,7 +939,7 @@ export default function FriendDetails() {
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Largest Expense</p>
                                             <p className="text-[16px] text-gray-900 font-medium leading-tight truncate">{maxExp.description}</p>
-                                            <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(maxExp.amount, user?.defaultCurrency, maxExp.currency)}</p>
+                                            <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(maxExp.amount, displayCurrency, maxExp.currency)}</p>
                                         </div>
                                     </div>
                                 </div>
