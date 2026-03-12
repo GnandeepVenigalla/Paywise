@@ -292,28 +292,7 @@ export default function AccountSettings() {
                     {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : savedMsg ? <><Check className="w-5 h-5" /> Saved!</> : 'Save changes'}
                 </button>
 
-                <h3 className="text-[25px] font-semibold text-slate-900 mb-5">Advanced features</h3>
 
-                <div className="mb-5">
-                    <p className="text-[15px] text-slate-900 mb-2">Block other users</p>
-                    <button className="px-3.5 py-1.5 bg-slate-50 border border-gray-300 rounded-[4px] text-gray-700 text-[15px] hover:bg-gray-200 transition">
-                        Manage your blocklist
-                    </button>
-                </div>
-
-                <div className="mb-5">
-                    <p className="text-[15px] text-slate-900 mb-2">Log out on all devices</p>
-                    <button className="px-3.5 py-1.5 bg-slate-50 border border-gray-300 rounded-[4px] text-gray-700 text-[15px] hover:bg-gray-200 transition">
-                        Log out on all devices
-                    </button>
-                </div>
-
-                <div className="mb-8">
-                    <p className="text-[15px] text-slate-900 mb-2">Your account</p>
-                    <button className="px-3.5 py-1.5 bg-slate-50 border border-gray-300 rounded-[4px] text-gray-700 text-[15px] hover:bg-gray-200 transition">
-                        Close your account
-                    </button>
-                </div>
             </main>
 
             {/* ── Edit Field Modal ── */}

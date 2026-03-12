@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Wallet, Layers, Plus, Upload, UserPlus, ChevronRight, Eye } from 'lucide-react';
+import { Wallet, Layers, Plus, Upload, UserPlus, ChevronRight, Eye, Sparkles } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
