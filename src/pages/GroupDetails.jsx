@@ -1263,17 +1263,19 @@ export default function GroupDetails() {
                                                     <div className="w-[46px] h-[46px] bg-slate-950 text-white rounded-full flex items-center justify-center text-[20px] font-medium uppercase shadow-sm flex-shrink-0 relative z-20">
                                                         {member.username?.charAt(0)}
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-[16px] text-gray-800 font-medium leading-snug truncate">
-                                                            {displayName} {b < 0 ? (
-                                                                <>owes <span className="text-rose-600">{formatCurrency(Math.abs(b), user?.defaultCurrency)}</span></>
+                                                    <div className="flex-1 min-w-0 pr-2">
+                                                        <p className="text-[16px] text-gray-900 font-bold truncate leading-tight">
+                                                            {displayName}
+                                                        </p>
+                                                        <p className="text-[14px] font-medium leading-snug mt-0.5">
+                                                            {b < 0 ? (
+                                                                <span className="text-rose-600">owes {formatCurrency(Math.abs(b), user?.defaultCurrency)}</span>
                                                             ) : b > 0 ? (
-                                                                <>gets back <span className="text-slate-900">{formatCurrency(b, user?.defaultCurrency)}</span></>
+                                                                <span className="text-emerald-500">gets back {formatCurrency(b, user?.defaultCurrency)}</span>
                                                             ) : (
-                                                                <span className="text-gray-500 font-normal">is settled up</span>
+                                                                <span className="text-gray-400">is settled up</span>
                                                             )}
-                                                            <br />
-                                                            <span className="text-gray-500 text-[15px] font-normal">in total</span>
+                                                            <span className="text-gray-400 text-[12px] font-medium lowercase ml-1">in total</span>
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1492,12 +1494,19 @@ export default function GroupDetails() {
                             {/* Insights & Charts Section */}
                             {monthlySpending.length > 0 && monthlySpending[selectedMonthIndex].expensesList.length > 0 && (() => {
                                 const curMonthExpenses = monthlySpending[selectedMonthIndex].expensesList;
-                                const maxExp = curMonthExpenses.reduce((max, e) => e.amount > max.amount ? e : max, curMonthExpenses[0]);
+                                
+                                // 1. Calculate Largest Expense by comparing CONVERTED amounts
+                                const maxExp = curMonthExpenses.reduce((max, e) => {
+                                    const currentConverted = convertAmount(e.amount, e.currency || 'USD', displayCurrency);
+                                    const maxConverted = convertAmount(max.amount, max.currency || 'USD', displayCurrency);
+                                    return currentConverted > maxConverted ? e : max;
+                                }, curMonthExpenses[0]);
 
+                                // 2. Calculate Top Spender accurately
                                 const spenderMap = {};
                                 const targetCurr = displayCurrency || 'USD';
                                 curMonthExpenses.forEach(e => {
-                                    const pid = e.paidBy._id || e.paidBy;
+                                    const pid = (e.paidBy?._id || e.paidBy || 'unknown').toString();
                                     const convertedAmt = convertAmount(e.amount, e.currency || 'USD', targetCurr);
                                     spenderMap[pid] = (spenderMap[pid] || 0) + convertedAmt;
                                 });
@@ -1511,8 +1520,10 @@ export default function GroupDetails() {
                                     }
                                 });
 
-                                const topUserObj = topId ? [...(group?.members || []), ...(group?.pastMembers || [])].find(m => m._id === topId) : null;
-                                const topUserName = topUserObj ? (topUserObj._id === user.id || topUserObj._id === user._id ? 'You' : formatName(topUserObj.username)) : 'Someone';
+                                const myId = (user?.id || user?._id || '').toString();
+                                const allMembers = [...(group?.members || []), ...(group?.pastMembers || [])];
+                                const topUserObj = topId ? allMembers.find(m => (m._id || m).toString() === topId) : null;
+                                const topUserName = topId === myId ? 'You' : (topUserObj?.username || 'Someone');
 
                                 return (
                                     <div className="mt-10 mb-8 border-t border-gray-100 pt-8">
@@ -1525,7 +1536,7 @@ export default function GroupDetails() {
                                                     <TrendingUp className="w-4 h-4 text-slate-900" />
                                                 </div>
                                                 <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Spender</p>
-                                                <p className="text-[16px] text-gray-900 font-medium leading-tight">{topUserName}</p>
+                                                <p className="text-[16px] text-gray-900 font-medium leading-tight truncate">{topUserName}</p>
                                                 <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, displayCurrency, displayCurrency)}</p>
                                             </div>
 

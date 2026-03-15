@@ -1,8 +1,9 @@
 import { useState, useContext, useEffect, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Send, Bot, User, ChevronLeft, Sparkles, Plus, Check, X, Loader2 } from 'lucide-react';
+import { Send, Bot, User, ChevronLeft, Sparkles, Plus, Check, X, Loader2, Trash2 } from 'lucide-react';
 import logoImg from '../assets/logo.png';
+import AdGate from '../components/UI/AdGate';
 
 export default function AiAssistant() {
     const { user, api } = useContext(AuthContext);
@@ -14,6 +15,8 @@ export default function AiAssistant() {
     const [isLoading, setIsLoading] = useState(false);
     const [proposedAction, setProposedAction] = useState(null);
     const [suggestions, setSuggestions] = useState([]);
+    const [showAd, setShowAd] = useState(false);
+    const [isAiUnlocked, setIsAiUnlocked] = useState(localStorage.getItem('ai_unlocked') === 'true');
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -46,6 +49,11 @@ export default function AiAssistant() {
     const handleSend = async (e) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
+        
+        if (!isAiUnlocked) {
+            setShowAd(true);
+            return;
+        }
 
         const userMsg = { id: Date.now(), text: input, sender: 'user' };
         setMessages(prev => [...prev, userMsg]);
@@ -225,9 +233,21 @@ export default function AiAssistant() {
                     </button>
                 </form>
                 <div className="mt-3 text-center">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Powered by Gemini 1.5 Flash</p>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Powered by Gemini 2.5 Flash</p>
                 </div>
             </footer>
+
+            <AdGate 
+                isOpen={showAd}
+                onClose={() => setShowAd(false)}
+                onFinish={() => {
+                    setShowAd(false);
+                    setIsAiUnlocked(true);
+                    localStorage.setItem('ai_unlocked', 'true');
+                    handleSend({ preventDefault: () => {} });
+                }}
+                type="ai"
+            />
         </div>
     );
 }

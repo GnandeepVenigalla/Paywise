@@ -4,6 +4,7 @@ import Webcam from 'react-webcam';
 import Tesseract from 'tesseract.js';
 import { Camera, RefreshCw, Upload, Image as ImageIcon, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
+import AdGate from '../components/UI/AdGate';
 
 export default function ScanBill() {
     const { id } = useParams();
@@ -18,6 +19,8 @@ export default function ScanBill() {
     const [progress, setProgress] = useState(0);
     const [cameraState, setCameraState] = useState('loading'); // 'loading', 'active', 'error'
     const [hasPermission, setHasPermission] = useState(localStorage.getItem('camera_granted') === 'true');
+    const [showAd, setShowAd] = useState(false);
+    const [pendingProcess, setPendingProcess] = useState(false);
 
     const requestPermission = async () => {
         try {
@@ -53,6 +56,11 @@ export default function ScanBill() {
             }
             reader.readAsDataURL(file);
         }
+    };
+
+    const initiateProcess = () => {
+        setShowAd(true);
+        setPendingProcess(true);
     };
 
     const processImage = async () => {
@@ -250,7 +258,7 @@ export default function ScanBill() {
                             <RefreshCw className="w-5 h-5" /> Retake
                         </button>
                         <button
-                            onClick={processImage}
+                            onClick={initiateProcess}
                             disabled={isProcessing}
                             className="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-slate-800 to-slate-800 text-white font-bold hover:from-slate-900 hover:to-slate-900 transition disabled:opacity-50 shadow-lg shadow-slate-800/30 flex items-center justify-center gap-2"
                         >
@@ -259,6 +267,22 @@ export default function ScanBill() {
                     </div>
                 )}
             </div>
+
+            <AdGate 
+                isOpen={showAd} 
+                onClose={() => {
+                    setShowAd(false);
+                    setPendingProcess(false);
+                }} 
+                onFinish={() => {
+                    setShowAd(false);
+                    if (pendingProcess) {
+                        setPendingProcess(false);
+                        processImage();
+                    }
+                }} 
+                type="camera"
+            />
 
             <style jsx>{`
         @keyframes scan {

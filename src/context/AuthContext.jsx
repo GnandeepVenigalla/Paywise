@@ -89,8 +89,20 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    const [expenseCount, setExpenseCount] = useState(parseInt(localStorage.getItem('expense_count') || '0'));
+
+    const incrementExpenseCount = () => {
+        const newCount = expenseCount + 1;
+        setExpenseCount(newCount);
+        localStorage.setItem('expense_count', newCount.toString());
+    };
+
     return (
-        <AuthContext.Provider value={{ user, setUser, loading, login, register, verifyOtp, logout, api, sessionAuthenticated, setSessionAuthenticated }}>
+        <AuthContext.Provider value={{ 
+            user, setUser, loading, login, register, verifyOtp, logout, api, 
+            sessionAuthenticated, setSessionAuthenticated,
+            expenseCount, incrementExpenseCount 
+        }}>
             {children}
         </AuthContext.Provider>
     );

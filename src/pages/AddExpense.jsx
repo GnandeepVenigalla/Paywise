@@ -2,15 +2,18 @@ import { useState, useContext, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { X, Receipt, Check, ChevronRight, ChevronLeft, AlignJustify, Camera, Trash2 } from 'lucide-react';
-import { useAppSettings, getCurrencySymbol } from '../hooks/useAppSettings';
+import { useAppSettings } from '../hooks/useAppSettings';
+import AdGate from '../components/UI/AdGate';
 import Avatar from '../components/UI/Avatar';
+import { CURRENCY_SYMBOLS, EXCHANGE_RATES } from '../utils/formatters';
 
 export default function AddExpense() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { api, user } = useContext(AuthContext);
+    const { api, user, expenseCount, incrementExpenseCount } = useContext(AuthContext);
     const { defaultSplitMethod } = useAppSettings();
-    const currSym = getCurrencySymbol(user?.defaultCurrency || 'USD');
+
+    const [showAd, setShowAd] = useState(false);
 
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
@@ -23,6 +26,10 @@ export default function AddExpense() {
     const [loanInterestRate, setLoanInterestRate] = useState(0);
     const [billImage, setBillImage] = useState(null);
     const [billImagePreview, setBillImagePreview] = useState(null);
+    const [currency, setCurrency] = useState(user?.defaultCurrency || 'USD');
+    const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+
+    const currSym = CURRENCY_SYMBOLS[currency] || '$';
 
     // Split State Modals
     const [showSplitModal, setShowSplitModal] = useState(false);
@@ -138,7 +145,7 @@ export default function AddExpense() {
             const expRes = await api.post('/expenses', {
                 description,
                 amount: parsedAmount,
-                currency: user?.defaultCurrency || 'USD',
+                currency: currency,
                 group: id,
                 paidBy: payerMode === 'multiple' ? 'multiple' : paidBy,
                 splits: buildSplits(),
@@ -158,6 +165,7 @@ export default function AddExpense() {
                 }
             }
 
+            incrementExpenseCount();
             navigate(`/group/${id}`);
         } catch (err) {
             console.error(err);
@@ -285,7 +293,13 @@ export default function AddExpense() {
                     Add an expense
                 </h1>
                 <button
-                    onClick={handleSubmit}
+                    onClick={(e) => {
+                        if (expenseCount >= 4) {
+                            setShowAd(true);
+                        } else {
+                            handleSubmit(e);
+                        }
+                    }}
                     disabled={!isSaveEnabled || isLoading}
                     className={`font-bold text-[16px] px-2 transition ${isSaveEnabled ? 'text-[#19876e] hover:opacity-80' : 'text-gray-300 dark:text-gray-600'}`}
                 >
@@ -320,9 +334,12 @@ export default function AddExpense() {
                     </div>
 
                     <div className="flex items-center gap-3 w-full border-b-[2px] border-[#19876e] pb-1">
-                        <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-md border border-gray-200 dark:border-slate-700 shadow-sm flex items-center justify-center">
-                            <span className="text-2xl font-bold text-gray-700 dark:text-gray-200">{currSym}</span>
-                        </div>
+                        <button 
+                            onClick={() => setShowCurrencyModal(true)}
+                            className="w-12 h-12 bg-white dark:bg-slate-800 rounded-md border border-gray-200 dark:border-slate-700 shadow-sm flex items-center justify-center active:scale-95 transition-transform"
+                        >
+                            <span className="text-xl font-bold text-gray-700 dark:text-gray-200">{currSym}</span>
+                        </button>
                         <input
                             type="number"
                             step="0.01"
@@ -670,6 +687,77 @@ export default function AddExpense() {
                     })()}
                 </div>
             )}
+
+            {/* Currency Selector Modal */}
+            {showCurrencyModal && (
+                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                        onClick={() => setShowCurrencyModal(false)}
+                    />
+                    <div className="bg-white dark:bg-slate-900 w-full max-h-[80vh] rounded-t-[32px] flex flex-col relative z-20 animate-in slide-in-from-bottom duration-300 shadow-2xl overflow-hidden">
+                        <div className="w-12 h-1.5 bg-gray-200 dark:bg-slate-800 rounded-full mx-auto mt-3 mb-1" />
+                        <div className="p-6 pb-4 flex justify-between items-center border-b border-gray-50 dark:border-slate-800">
+                            <h2 className="text-xl font-black text-gray-900 dark:text-white">Select Currency</h2>
+                            <button 
+                                onClick={() => setShowCurrencyModal(false)}
+                                className="w-8 h-8 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-gray-500"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 gap-2">
+                            {Object.keys(EXCHANGE_RATES).map(code => {
+                                const isSelected = currency === code;
+                                return (
+                                    <button
+                                        key={code}
+                                        onClick={() => {
+                                            setCurrency(code);
+                                            setShowCurrencyModal(false);
+                                        }}
+                                        className={`flex items-center justify-between p-4 rounded-2xl transition-all ${
+                                            isSelected 
+                                            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-500 shadow-sm' 
+                                            : 'bg-gray-50 dark:bg-slate-800/50 hover:bg-gray-100 dark:hover:bg-slate-800 border-2 border-transparent'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl ${
+                                                isSelected ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 shadow-sm'
+                                            }`}>
+                                                {CURRENCY_SYMBOLS[code] || '$'}
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="font-black text-gray-900 dark:text-white text-[17px]">{code}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Global Standard</p>
+                                            </div>
+                                        </div>
+                                        {isSelected && (
+                                            <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center shadow-md">
+                                                <Check className="w-4 h-4 text-white" />
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="p-6 bg-gray-50 dark:bg-slate-950 border-t border-gray-100 dark:border-slate-800 flex justify-center">
+                            <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Live exchange rates applied automatically</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <AdGate 
+                isOpen={showAd}
+                onClose={() => setShowAd(false)}
+                onFinish={() => {
+                    setShowAd(false);
+                    handleSubmit();
+                }}
+                type="premium"
+            />
         </div>
     );
 }

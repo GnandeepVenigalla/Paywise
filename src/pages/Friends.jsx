@@ -327,23 +327,33 @@ export default function Friends() {
                                         key={friend.id}
                                         className="block bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100 transition-all group"
                                     >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 bg-slate-50 text-slate-900 rounded-full flex items-center justify-center font-bold text-lg uppercase group-hover:scale-105 transition">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-12 h-12 bg-slate-50 text-slate-900 rounded-full flex items-center justify-center font-bold text-lg uppercase flex-shrink-0 group-hover:scale-105 transition-all">
                                                     {friend.username.charAt(0)}
                                                 </div>
-                                                <div>
-                                                    <h3 className="font-bold text-gray-900 text-lg">{friend.username}</h3>
-                                                    <p className="text-xs text-gray-500">{friend.email}</p>
+                                                <div className="min-w-0">
+                                                    <h3 className="font-bold text-gray-900 text-[16px] truncate leading-tight">{friend.username}</h3>
+                                                    <p className="text-[12px] text-gray-400 truncate mt-0.5">{friend.email}</p>
                                                 </div>
                                             </div>
-                                            <div className="text-right flex flex-col items-end">
+                                            <div className="text-right flex-shrink-0">
                                                 {friend.balance > 0 ? (
-                                                    <p className="font-bold text-emerald-500">owes you {formatCurrency(friend.balance, user.defaultCurrency)}</p>
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-[11px] font-black uppercase tracking-tight text-emerald-500/80 mb-0.5">owes you</span>
+                                                        <span className="text-[16px] font-black text-emerald-500 leading-none">
+                                                            {formatCurrency(friend.balance, user.defaultCurrency)}
+                                                        </span>
+                                                    </div>
                                                 ) : friend.balance < 0 ? (
-                                                    <p className="font-bold text-rose-600">you owe {formatCurrency(friend.balance, user.defaultCurrency)}</p>
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-[11px] font-black uppercase tracking-tight text-rose-500/80 mb-0.5">you owe</span>
+                                                        <span className="text-[16px] font-black text-rose-600 leading-none">
+                                                            {formatCurrency(Math.abs(friend.balance), user.defaultCurrency)}
+                                                        </span>
+                                                    </div>
                                                 ) : (
-                                                    <p className="font-medium text-gray-400">settled up</p>
+                                                    <p className="text-[13px] font-bold text-gray-400 uppercase tracking-widest">settled up</p>
                                                 )}
                                             </div>
                                         </div>

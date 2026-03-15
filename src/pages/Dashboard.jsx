@@ -150,13 +150,18 @@ export default function Dashboard() {
                                         <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-900 group-hover:bg-slate-100 group-hover:scale-105 transition-all">
                                             <Layers className="w-6 h-6" />
                                         </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-gray-800 text-lg">{group.name}</h3>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-gray-800 text-lg truncate leading-tight">{group.name}</h3>
                                             <p className="text-sm text-gray-500 mt-0.5">{group.members.length} member{group.members.length !== 1 && 's'}</p>
                                         </div>
                                         {myBal !== 0 && (
-                                            <div className={`text-[15px] font-bold flex-shrink-0 ${hideBalance ? 'privacy-blur' : ''} ${myBal > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                {myBal > 0 ? '+' : '-'}{formatCurrency(myBal, user?.defaultCurrency)}
+                                            <div className={`text-right flex-shrink-0 ml-2 ${hideBalance ? 'privacy-blur' : ''}`}>
+                                                <p className={`text-[10px] font-black uppercase tracking-tight mb-0.5 ${myBal > 0 ? 'text-emerald-500/80' : 'text-rose-500/80'}`}>
+                                                    {myBal > 0 ? 'you get back' : 'you owe'}
+                                                </p>
+                                                <p className={`text-[16px] font-black leading-none ${myBal > 0 ? 'text-emerald-500' : 'text-rose-600'}`}>
+                                                    {formatCurrency(myBal, user?.defaultCurrency)}
+                                                </p>
                                             </div>
                                         )}
                                     </div>
