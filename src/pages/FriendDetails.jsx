@@ -254,12 +254,20 @@ export default function FriendDetails() {
                     };
                 }
                 const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+                const sourceCurr = exp.currency || 'USD';
+                
                 if (isPaidByMe) {
                     const fSplit = (exp.splits || []).find(s => s?.user?._id === friend?._id || s?.user?._id === friend?.id || s?.user === friend?._id || s?.user === friend?.id);
-                    if (fSplit) groupBalances[gid].balance += fSplit.amount;
+                    if (fSplit) {
+                        // Convert to USD base for internal summing
+                        groupBalances[gid].balance += convertAmount(fSplit.amount, sourceCurr, 'USD');
+                    }
                 } else if (exp.paidBy?._id === friend?._id || exp.paidBy?._id === friend?.id || exp.paidBy === friend?._id || exp.paidBy === friend?.id) {
                     const mySplit = (exp.splits || []).find(s => s?.user?._id === user.id || s?.user?._id === user._id || s?.user === user.id || s?.user === user._id);
-                    if (mySplit) groupBalances[gid].balance -= mySplit.amount;
+                    if (mySplit) {
+                        // Convert to USD base for internal summing
+                        groupBalances[gid].balance -= convertAmount(mySplit.amount, sourceCurr, 'USD');
+                    }
                 }
             }
         });
@@ -324,13 +332,21 @@ export default function FriendDetails() {
                                     (expenses || []).forEach(exp => {
                                         if (!exp) return;
                                         const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+                                        const sourceCurr = exp.currency || 'USD';
                                         let b = 0;
+                                        
                                         if (isPaidByMe) {
                                             const fSplit = (exp.splits || []).find(s => s?.user?._id === friend?._id || s?.user?._id === friend?.id || s?.user === friend?._id || s?.user === friend?.id);
-                                            if (fSplit) b = fSplit.amount;
+                                            if (fSplit) {
+                                                // Convert to USD base for internal summing
+                                                b = convertAmount(fSplit.amount, sourceCurr, 'USD');
+                                            }
                                         } else if (exp.paidBy?._id === friend?._id || exp.paidBy?._id === friend?.id || exp.paidBy === friend?._id || exp.paidBy === friend?.id) {
                                             const mySplit = (exp.splits || []).find(s => s?.user?._id === user.id || s?.user?._id === user._id || s?.user === user.id || s?.user === user._id);
-                                            if (mySplit) b = -mySplit.amount;
+                                            if (mySplit) {
+                                                // Convert to USD base for internal summing
+                                                b = -convertAmount(mySplit.amount, sourceCurr, 'USD');
+                                            }
                                         }
 
                                         if (b !== 0) {
@@ -896,26 +912,30 @@ export default function FriendDetails() {
                         {/* Insights & Charts Section */}
                         {monthlySpending.length > 0 && monthlySpending[selectedMonthIndex].expensesList.length > 0 && (() => {
                             const curMonthExpenses = monthlySpending[selectedMonthIndex].expensesList;
-                            const maxExp = curMonthExpenses.reduce((max, e) => e.amount > max.amount ? e : max, curMonthExpenses[0]);
+                            
+                            // 1. Calculate Largest Expense by comparing CONVERTED amounts
+                            const maxExp = curMonthExpenses.reduce((max, e) => {
+                                const currentConverted = convertAmount(e.amount, e.currency || 'USD', displayCurrency);
+                                const maxConverted = convertAmount(max.amount, max.currency || 'USD', displayCurrency);
+                                return currentConverted > maxConverted ? e : max;
+                            }, curMonthExpenses[0]);
 
+                            // 2. Calculate Top Payer accurately
                             const spenderMap = {};
                             curMonthExpenses.forEach(e => {
-                                const pid = e.paidBy._id || e.paidBy;
+                                const pid = (e.paidBy?._id || e.paidBy || 'unknown').toString();
                                 const convertedAmt = convertAmount(e.amount, e.currency || 'USD', displayCurrency);
                                 spenderMap[pid] = (spenderMap[pid] || 0) + convertedAmt;
                             });
 
-                            let topAmt = 0;
-                            Object.entries(spenderMap).forEach(([id, amt]) => {
-                                if (amt > topAmt) {
-                                    topAmt = amt;
-                                }
-                            });
+                            const myId = (user?.id || user?._id || '').toString();
+                            const friendId = (friend?._id || friend?.id || '').toString();
+                            
+                            const myPaidTotal = spenderMap[myId] || 0;
+                            const friendPaidTotal = spenderMap[friendId] || 0;
 
-                            const myAmt = spenderMap[user.id] || spenderMap[user._id] || 0;
-                            const friendAmt = (spenderMap[friend._id] || 0) + (spenderMap[friend.id] || 0);
-
-                            const topPayerString = myAmt >= friendAmt ? 'You' : friend.username;
+                            const topPayerString = myPaidTotal >= friendPaidTotal ? 'You' : (friend?.username || 'Friend');
+                            const topAmt = Math.max(myPaidTotal, friendPaidTotal);
 
                             return (
                                 <div className="mt-10 mb-8 border-t border-gray-100 pt-8">
@@ -928,7 +948,7 @@ export default function FriendDetails() {
                                                 <TrendingUp className="w-4 h-4 text-slate-900" />
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Payer</p>
-                                            <p className="text-[16px] text-gray-900 font-medium leading-tight">{topPayerString}</p>
+                                            <p className="text-[16px] text-gray-900 font-medium leading-tight truncate">{topPayerString}</p>
                                             <p className="text-[14px] text-gray-500 mt-0.5">{formatCurrency(topAmt, displayCurrency, displayCurrency)}</p>
                                         </div>
 

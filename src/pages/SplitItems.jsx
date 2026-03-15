@@ -1,9 +1,9 @@
 import { useState, useEffect, useContext } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Check, Users, Receipt, DollarSign } from 'lucide-react';
+import { ArrowLeft, Check, Users, Receipt, DollarSign, X } from 'lucide-react';
 import logoImg from '../assets/logo.png';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, CURRENCY_SYMBOLS, EXCHANGE_RATES } from '../utils/formatters';
 
 export default function SplitItems() {
     const { id } = useParams();
@@ -17,6 +17,20 @@ export default function SplitItems() {
     const [paidBy, setPaidBy] = useState(user.id);
     const [isLoading, setIsLoading] = useState(false);
     const [saveReceipt, setSaveReceipt] = useState(true);
+    const [currency, setCurrency] = useState(user?.defaultCurrency || 'USD');
+    const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+    
+    // Global common tax/fee keywords to ensure worldwide accuracy (IVA, TVA, GST, etc.)
+    const COMMON_TAX_KEYWORDS = [
+        'tax', 'gst', 'sc', 'service charge', 'vat', 'surcharge', 'gratuity', '@', 'fee', 
+        'iva', 'tva', 'mwst', 'igst', 'cgst', 'sgst', 'sales tax', 'consumption tax', 
+        'tourism tax', 'service tax', 'municipality', 'levy'
+    ];
+
+    const isCommonItem = (name) => {
+        const lower = name.toLowerCase();
+        return COMMON_TAX_KEYWORDS.some(k => lower.includes(k));
+    };
 
     useEffect(() => {
         fetchGroup();
@@ -66,9 +80,10 @@ export default function SplitItems() {
         let parsedItems = [];
         let idCounter = 1;
 
-        // Matches lines ending in a price (allowing an optional character at the very end like 'A' or 'E')
-        const priceRegex = /(.+?)\s+[$]?(\d+\.\d{2})(?:\s*[A-Za-z%]{1,2})?$/;
+        // Matches lines ending in a price (allowing optional leading/trailing minus or plus signs)
+        const priceRegex = /(.+?)\s+[$]?([+-]?\d+\.\d{2}[+-]?)(?:\s*[A-Za-z%]{1,2})?$/;
         const ignoreKeywords = ['total', 'subtotal', 'change', 'amount', 'visa', 'mastercard', 'cash', 'due', 'balance', 'items sold', 'approved'];
+        const discountKeywords = ['discount', 'rebate', 'coupon', 'less', 'off', 'savings'];
 
         lines.forEach(line => {
             line = line.trim();
@@ -77,22 +92,39 @@ export default function SplitItems() {
             const match = line.match(priceRegex);
             if (match) {
                 let name = match[1].trim();
-                const price = parseFloat(match[2]);
+                let priceStr = match[2];
+                
+                // Handle trailing minus (e.g., "4.00-") or leading
+                let isNegative = priceStr.includes('-') || name.endsWith('-');
+                let priceValue = parseFloat(priceStr.replace(/[+-]/g, ''));
+                if (isNegative) priceValue = -Math.abs(priceValue);
 
                 // Filter out common non-item lines
                 const isIgnored = ignoreKeywords.some(keyword => name.toLowerCase().includes(keyword));
 
-                if (name && !isNaN(price) && !isIgnored && name.length > 2 && price > 0) {
-                    // Clean up Costco/retailer SKUs (e.g., "E 782796 ***KSWTR40PK" -> "KSWTR40PK", "4873222 ALL F&C" -> "ALL F&C")
+                if (name && !isNaN(priceValue) && !isIgnored && name.length > 2) {
+                    // Clean up SKU
                     let cleanName = name.replace(/^(?:[A-Za-z]\s+)?\d+\s+/, '').trim();
-                    cleanName = cleanName.replace(/^\*+/, '').trim(); // Remove leading asterisks
+                    cleanName = cleanName.replace(/^\*+/, '').trim();
 
-                    parsedItems.push({
-                        id: idCounter++,
-                        name: cleanName || name,
-                        price,
-                        assignedTo: []
-                    });
+                    const isDiscount = discountKeywords.some(k => name.toLowerCase().includes(k)) || priceValue < 0;
+
+                    // SMART MERGE: If this is a discount and we have a previous item, apply it to that item
+                    if (isDiscount && parsedItems.length > 0) {
+                        const lastItem = parsedItems[parsedItems.length - 1];
+                        lastItem.price = parseFloat((lastItem.price + priceValue).toFixed(2));
+                        // Update name to show discount applied if it's the first one
+                        if (!lastItem.name.includes('(Disc)')) {
+                            lastItem.name += ' (Disc applied)';
+                        }
+                    } else {
+                        parsedItems.push({
+                            id: idCounter++,
+                            name: cleanName || name,
+                            price: priceValue,
+                            assignedTo: []
+                        });
+                    }
                 }
             }
         });
@@ -143,6 +175,18 @@ export default function SplitItems() {
         );
     };
 
+    const splitCommonItems = () => {
+        if (!group) return;
+        const allMemberIds = group.members.map(m => m._id);
+        
+        setItems(items.map(item => {
+            if (isCommonItem(item.name)) {
+                return { ...item, assignedTo: allMemberIds };
+            }
+            return item;
+        }));
+    };
+
     const saveExpense = async () => {
         // Validate
         const totalAssigned = items.reduce((acc, item) => item.assignedTo.length > 0 ? acc + item.price : acc, 0);
@@ -179,7 +223,7 @@ export default function SplitItems() {
             const expRes = await api.post('/expenses', {
                 description,
                 amount: totalAmount, // or totalAssigned? usually receipt total
-                currency: user?.defaultCurrency || 'USD',
+                currency: currency,
                 group: isFriend ? null : id,
                 paidBy: paidBy,
                 splits: splitsArray,
@@ -233,7 +277,15 @@ export default function SplitItems() {
                     <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition">
                         <ArrowLeft className="w-6 h-6 text-gray-700" />
                     </button>
-                    <h2 className="text-xl font-bold text-gray-900">Assign Items</h2>
+                    <div className="flex flex-col items-center">
+                        <h2 className="text-xl font-bold text-gray-900 leading-tight">Assign Items</h2>
+                        <button 
+                            onClick={() => setShowCurrencyModal(true)}
+                            className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1 border border-slate-200"
+                        >
+                            Currency: {currency} ({CURRENCY_SYMBOLS[currency] || '$'})
+                        </button>
+                    </div>
                     <button
                         onClick={saveExpense}
                         disabled={isLoading || assignedTotal === 0}
@@ -246,18 +298,28 @@ export default function SplitItems() {
                 {/* Member selection pills */}
                 <div className="flex justify-between items-center mt-2 px-1 pb-1">
                     <p className="text-xs text-gray-500 font-medium">Select recipients:</p>
-                    <button
-                        onClick={() => {
-                            if (selectedMemberIds.length === group.members.length) {
-                                setSelectedMemberIds([]);
-                            } else {
-                                setSelectedMemberIds(group.members.map(m => m._id));
-                            }
-                        }}
-                        className="text-xs font-bold text-slate-900 bg-slate-50 px-3 py-1 rounded hover:bg-slate-100 transition"
-                    >
-                        {selectedMemberIds.length === group.members.length ? 'Deselect All' : 'Select All'}
-                    </button>
+                    <div className="flex gap-2">
+                        {items.some(i => isCommonItem(i.name)) && (
+                            <button
+                                onClick={splitCommonItems}
+                                className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition shadow-sm"
+                            >
+                                Split Common Items
+                            </button>
+                        )}
+                        <button
+                            onClick={() => {
+                                if (selectedMemberIds.length === group.members.length) {
+                                    setSelectedMemberIds([]);
+                                } else {
+                                    setSelectedMemberIds(group.members.map(m => m._id));
+                                }
+                            }}
+                            className="text-xs font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded hover:bg-slate-200 transition"
+                        >
+                            {selectedMemberIds.length === group.members.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                    </div>
                 </div>
                 <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide mt-1">
                     {group.members.map(member => {
@@ -335,7 +397,12 @@ export default function SplitItems() {
                                     }`}
                             >
                                 <div className="flex-1 pr-4">
-                                    <h3 className={`font-bold text-lg ${isAssigned ? 'text-gray-900' : 'text-gray-700'}`}>{item.name}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className={`font-bold text-lg ${isAssigned ? 'text-gray-900' : 'text-gray-700'}`}>{item.name}</h3>
+                                        {isCommonItem(item.name) && (
+                                            <span className="bg-emerald-50 text-emerald-600 text-[9px] font-black px-1.5 py-0.5 rounded leading-none uppercase tracking-tighter border border-emerald-100">Common</span>
+                                        )}
+                                    </div>
                                     {isAssigned && (
                                         <div className="flex gap-1 mt-2 flex-wrap">
                                             {item.assignedTo.map(uid => {
@@ -352,7 +419,7 @@ export default function SplitItems() {
 
                                 <div className="flex items-center gap-4">
                                     <span className={`text-xl font-extrabold ${isAssigned ? 'text-slate-950' : 'text-gray-900'}`}>
-                                        {formatCurrency(item.price, user?.defaultCurrency)}
+                                        {formatCurrency(item.price, currency, currency)}
                                     </span>
 
                                     <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all shadow-sm ${isAssigned
@@ -380,10 +447,10 @@ export default function SplitItems() {
             <footer className="bg-white border-t border-gray-200 p-5 pb-8 fixed bottom-0 w-full max-w-lg left-1/2 -translate-x-1/2 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-20">
                 <div className="flex justify-between items-center mb-1">
                     <span className="text-gray-500 font-semibold text-sm uppercase tracking-wider">Assigned Total</span>
-                    <span className="text-gray-900 font-extrabold text-2xl">{formatCurrency(assignedTotal, user?.defaultCurrency)}</span>
+                    <span className="text-gray-900 font-extrabold text-2xl">{formatCurrency(assignedTotal, currency, currency)}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs text-gray-400 font-medium">
-                    <span>Receipt Total: {formatCurrency(total, user?.defaultCurrency)}</span>
+                    <span>Receipt Total: {formatCurrency(total, currency, currency)}</span>
                     <span>{items.filter(i => i.assignedTo.length > 0).length} of {items.length} items</span>
                 </div>
 
@@ -395,6 +462,67 @@ export default function SplitItems() {
                     ></div>
                 </div>
             </footer>
+
+            {/* Currency Selector Modal */}
+            {showCurrencyModal && (
+                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                        onClick={() => setShowCurrencyModal(false)}
+                    />
+                    <div className="bg-white dark:bg-slate-900 w-full max-h-[80vh] rounded-t-[32px] flex flex-col relative z-20 animate-in slide-in-from-bottom duration-300 shadow-2xl overflow-hidden">
+                        <div className="w-12 h-1.5 bg-gray-200 dark:bg-slate-800 rounded-full mx-auto mt-3 mb-1" />
+                        <div className="p-6 pb-4 flex justify-between items-center border-b border-gray-50 dark:border-slate-800">
+                            <h2 className="text-xl font-black text-gray-900 dark:text-white">Select Receipt Currency</h2>
+                            <button 
+                                onClick={() => setShowCurrencyModal(false)}
+                                className="w-8 h-8 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-gray-500"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 gap-2">
+                            {Object.keys(EXCHANGE_RATES).map(code => {
+                                const isSelected = currency === code;
+                                return (
+                                    <button
+                                        key={code}
+                                        onClick={() => {
+                                            setCurrency(code);
+                                            setShowCurrencyModal(false);
+                                        }}
+                                        className={`flex items-center justify-between p-4 rounded-2xl transition-all ${
+                                            isSelected 
+                                            ? 'bg-slate-900 text-white border-2 border-slate-950 shadow-lg' 
+                                            : 'bg-gray-50 dark:bg-slate-800/50 hover:bg-gray-100 dark:hover:bg-slate-800 border-2 border-transparent'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl ${
+                                                isSelected ? 'bg-white text-slate-950 shadow-inner' : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 shadow-sm'
+                                            }`}>
+                                                {CURRENCY_SYMBOLS[code] || '$'}
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`font-black text-[17px] ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{code}</p>
+                                                <p className={`text-xs font-medium ${isSelected ? 'text-slate-400' : 'text-gray-500 dark:text-gray-400'}`}>Global Standard</p>
+                                            </div>
+                                        </div>
+                                        {isSelected && (
+                                            <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md">
+                                                <Check className="w-4 h-4 text-slate-900" />
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="p-6 bg-gray-50 dark:bg-slate-950 border-t border-gray-100 dark:border-slate-800 flex justify-center">
+                            <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Sets the detected prices to this currency</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -21,6 +21,8 @@ import CurrencySettings from './pages/CurrencySettings';
 import AppSettings from './pages/AppSettings';
 import JoinGroup from './pages/JoinGroup';
 import SplitwiseCallback from './pages/SplitwiseCallback';
+import AiAssistant from './pages/AiAssistant';
+import BetaHandler from './pages/BetaHandler';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 import logoImg from './assets/logo.png';
@@ -49,6 +51,7 @@ const PrivateRoute = ({ children }) => {
 
 import BlockedUsers from './pages/BlockedUsers';
 import InstallGate from './components/InstallGate';
+import FloatingAiButton from './components/FloatingAiButton';
 
 function App() {
   return (
@@ -84,8 +87,11 @@ function App() {
                 <Route path="/group/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
                 <Route path="/group/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
                 <Route path="/group/:id/add" element={<PrivateRoute><AddExpense /></PrivateRoute>} />
+                <Route path="/ai" element={<PrivateRoute><AiAssistant /></PrivateRoute>} />
+                <Route path="/beta" element={<BetaHandler />} />
                 <Route path="/" element={<Navigate to="/dashboard" />} />
               </Routes>
+              <FloatingAiButton />
             </BiometricGate>
           </div>
         </InstallGate>
