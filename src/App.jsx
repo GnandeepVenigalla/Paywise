@@ -28,6 +28,7 @@ import { useContext } from 'react';
 import logoImg from './assets/logo.png';
 import { useAppSettings } from './hooks/useAppSettings';
 import BiometricGate from './components/BiometricGate';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Applies theme + high contrast to <html> globally
 function ThemeApplier() {
@@ -56,8 +57,9 @@ import FloatingAiButton from './components/FloatingAiButton';
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <ThemeApplier />
+      <ErrorBoundary>
+        <AuthProvider>
+          <ThemeApplier />
         <InstallGate>
           <div className="min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden bg-gray-50 text-gray-900 font-sans relative">
             <BiometricGate>
@@ -96,6 +98,7 @@ function App() {
           </div>
         </InstallGate>
       </AuthProvider>
+      </ErrorBoundary>
     </Router>
   );
 }

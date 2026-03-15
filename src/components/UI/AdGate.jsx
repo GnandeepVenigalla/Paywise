@@ -59,67 +59,64 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
         switch (status) {
             case 'ready':
                 return (
-                    <div className="flex flex-col items-center text-center p-8">
-                        <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center mb-4">
-                            {type === 'ai' ? <Sparkles className="w-8 h-8 text-indigo-600" /> : type === 'camera' ? <AlertTriangle className="w-8 h-8 text-amber-500" /> : <PlayCircle className="w-8 h-8 text-emerald-500" />}
+                    <div className="flex flex-col items-center text-center p-10 min-h-full justify-center">
+                        <div className="w-20 h-20 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-3xl flex items-center justify-center mb-8 shadow-xl shadow-indigo-500/5">
+                            {type === 'ai' ? <Sparkles className="w-10 h-10 text-indigo-500" /> : type === 'camera' ? <AlertTriangle className="w-10 h-10 text-amber-500" /> : <PlayCircle className="w-10 h-10 text-emerald-500" />}
                         </div>
-                        <h2 className="text-xl font-black text-gray-900 dark:text-white mb-2">Support Paywise</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">
-                            To keep our {type === 'ai' ? 'AI Assistant' : type === 'camera' ? 'Camera Scanner' : 'premium features'} free, please watch a quick 5-second ad.
+                        <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Unlock Premium</h2>
+                        <p className="text-base text-gray-500 dark:text-gray-400 mb-10 font-medium max-w-[280px] leading-relaxed">
+                            Support Paywise by watching a short ad and gain instant access to our advanced {type === 'ai' ? 'AI Assistant' : type === 'camera' ? 'Camera Scanner' : 'features'}.
                         </p>
                         <button 
                             onClick={startAd}
-                            className="w-full bg-slate-900 dark:bg-white text-white dark:text-gray-900 h-14 rounded-2xl font-black flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl"
+                            className="w-full bg-slate-900 dark:bg-indigo-600 text-white h-16 rounded-[24px] font-black text-lg flex items-center justify-center gap-3 active:scale-95 transition-all shadow-2xl shadow-indigo-500/20"
                         >
-                            <PlayCircle className="w-5 h-5" /> Watch Ad to Continue
+                            <PlayCircle className="w-6 h-6" /> Start Ad
                         </button>
-                        <button onClick={onClose} className="mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">Maybe later</button>
+                        <button onClick={onClose} className="mt-6 text-xs font-black text-gray-400 uppercase tracking-[0.2em] hover:text-gray-900 dark:hover:text-white transition-colors">Not Now</button>
                     </div>
                 );
             case 'loading':
                 return (
-                    <div className="flex flex-col items-center justify-center p-12 py-20">
-                        <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Initializing Secure Ad Stream...</p>
+                    <div className="flex flex-col items-center justify-center p-12 min-h-[400px]">
+                        <div className="relative">
+                            <Loader2 className="w-16 h-16 text-indigo-500 animate-spin" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping" />
+                            </div>
+                        </div>
+                        <p className="mt-8 text-xs font-black text-gray-400 uppercase tracking-[0.3em] animate-pulse">Initializing Ad Stream</p>
                     </div>
                 );
             case 'playing':
                 return (
-                    <div className="flex flex-col items-center justify-center p-6">
-                        <div className="w-full aspect-[9/16] bg-slate-100 dark:bg-slate-800 rounded-2xl border-2 border-indigo-500/20 flex flex-col items-center justify-center relative overflow-hidden">
-                             {/* Placeholder for actual AdSense Ad */}
-                             <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/10 to-purple-500/10 animate-pulse" />
-                             
-                             <div className="relative z-10 w-full h-full flex items-center justify-center">
-                                <ins className="adsbygoogle"
-                                    style={{ display: 'block', width: '100%', height: '100%' }}
-                                    data-ad-client="ca-pub-7749956119820849"
-                                    data-ad-slot="8452361092"
-                                    data-ad-format="auto"
-                                    data-full-width-responsive="true"></ins>
-                             </div>
+                    <div className="flex flex-col items-center justify-center w-full h-full min-h-[450px] relative">
+                         {/* Seamless Ad Integration - No visible box unless ad fills */}
+                         <div className="w-full h-full flex items-center justify-center bg-slate-50/50 dark:bg-black/20">
+                            <ins className="adsbygoogle"
+                                style={{ display: 'block', width: '100%', height: '100%', minHeight: '350px' }}
+                                data-ad-client="ca-pub-7749956119820849"
+                                data-ad-slot="8452361092"
+                                data-ad-format="auto"
+                                data-full-width-responsive="true"></ins>
+                         </div>
 
-                             <div className="absolute top-4 right-4 z-20 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
-                                <span className="text-white font-bold text-xs">Unlock in {timeLeft}s</span>
-                             </div>
-                             
-                             <div className="absolute bottom-4 left-4 right-4 z-20 bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/20 text-center">
-                                <p className="text-white/60 text-[10px] font-bold uppercase tracking-tighter">Advertisement • ca-pub-7749956119820849</p>
-                             </div>
-                        </div>
+                         <div className="absolute top-8 right-8 z-30 bg-white dark:bg-slate-900 shadow-2xl px-6 py-2.5 rounded-full border border-indigo-500/30">
+                            <span className="text-slate-900 dark:text-white font-black text-sm tabular-nums">Unlocking in {timeLeft}s</span>
+                         </div>
                     </div>
                 );
             case 'finished':
                 return (
-                    <div className="flex flex-col items-center text-center p-8">
-                        <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mb-4">
-                            <Check className="w-8 h-8 text-emerald-600" />
+                    <div className="flex flex-col items-center text-center p-10 py-16">
+                        <div className="w-24 h-24 bg-emerald-500 rounded-[32px] flex items-center justify-center mb-8 shadow-2xl shadow-emerald-500/30 animate-in zoom-in-50 duration-500">
+                            <Check className="w-12 h-12 text-white" />
                         </div>
-                        <h2 className="text-xl font-black text-gray-900 dark:text-white mb-2">Access Granted!</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">Thanks for supporting us. You can now use the premium feature.</p>
+                        <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Access Unlocked</h2>
+                        <p className="text-base text-gray-500 dark:text-gray-400 mb-10 font-medium max-w-[260px] leading-relaxed">Your content is ready. Thank you for your support!</p>
                         <button 
                             onClick={onFinish}
-                            className="w-full bg-emerald-600 text-white h-14 rounded-2xl font-black active:scale-95 transition-all shadow-xl shadow-emerald-600/20"
+                            className="w-full bg-slate-900 dark:bg-emerald-600 text-white h-16 rounded-[24px] font-black text-lg active:scale-95 transition-all shadow-2xl shadow-emerald-500/20"
                         >
                             Continue
                         </button>
@@ -129,10 +126,20 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
     };
 
     return (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md" />
-            <div className="relative bg-white dark:bg-slate-900 w-full max-w-sm rounded-[40px] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95 duration-300">
-                {getContent()}
+        <div className="fixed inset-0 z-[4000] flex items-center justify-center">
+            <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-3xl animate-in fade-in duration-500" />
+            <div className="relative w-full h-full sm:h-auto sm:max-w-md sm:rounded-[56px] bg-white dark:bg-slate-900 shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-white/5 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-20 duration-500">
+                {status !== 'playing' && (
+                    <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-100 dark:bg-white/5">
+                        <div 
+                            className="h-full bg-indigo-500 transition-all duration-1000 ease-linear shadow-[0_0_15px_rgba(99,102,241,0.5)]" 
+                            style={{ width: `${((5 - timeLeft) / 5) * 100}%` }} 
+                        />
+                    </div>
+                )}
+                <div className="w-full h-full overflow-y-auto custom-scrollbar">
+                    {getContent()}
+                </div>
             </div>
         </div>
     );

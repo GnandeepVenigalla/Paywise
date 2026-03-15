@@ -17,6 +17,7 @@ export default function AiAssistant() {
     const [suggestions, setSuggestions] = useState([]);
     const [showAd, setShowAd] = useState(false);
     const [isAiUnlocked, setIsAiUnlocked] = useState(localStorage.getItem('ai_unlocked') === 'true');
+    const [pendingMessage, setPendingMessage] = useState('');
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -46,29 +47,43 @@ export default function AiAssistant() {
         scrollToBottom();
     }, [messages, isLoading]);
 
-    const handleSend = async (e) => {
-        e.preventDefault();
-        if (!input.trim() || isLoading) return;
+    const handleSend = async (e, overrideText = null, isRetry = false) => {
+        if (e) e.preventDefault();
+        const messageText = (overrideText || input || '').trim();
         
-        if (!isAiUnlocked) {
+        if (!messageText || isLoading) return;
+        
+        // Skip ad check ONLY if explicitly allowed OR if already unlocked
+        const isCurrentlyUnlocked = isAiUnlocked || localStorage.getItem('ai_unlocked') === 'true';
+
+        if (!isCurrentlyUnlocked && !isRetry) {
+            setPendingMessage(messageText);
             setShowAd(true);
             return;
         }
 
-        const userMsg = { id: Date.now(), text: input, sender: 'user' };
+        // Add user message immediately
+        const userMsg = { id: Date.now() + Math.random(), text: messageText, sender: 'user' };
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setIsLoading(true);
 
         try {
-            const res = await api.post('/ai/chat', { message: input });
-            const { reply } = res.data;
+            const res = await api.post('/ai/chat', { message: messageText });
+            const data = res.data || {};
+            const reply = typeof data.reply === 'string' ? data.reply : "I received a response, but couldn't understand it.";
 
             // Extract action if present
             const actionMatch = reply.match(/\[ACTION\]([\s\S]*?)\[\/ACTION\]/);
             let cleanedReply = reply.replace(/\[ACTION\][\s\S]*?\[\/ACTION\]/, '').trim();
             
-            setMessages(prev => [...prev, { id: Date.now() + 1, text: cleanedReply, sender: 'bot' }]);
+            if (!cleanedReply) cleanedReply = "Action processed!";
+
+            setMessages(prev => [...prev, { 
+                id: Date.now() + Math.random(), 
+                text: cleanedReply, 
+                sender: 'bot' 
+            }]);
 
             if (actionMatch) {
                 try {
@@ -79,7 +94,12 @@ export default function AiAssistant() {
                 }
             }
         } catch (err) {
-            setMessages(prev => [...prev, { id: Date.now() + 1, text: "Sorry, I'm having trouble connecting to my brain. Please try again later.", sender: 'bot' }]);
+            console.error('AI Send Failure:', err);
+            setMessages(prev => [...prev, { 
+                id: Date.now() + Math.random(), 
+                text: "My connection timed out! Please try again in 5 seconds.", 
+                sender: 'bot' 
+            }]);
         } finally {
             setIsLoading(false);
         }
@@ -180,7 +200,7 @@ export default function AiAssistant() {
                     </div>
                 )}
 
-                {proposedAction && (
+                {proposedAction && proposedAction.data && (
                     <div className={`mx-11 p-4 rounded-2xl border animate-in zoom-in-95 duration-300 ${proposedAction.type === 'DELETE_EXPENSE' ? 'bg-rose-500/10 border-rose-500/20' : 'bg-indigo-500/10 border-indigo-500/20'}`}>
                         <div className={`flex items-center gap-2 mb-2 ${proposedAction.type === 'DELETE_EXPENSE' ? 'text-rose-400' : 'text-indigo-400'}`}>
                             {proposedAction.type === 'DELETE_EXPENSE' ? <Trash2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -190,9 +210,9 @@ export default function AiAssistant() {
                         </div>
                         <p className="text-sm mb-4">
                             {proposedAction.type === 'DELETE_EXPENSE' ? (
-                                <>Delete expense: <strong className="text-white">"{proposedAction.data.description}"</strong> for <strong className="text-rose-400">${proposedAction.data.amount}</strong>?</>
+                                <>Delete expense: <strong className="text-white">"{proposedAction.data.description || 'Untitled'}"</strong> for <strong className="text-rose-400">${proposedAction.data.amount || 0}</strong>?</>
                             ) : (
-                                <>Add expense: <strong className="text-white">"{proposedAction.data.description}"</strong> for <strong className="text-emerald-400">${proposedAction.data.amount}</strong>?</>
+                                <>Add expense: <strong className="text-white">"{proposedAction.data.description || 'New Expense'}"</strong> for <strong className="text-emerald-400">${proposedAction.data.amount || 0}</strong>?</>
                             )}
                         </p>
                         <div className="flex gap-2">
@@ -241,10 +261,13 @@ export default function AiAssistant() {
                 isOpen={showAd}
                 onClose={() => setShowAd(false)}
                 onFinish={() => {
+                    const msgToProcess = pendingMessage;
+                    setPendingMessage('');
                     setShowAd(false);
                     setIsAiUnlocked(true);
                     localStorage.setItem('ai_unlocked', 'true');
-                    handleSend({ preventDefault: () => {} });
+                    // Pass isRetry = true to bypass the lock check
+                    handleSend(null, msgToProcess, true);
                 }}
                 type="ai"
             />
