@@ -166,7 +166,7 @@ export default function AddExpense() {
             }
 
             incrementExpenseCount();
-            navigate(`/group/${id}`);
+            navigate(`/group/${id}`, { replace: true });
         } catch (err) {
             console.error(err);
             alert('Error adding expense');
@@ -444,8 +444,8 @@ export default function AddExpense() {
                             <div className="relative">
                                 <input
                                     type="number"
-                                    value={loanInterestRate}
-                                    onChange={(e) => setLoanInterestRate(parseFloat(e.target.value) || 0)}
+                                    value={loanInterestRate === 0 ? '' : loanInterestRate}
+                                    onChange={(e) => setLoanInterestRate(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                                     className="w-full bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-900/50 rounded-xl py-2 px-3 text-[18px] font-bold text-emerald-900 dark:text-emerald-300 outline-none"
                                     placeholder="0.0"
                                 />

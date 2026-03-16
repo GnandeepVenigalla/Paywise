@@ -1,7 +1,7 @@
-import { useEffect, useState, useContext } from 'react';
+import { useState, useEffect, useContext, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder, Percent } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder, Percent, Sparkles } from 'lucide-react';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -25,6 +25,8 @@ export default function FriendDetails() {
     const [editDescription, setEditDescription] = useState('');
     const [editAmount, setEditAmount] = useState('');
     const [editItems, setEditItems] = useState([]);
+    const [editIsLoan, setEditIsLoan] = useState(false);
+    const [editLoanInterestRate, setEditLoanInterestRate] = useState(0);
     const [selectedMemberIdsForEdit, setSelectedMemberIdsForEdit] = useState([]);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const location = useLocation();
@@ -47,9 +49,7 @@ export default function FriendDetails() {
     const [reportDetails, setReportDetails] = useState('');
     const [isReporting, setIsReporting] = useState(false);
     const [isBlocking, setIsBlocking] = useState(false);
-    const [loanInterestEnabled, setLoanInterestEnabled] = useState(false);
-    const [loanInterestRate, setLoanInterestRate] = useState(0);
-    const [isSavingLoanSettings, setIsSavingLoanSettings] = useState(false);
+    const [targetExportCurrency, setTargetExportCurrency] = useState(user?.defaultCurrency || 'USD');
 
     // Extract monthly spending aggregation logic to custom hook
     // Pass user.defaultCurrency so chart amounts are consistently converted
@@ -61,6 +61,19 @@ export default function FriendDetails() {
             setSelectedMonthIndex(monthlySpending.length - 1);
         }
     }, [monthlySpending]);
+
+    const projectedInterest = useMemo(() => {
+        if (!expenses || !friend) return 0;
+        return expenses.reduce((acc, exp) => {
+            // Only calculate for active loans
+            if (exp.isLoan && exp.loanInterestRate > 0) {
+                const userSplit = getUserExpenseSplit(exp, user, friend._id || friend);
+                // Apply the rate to this specific transaction's split amount
+                return acc + (Math.abs(userSplit) * (exp.loanInterestRate / 100));
+            }
+            return acc;
+        }, 0);
+    }, [expenses, friend, user.id]);
 
     const fetchFriendDetails = async () => {
         try {
@@ -104,11 +117,6 @@ export default function FriendDetails() {
         fetchFriendDetails();
         // Load the shared friend note from backend
         api.get(`/auth/friend-note/${id}`).then(res => setFriendNote(res.data.note || '')).catch(() => { });
-        // Load loan interest settings
-        api.get(`/auth/friend-settings/${id}`).then(res => {
-            setLoanInterestEnabled(res.data.interestEnabled);
-            setLoanInterestRate(res.data.interestRate);
-        }).catch(() => { });
     }, [id]);
 
     const handleUpdateExpense = async (e) => {
@@ -122,7 +130,9 @@ export default function FriendDetails() {
                 description: editDescription,
                 amount: Number(editAmount),
                 items: normalizeItemsForSave(editItems),
-                splits: calculatedSplits || undefined
+                splits: calculatedSplits || undefined,
+                isLoan: editIsLoan,
+                loanInterestRate: editLoanInterestRate
             });
             setIsEditingExpense(false);
             setSelectedExpense(null);
@@ -209,20 +219,7 @@ export default function FriendDetails() {
         }
     };
 
-    const handleSaveLoanSettings = async () => {
-        setIsSavingLoanSettings(true);
-        try {
-            await api.put(`/auth/friend-settings/${id}`, {
-                interestEnabled: loanInterestEnabled,
-                interestRate: loanInterestRate
-            });
-            alert('Loan interest settings updated.');
-        } catch (err) {
-            alert('Failed to update loan settings.');
-        } finally {
-            setIsSavingLoanSettings(false);
-        }
-    };
+
 
     if (!friend) {
         return (
@@ -284,6 +281,9 @@ export default function FriendDetails() {
                         </button>
                     </div>
                     <div className="flex gap-3 items-center">
+                        <Link to="/ai" className="w-9 h-9 rounded-full bg-white/20 border-2 border-white/40 text-white flex items-center justify-center shadow-sm cursor-pointer hover:bg-white/30 transition group">
+                            <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+                        </Link>
                         <button onClick={() => setShowSettings(true)} className="w-9 h-9 rounded-full bg-white/20 border-2 border-white/40 text-white flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-white/30 transition">
                             <Settings className="w-5 h-5" />
                         </button>
@@ -323,6 +323,27 @@ export default function FriendDetails() {
                                 <span className="text-lg font-bold text-gray-700">Settled Up</span>
                             )}
                         </div>
+
+                        {projectedInterest > 0 && (
+                            <div className="mb-4 bg-emerald-50/80 rounded-2xl p-4 border border-emerald-100 flex items-center justify-between shadow-sm">
+                                <div>
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <Percent className="w-3.5 h-3.5 text-emerald-600" />
+                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70">Next Month Interest</p>
+                                    </div>
+                                    <p className="text-[15px] font-black text-emerald-900 leading-none">
+                                        Estimated Interest <span className="mx-1 text-emerald-300 font-light">|</span> 
+                                        {formatCurrency(projectedInterest, user?.defaultCurrency)}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70 mb-1">Projected Bill</p>
+                                    <p className="text-[18px] font-black text-emerald-950 leading-none">
+                                        {balance > 0 ? '+' : '-'}{formatCurrency(Math.abs(balance) + projectedInterest, user?.defaultCurrency)}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Breakdown */}
                         {balance !== 0 && (
@@ -445,8 +466,9 @@ export default function FriendDetails() {
                                                         setEditDescription(item.description);
                                                         setEditAmount(item.amount.toString());
                                                         setEditItems(item.items || []);
+                                                        setEditIsLoan(item.isLoan || false);
+                                                        setEditLoanInterestRate(item.loanInterestRate || 0);
                                                         setSelectedMemberIdsForEdit([user.id]);
-                                                        setShowExpenseModal(true);
                                                     }
                                                 }}
                                             />
@@ -587,6 +609,38 @@ export default function FriendDetails() {
                                                 </div>
                                             </div>
                                         )}
+                                        <div>
+                                            <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                                <div className="flex items-center gap-2">
+                                                    <Banknote className={`w-5 h-5 ${editIsLoan ? 'text-emerald-600' : 'text-gray-400'}`} />
+                                                    <span className="text-sm font-bold text-gray-800">Treat as Loan?</span>
+                                                </div>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={editIsLoan}
+                                                        onChange={(e) => setEditIsLoan(e.target.checked)}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                                </label>
+                                            </div>
+                                            {editIsLoan && (
+                                                <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                    <label className="text-[11px] font-black text-emerald-800 uppercase tracking-widest mb-1.5 block">Annual Interest Rate (%)</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            value={editLoanInterestRate === 0 ? '' : editLoanInterestRate}
+                                                            onChange={(e) => setEditLoanInterestRate(e.target.value === '' ? 0 : parseFloat(e.target.value))}
+                                                            className="w-full bg-white border border-emerald-200 rounded-xl py-2 px-3 text-[18px] font-bold text-emerald-900 outline-none"
+                                                            placeholder="0.0"
+                                                        />
+                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-emerald-600/50">%</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
 
                                         <button
                                             type="submit"
@@ -599,26 +653,36 @@ export default function FriendDetails() {
                                 ) : (
                                     <div>
                                         <div className="text-center mb-6">
-                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner overflow-hidden border-2 border-white`}>
+                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner overflow-hidden border-2 border-white`}>
                                                 {selectedExpense.billImage ? (
                                                     <a href={selectedExpense.billImage} target="_blank" rel="noopener noreferrer" className="w-full h-full"> 
                                                         <img src={selectedExpense.billImage} alt="Bill" className="w-full h-full object-cover" />
                                                     </a>
                                                 ) : (
-                                                    selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest')) ? <Percent className="w-8 h-8" /> : (selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />)
+                                                    selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? <Percent className="w-8 h-8" /> : (selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />)
                                                 )}
                                             </div>
                                             <div className="flex items-center justify-center gap-2 mb-1">
                                                 <h3 className="text-2xl font-black text-gray-900 break-all leading-tight">{selectedExpense.description}</h3>
                                             </div>
                                             {selectedExpense.isLoan && (
-                                                <div className="flex justify-center mb-2">
+                                                <div className="flex flex-col items-center gap-2 mb-2">
                                                     <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-[0.15em] shadow-sm">Active Loan</span>
+                                                    {selectedExpense.loanInterestRate > 0 && (
+                                                        <p className="text-[12px] font-bold text-amber-600 bg-white border border-amber-100 px-3 py-1 rounded-lg">
+                                                            Accumulates {selectedExpense.loanInterestRate}% interest
+                                                        </p>
+                                                    )}
                                                 </div>
                                             )}
-                                            {selectedExpense.parentLoan && (
-                                                <div className="flex justify-center mb-2">
+                                            {(selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) && (
+                                                <div className="flex flex-col items-center gap-2 mb-2">
                                                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-[0.15em] shadow-sm">Interest Accrual</span>
+                                                    {selectedExpense.loanInterestRate > 0 && (
+                                                        <p className="text-[12px] font-bold text-emerald-600 bg-white border border-emerald-100 px-3 py-1 rounded-lg">
+                                                            Applied at {selectedExpense.loanInterestRate}% rate
+                                                        </p>
+                                                    )}
                                                 </div>
                                             )}
                                             <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense.amount, user?.defaultCurrency, selectedExpense.currency)}</p>
@@ -728,61 +792,7 @@ export default function FriendDetails() {
                                 </button>
                             </div>
                         </div>
-                        {/* Loan Settings section */}
-                        <div className="mt-8 px-6 pb-2 border-b border-gray-100">
-                            <div className="flex items-center justify-between mb-4">
-                                <h4 className="text-[15px] font-bold text-gray-800 uppercase tracking-widest">Loan Settings</h4>
-                                <TrendingUp className="w-5 h-5 text-emerald-500" />
-                            </div>
 
-                            <div className="bg-emerald-50/50 rounded-2xl p-5 border border-emerald-100/50 mb-6">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="flex flex-col">
-                                        <span className="text-[15px] font-bold text-emerald-900">Enable Loan Interest</span>
-                                        <span className="text-[12px] text-emerald-700/70 font-medium leading-relaxed mt-0.5">Automatically apply interest on the current net balance if {friend?.username} owes you.</span>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={loanInterestEnabled}
-                                            onChange={() => setLoanInterestEnabled(!loanInterestEnabled)}
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all"></div>
-                                    </label>
-                                </div>
-
-                                {loanInterestEnabled && (
-                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div className="flex flex-col gap-2">
-                                            <label className="text-[13px] font-bold text-emerald-800 tracking-wide">ANNUAL INTEREST RATE (%)</label>
-                                            <div className="relative">
-                                                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-emerald-600">%</span>
-                                                <input
-                                                    type="number"
-                                                    value={loanInterestRate}
-                                                    onChange={(e) => setLoanInterestRate(parseFloat(e.target.value) || 0)}
-                                                    className="w-full bg-white border border-emerald-200 rounded-xl py-3 px-4 font-black text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none shadow-sm"
-                                                    placeholder="e.g. 5.5"
-                                                    min="0"
-                                                    step="0.1"
-                                                />
-                                            </div>
-                                            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-1">Calculated daily based on {loanInterestRate}% APR</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <button
-                                    onClick={handleSaveLoanSettings}
-                                    disabled={isSavingLoanSettings}
-                                    className="w-full mt-6 bg-emerald-600 text-white font-black py-3.5 rounded-xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {isSavingLoanSettings ? 'SAVING...' : 'SAVE LOAN SETTINGS'}
-                                    {!isSavingLoanSettings && <Banknote className="w-4 h-4" />}
-                                </button>
-                            </div>
-                        </div>
                         {/* Shared groups section */}
                         <div className="mt-8">
                             <h4 className="px-6 py-2 text-[15px] font-bold text-gray-800">Shared groups</h4>
@@ -998,11 +1008,27 @@ export default function FriendDetails() {
                         <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
                         <h3 className="text-center text-[18px] text-gray-900 font-bold tracking-tight mb-2">Export Shared Expenses</h3>
                         <p className="text-center text-gray-500 text-[14px] mb-6 px-4">Download a copy of all the expenses with {friend?.username}.</p>
+                        <div className="px-2 mb-6">
+                            <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 block px-2">Select Export Currency</label>
+                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                {Object.keys(CURRENCY_SYMBOLS).map(code => (
+                                    <button
+                                        key={code}
+                                        onClick={() => setTargetExportCurrency(code)}
+                                        className={`flex-shrink-0 px-4 py-2 rounded-xl border-2 transition-all font-bold text-sm ${targetExportCurrency === code 
+                                            ? 'border-slate-900 bg-slate-900 text-white shadow-md' 
+                                            : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
+                                    >
+                                        {code}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
                         <div className="flex flex-col gap-3 px-2">
                             <button
                                 onClick={() => {
-                                    exportExpenses(expenses, 'pdf', `You and ${friend?.username}`, user);
+                                    exportExpenses(expenses, 'pdf', friend?.username || 'Friend', user, targetExportCurrency);
                                     setShowExportOptions(false);
                                 }}
                                 className="flex items-center gap-4 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 transition rounded-[14px] border border-gray-200 border-b-[2px]"
@@ -1012,13 +1038,13 @@ export default function FriendDetails() {
                                 </div>
                                 <div className="flex flex-col text-left">
                                     <span className="text-[16px] text-gray-800 font-bold">PDF Document</span>
-                                    <span className="text-[13px] text-gray-500 font-medium">Best for printing & sharing</span>
+                                    <span className="text-[13px] text-gray-500 font-medium">Download as {targetExportCurrency}</span>
                                 </div>
                             </button>
 
                             <button
                                 onClick={() => {
-                                    exportExpenses(expenses, 'csv', `You and ${friend?.username}`, user);
+                                    exportExpenses(expenses, 'csv', friend?.username || 'Friend', user, targetExportCurrency);
                                     setShowExportOptions(false);
                                 }}
                                 className="flex items-center gap-4 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 transition rounded-[14px] border border-gray-200 border-b-[2px]"
@@ -1028,7 +1054,7 @@ export default function FriendDetails() {
                                 </div>
                                 <div className="flex flex-col text-left">
                                     <span className="text-[16px] text-gray-800 font-bold">CSV Spreadsheet</span>
-                                    <span className="text-[13px] text-gray-500 font-medium">Best for Excel & Numbers</span>
+                                    <span className="text-[13px] text-gray-500 font-medium">Download as {targetExportCurrency}</span>
                                 </div>
                             </button>
 

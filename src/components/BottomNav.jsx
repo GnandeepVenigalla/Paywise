@@ -1,8 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Layers, Activity, User, HeartHandshake } from 'lucide-react';
+import { useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
+import Avatar from './UI/Avatar';
 
 export default function BottomNav() {
     const location = useLocation();
+    const { user } = useContext(AuthContext);
 
     const tabs = [
         { path: '/friends', label: 'Friends', icon: HeartHandshake },
@@ -16,14 +20,24 @@ export default function BottomNav() {
             {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = location.pathname === tab.path;
+                const isAccount = tab.label === 'Account';
+
                 return (
                     <Link
                         key={tab.path}
                         to={tab.path}
                         className={`flex flex-col items-center gap-1 min-w-[60px] cursor-pointer ${isActive ? 'text-slate-900' : 'text-slate-400 hover:text-slate-300'} transition-colors`}
                     >
-                        <div className={`p-1.5 rounded-2xl ${isActive ? 'bg-slate-50 shadow-sm' : 'bg-transparent'} transition-all duration-300 transform ${isActive ? 'scale-110' : 'scale-100'}`}>
-                            <Icon className={`w-6 h-6 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                        <div className={`transition-all duration-300 transform ${isActive ? 'scale-110' : 'scale-100'}`}>
+                            {isAccount ? (
+                                <div className={`p-0.5 rounded-2xl ${isActive ? 'ring-2 ring-slate-900 ring-offset-2' : ''} transition-all`}>
+                                    <Avatar src={user?.profilePic} name={user?.username} size="sm" className="!w-7 !h-7 !rounded-xl shadow-none" />
+                                </div>
+                            ) : (
+                                <div className={`p-1.5 rounded-2xl ${isActive ? 'bg-slate-50 shadow-sm' : 'bg-transparent'} transition-all`}>
+                                    <Icon className={`w-6 h-6 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                                </div>
+                            )}
                         </div>
                         <span className={`text-[10px] font-bold ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>{tab.label}</span>
                     </Link>

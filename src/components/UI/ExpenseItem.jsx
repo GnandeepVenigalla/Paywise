@@ -21,15 +21,19 @@ const ExpenseItem = ({
         day: 'numeric'
     });
 
-    const isInterest = description?.toLowerCase().includes('interest') || !!parentLoan;
+    const isInterest = description?.toLowerCase().includes('interest') || description?.toLowerCase().includes('intrest') || !!parentLoan;
 
     return (
         <div
             onClick={onClick}
-            className="flex items-center justify-between p-5 hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer border-b border-gray-50 group"
+            className={`flex items-center justify-between p-5 transition-all cursor-pointer border-b border-gray-50 group hover:z-10 relative ${
+                isInterest 
+                ? 'bg-emerald-50/40 hover:bg-emerald-50/60 border-l-4 border-l-emerald-400' 
+                : 'hover:bg-gray-50'
+            }`}
         >
             <div className="flex items-center gap-4 min-w-0">
-                <div className={`w-12 h-12 ${isLoan ? 'bg-amber-50 text-amber-600' : isInterest ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-400'} rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-gray-100 overflow-hidden`}>
+                <div className={`w-12 h-12 ${isLoan ? 'bg-amber-50 text-amber-600' : isInterest ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-400'} rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-gray-100 overflow-hidden`}>
                     {billImage ? (
                         <img src={billImage} alt="Bill" className="w-full h-full object-cover" />
                     ) : (

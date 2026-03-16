@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
-import { Activity as ActivityIcon, Receipt, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Activity as ActivityIcon, Receipt, ArrowRight, ArrowLeft, Sparkles, Banknote } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
@@ -34,8 +34,8 @@ export default function Activity() {
                     <h1 className="text-xl font-bold text-gray-900">Paywise</h1>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link to="/account" className="w-9 h-9 rounded-full bg-slate-100 border-2 border-slate-50 text-slate-950 flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-slate-200 transition">
-                        {user?.username?.charAt(0) || 'U'}
+                    <Link to="/ai" className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-950 transition-all hover:scale-105 active:scale-95 group">
+                        <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
                     </Link>
                 </div>
             </header>
@@ -79,13 +79,21 @@ export default function Activity() {
                                 displayMessage = `You added "${expense.description}"`;
                                 amountColor = 'text-emerald-500';
                                 amountDisplay = `You get back ${formatCurrency(othersOweMe, user?.defaultCurrency, expense.currency)}`;
-                                Icon = ArrowLeft;
+                                if (expense.isLoan) {
+                                    Icon = Banknote;
+                                } else {
+                                    Icon = ArrowLeft;
+                                }
                             } else {
                                 // Someone else paid, I am involved
                                 displayMessage = `${expense.paidBy.username} added "${expense.description}"`;
                                 amountColor = 'text-rose-600';
                                 amountDisplay = `You owe ${formatCurrency(mySplitAmount, user?.defaultCurrency, expense.currency)}`;
-                                Icon = ArrowRight;
+                                if (expense.isLoan) {
+                                    Icon = Banknote;
+                                } else {
+                                    Icon = ArrowRight;
+                                }
                             }
 
                             // If it's a group expense, show the group name
@@ -104,7 +112,7 @@ export default function Activity() {
                                     className="block bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:bg-gray-50 transition active:scale-[0.99]"
                                 >
                                     <div className="flex gap-4">
-                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isPaidByMe ? 'bg-slate-50 text-slate-900' : 'bg-rose-50 text-rose-600'} overflow-hidden`}>
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${expense.isLoan ? 'bg-amber-50 text-amber-600' : isPaidByMe ? 'bg-slate-50 text-slate-900' : 'bg-rose-50 text-rose-600'} overflow-hidden`}>
                                             {expense.billImage ? (
                                                 <img src={expense.billImage} alt="Bill" className="w-full h-full object-cover" />
                                             ) : (
@@ -112,7 +120,12 @@ export default function Activity() {
                                             )}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm font-bold text-gray-900 truncate">{displayMessage}</h4>
+                                            <div className="flex items-center gap-2">
+                                                <h4 className="text-sm font-bold text-gray-900 truncate">{displayMessage}</h4>
+                                                {expense.isLoan && (
+                                                    <span className="px-1 py-0.5 bg-amber-100 text-amber-700 rounded text-[8px] font-black uppercase tracking-widest">Loan</span>
+                                                )}
+                                            </div>
                                             <p className="text-xs text-gray-500 mt-0.5 truncate">{expense.group ? `Group: ${expense.group.name}` : 'Individual Expense'}</p>
                                             <p className={`text-sm font-bold mt-2 ${amountColor}`}>{amountDisplay}</p>
                                         </div>

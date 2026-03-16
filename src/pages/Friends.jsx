@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, HeartHandshake, Search, Plus, ArrowRight, ArrowLeft, Contact, Share2 } from 'lucide-react';
+import { UserPlus, HeartHandshake, Search, Plus, ArrowRight, ArrowLeft, Contact, Share2, Sparkles } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import { formatCurrency } from '../utils/formatters';
@@ -164,8 +164,8 @@ export default function Friends() {
                     >
                         {isAddingMode ? <HeartHandshake className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
                     </button>
-                    <Link to="/account" className="w-9 h-9 rounded-full bg-slate-100 border-2 border-slate-50 text-slate-950 flex items-center justify-center font-bold text-lg uppercase shadow-sm border-l-gray-200 ml-1 cursor-pointer hover:bg-slate-200 transition">
-                        {user?.username?.charAt(0) || 'U'}
+                    <Link to="/ai" className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-950 transition-all hover:scale-105 active:scale-95 group ml-1">
+                        <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
                     </Link>
                 </div>
             </header>

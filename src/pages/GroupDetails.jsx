@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, UserPlus, Receipt, CreditCard, Camera, Trash2, X, Edit2, LogOut, Check, Settings, Calendar, Users, Scale, Link2, User, Plane, Home, Heart, ClipboardList, Share, Copy, Link as LinkIcon, Link2Off, Expand, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Percent } from 'lucide-react';
+import { ArrowLeft, UserPlus, Receipt, CreditCard, Camera, Trash2, X, Edit2, LogOut, Check, Settings, Calendar, Users, Scale, Link2, User, Plane, Home, Heart, ClipboardList, Share, Copy, Link as LinkIcon, Link2Off, Expand, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Percent, Sparkles } from 'lucide-react';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -90,6 +90,7 @@ export default function GroupDetails() {
     const [showReminderModal, setShowReminderModal] = useState(false);
     const [selectedReminderMember, setSelectedReminderMember] = useState(null);
     const [reminderEmailBody, setReminderEmailBody] = useState('');
+    const [targetExportCurrency, setTargetExportCurrency] = useState(user?.defaultCurrency || 'USD');
 
 
     // Extract monthly spending aggregation logic to custom hook
@@ -363,6 +364,9 @@ export default function GroupDetails() {
                             </button>
                         </div>
                         <div className="flex gap-3 items-center">
+                            <Link to="/ai" className="w-9 h-9 rounded-full bg-white/20 border border-white/40 text-white flex items-center justify-center shadow-sm cursor-pointer hover:bg-white/30 transition group">
+                                <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+                            </Link>
                             <button onClick={() => setShowSettings(true)} className="w-9 h-9 rounded-full bg-white/20 border border-white/40 text-white flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-white/30 transition">
                                 <Settings className="w-5 h-5" />
                             </button>
@@ -1589,10 +1593,27 @@ export default function GroupDetails() {
                             <h3 className="text-center text-[18px] text-gray-900 font-bold tracking-tight mb-2">Export Group Expenses</h3>
                             <p className="text-center text-gray-500 text-[14px] mb-6 px-4">Download a copy of all the expenses for "{group?.name}".</p>
 
+                            <div className="px-2 mb-6">
+                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 block px-2">Select Export Currency</label>
+                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                    {Object.keys(CURRENCY_SYMBOLS).map(code => (
+                                        <button
+                                            key={code}
+                                            onClick={() => setTargetExportCurrency(code)}
+                                            className={`flex-shrink-0 px-4 py-2 rounded-xl border-2 transition-all font-bold text-sm ${targetExportCurrency === code 
+                                                ? 'border-slate-900 bg-slate-900 text-white shadow-md' 
+                                                : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
+                                        >
+                                            {code}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="flex flex-col gap-3 px-2">
                                 <button
                                     onClick={() => {
-                                        exportExpenses(expenses, 'pdf', group?.name || 'Group', user);
+                                        exportExpenses(expenses, 'pdf', group?.name || 'Group', user, targetExportCurrency);
                                         setShowExportOptions(false);
                                     }}
                                     className="flex items-center gap-4 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 transition rounded-[14px] border border-gray-200 border-b-[2px]"
@@ -1602,13 +1623,13 @@ export default function GroupDetails() {
                                     </div>
                                     <div className="flex flex-col text-left">
                                         <span className="text-[16px] text-gray-800 font-bold">PDF Document</span>
-                                        <span className="text-[13px] text-gray-500 font-medium">Best for printing & sharing</span>
+                                        <span className="text-[13px] text-gray-500 font-medium">Download as {targetExportCurrency}</span>
                                     </div>
                                 </button>
 
                                 <button
                                     onClick={() => {
-                                        exportExpenses(expenses, 'csv', group?.name || 'Group', user);
+                                        exportExpenses(expenses, 'csv', group?.name || 'Group', user, targetExportCurrency);
                                         setShowExportOptions(false);
                                     }}
                                     className="flex items-center gap-4 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 transition rounded-[14px] border border-gray-200 border-b-[2px]"
@@ -1618,7 +1639,7 @@ export default function GroupDetails() {
                                     </div>
                                     <div className="flex flex-col text-left">
                                         <span className="text-[16px] text-gray-800 font-bold">CSV Spreadsheet</span>
-                                        <span className="text-[13px] text-gray-500 font-medium">Best for Excel & Numbers</span>
+                                        <span className="text-[13px] text-gray-500 font-medium">Download as {targetExportCurrency}</span>
                                     </div>
                                 </button>
 

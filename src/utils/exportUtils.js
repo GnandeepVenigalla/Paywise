@@ -1,35 +1,39 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { CURRENCY_SYMBOLS, convertAmount } from './formatters';
 
 // Reusable export utility function
-export const exportExpenses = (expenses, format, entityName, currentUser) => {
+export const exportExpenses = (expenses, format, entityName, currentUser, targetCurrency = 'USD') => {
     // 1. Prepare Data
     if (!expenses || expenses.length === 0) {
         alert("No expenses to export.");
         return;
     }
 
+    const symbol = CURRENCY_SYMBOLS[targetCurrency.toUpperCase()] || '$';
     const rows = [];
-    const headers = ["Date", "Description", "Cost", "Paid By", "Your Share"];
+    const headers = ["Date", "Description", `Cost (${targetCurrency})`, "Paid By", `Your Share (${targetCurrency})` ];
 
     expenses.forEach(exp => {
-        // Skip simplified payment pseudo-expenses if desired or include them. We include them but format nicely.
         const dateObj = new Date(exp.date);
         const formattedDate = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         const payerName = (exp.paidBy._id === currentUser.id || exp.paidBy._id === currentUser._id) ? "You" : (exp.paidBy.username || "Someone");
 
+        const sourceCurr = exp.currency || 'USD';
+        const convertedTotal = convertAmount(exp.amount, sourceCurr, targetCurrency);
+
         let userShare = 0;
         const yourSplit = exp.splits.find(s => (s.user._id || s.user) === currentUser.id || (s.user._id || s.user) === currentUser._id);
         if (yourSplit) {
-            userShare = yourSplit.amount;
+            userShare = convertAmount(yourSplit.amount, sourceCurr, targetCurrency);
         }
 
         rows.push([
             formattedDate,
             exp.description || 'Payment',
-            `$${exp.amount.toFixed(2)}`,
+            `${symbol}${convertedTotal.toFixed(2)}`,
             payerName,
-            yourSplit ? `$${userShare.toFixed(2)}` : '$0.00'
+            `${symbol}${userShare.toFixed(2)}`
         ]);
     });
 
