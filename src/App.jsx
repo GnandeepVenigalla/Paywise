@@ -52,7 +52,6 @@ const PrivateRoute = ({ children }) => {
 
 import BlockedUsers from './pages/BlockedUsers';
 import InstallGate from './components/InstallGate';
-import FloatingAiButton from './components/FloatingAiButton';
 
 function App() {
   return (
@@ -93,7 +92,6 @@ function App() {
                 <Route path="/beta" element={<BetaHandler />} />
                 <Route path="/" element={<Navigate to="/dashboard" />} />
               </Routes>
-              <FloatingAiButton />
             </BiometricGate>
           </div>
         </InstallGate>

@@ -129,15 +129,15 @@ export default function Account() {
             label: 'Preferences',
             items: [
                 {
-                    icon: <Bell className="w-5 h-5 text-slate-900" />,
-                    bg: 'bg-[#e6f7f3]',
+                    icon: <Bell className="w-5 h-5 text-slate-900 dark:text-emerald-400" />,
+                    bg: 'bg-[#e6f7f3] dark:bg-emerald-950/30',
                     label: 'Notifications',
                     sub: 'Manage your email alerts',
                     to: '/account/notifications',
                 },
                 {
-                    icon: <DollarSign className="w-5 h-5 text-slate-900" />,
-                    bg: 'bg-[#e6f7f3]',
+                    icon: <DollarSign className="w-5 h-5 text-slate-900 dark:text-emerald-400" />,
+                    bg: 'bg-[#e6f7f3] dark:bg-emerald-950/30',
                     label: 'Default Currency',
                     sub: currencyDisplay,
                     to: '/account/currency',
@@ -148,22 +148,22 @@ export default function Account() {
             label: 'Account',
             items: [
                 {
-                    icon: <Settings className="w-5 h-5 text-slate-900" />,
-                    bg: 'bg-slate-50',
+                    icon: <Settings className="w-5 h-5 text-slate-900 dark:text-slate-100" />,
+                    bg: 'bg-slate-50 dark:bg-slate-800',
                     label: 'App Settings',
                     sub: 'Split method, budget, theme, privacy',
                     to: '/account/app-settings',
                 },
                 {
-                    icon: <Shield className="w-5 h-5 text-slate-900" />,
-                    bg: 'bg-slate-50',
+                    icon: <Shield className="w-5 h-5 text-slate-900 dark:text-slate-100" />,
+                    bg: 'bg-slate-50 dark:bg-slate-800',
                     label: 'Privacy & Security',
                     sub: 'How we protect your data',
                     to: '/account/privacy',
                 },
                 {
-                    icon: <UserX className="w-5 h-5 text-slate-900" />,
-                    bg: 'bg-rose-50',
+                    icon: <UserX className="w-5 h-5 text-slate-900 dark:text-rose-400" />,
+                    bg: 'bg-rose-50 dark:bg-rose-950/30',
                     label: 'Blocked Users',
                     sub: 'Manage people you have blocked',
                     to: '/account/blocked',
@@ -174,15 +174,15 @@ export default function Account() {
             label: 'More',
             items: [
                 {
-                    icon: <UserPlus className="w-5 h-5 text-emerald-600" />,
-                    bg: 'bg-emerald-50',
+                    icon: <UserPlus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />,
+                    bg: 'bg-emerald-50 dark:bg-emerald-950/30',
                     label: 'Invite Friends',
                     sub: 'Share Paywise & grow your squad',
                     to: '/invite',
                 },
                 {
-                    icon: <HelpCircle className="w-5 h-5 text-gray-400" />,
-                    bg: 'bg-gray-50',
+                    icon: <HelpCircle className="w-5 h-5 text-gray-400 dark:text-gray-500" />,
+                    bg: 'bg-gray-50 dark:bg-slate-800',
                     label: 'Help & Support',
                     sub: 'FAQ, contact us',
                     to: null,
@@ -193,21 +193,21 @@ export default function Account() {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-28 font-sans text-gray-800">
-            <header className="bg-white pt-10 pb-5 px-6 sticky top-0 z-10 border-b border-gray-100">
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight">Account</h1>
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-28 font-sans text-gray-800 dark:text-gray-200 transition-colors">
+            <header className="bg-white dark:bg-slate-900 pt-10 pb-5 px-6 sticky top-0 z-10 border-b border-gray-100 dark:border-slate-800">
+                <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Account</h1>
             </header>
 
             <main className="px-5 mt-6 max-w-lg mx-auto">
                 {/* Profile Card */}
-                <Card className="mb-8">
+                <Card className="mb-8 dark:bg-slate-900 dark:border-slate-800">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-5">
                             <div className="relative">
                                 <Avatar src={user?.profilePic} name={user?.username} size="lg" />
                                 <label 
                                     htmlFor="profile-upload"
-                                    className={`absolute -bottom-1 -right-1 bg-slate-900 rounded-full p-1.5 border-2 border-white shadow-lg cursor-pointer hover:bg-slate-800 transition flex items-center justify-center z-10 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                                    className={`absolute -bottom-1 -right-1 bg-slate-900 dark:bg-emerald-600 rounded-full p-1.5 border-2 border-white dark:border-slate-900 shadow-lg cursor-pointer hover:bg-slate-800 transition flex items-center justify-center z-10 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
                                 >
                                     <Camera className="w-3.5 h-3.5 text-white pointer-events-none" />
                                     <input 
@@ -221,17 +221,17 @@ export default function Account() {
                                 </label>
                             </div>
                             <div className="min-w-0">
-                                <h2 className="text-xl font-black text-gray-900 truncate leading-tight">
+                                <h2 className="text-xl font-black text-gray-900 dark:text-white truncate leading-tight">
                                     {user?.username || 'User'}
                                 </h2>
-                                <p className="text-gray-400 text-sm truncate mt-0.5">
+                                <p className="text-gray-400 dark:text-gray-500 text-sm truncate mt-0.5">
                                     {user?.email || 'user@paywise.com'}
                                 </p>
                             </div>
                         </div>
                         <Link
                             to="/account/settings"
-                            className="text-slate-950 font-black text-sm uppercase tracking-widest hover:opacity-70 transition flex-shrink-0"
+                            className="text-slate-950 dark:text-emerald-400 font-black text-sm uppercase tracking-widest hover:opacity-70 transition flex-shrink-0"
                         >
                             Edit
                         </Link>
@@ -250,16 +250,16 @@ export default function Account() {
                                 const content = (
                                     <div
                                         onClick={item.onClick}
-                                        className={`flex items-center gap-4 px-6 py-5 hover:bg-gray-50 transition cursor-pointer ${!isLast ? 'border-b border-gray-50' : ''}`}
+                                        className={`flex items-center gap-4 px-6 py-5 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition cursor-pointer ${!isLast ? 'border-b border-gray-50 dark:border-slate-800/50' : ''}`}
                                     >
                                         <div className={`w-11 h-11 rounded-2xl ${item.bg} flex items-center justify-center flex-shrink-0 animate-in fade-in zoom-in-75 duration-300`}>
                                             {item.icon}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[16px] font-bold text-gray-900 leading-tight">{item.label}</p>
-                                            <p className="text-[13px] text-gray-400 mt-1 truncate">{item.sub}</p>
+                                            <p className="text-[16px] font-bold text-gray-900 dark:text-slate-100 leading-tight">{item.label}</p>
+                                            <p className="text-[13px] text-gray-400 dark:text-gray-500 mt-1 truncate">{item.sub}</p>
                                         </div>
-                                        <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                                        <ChevronRight className="w-5 h-5 text-gray-300 dark:text-slate-700 flex-shrink-0" />
                                     </div>
                                 );
 
@@ -287,8 +287,8 @@ export default function Account() {
 
             <div className="text-center mt-12 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
-                    <p>Crafted with love by <span className="text-slate-900 font-bold">GD Enterprises</span></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.3.7 · © 2026</p>
+                    <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.3.8 · © 2026</p>
                 </div>
                 <div
                     onClick={spawnKitty}

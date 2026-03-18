@@ -81,8 +81,8 @@ export default function Dashboard() {
                     <img src={logoImg} alt="Paywise" className="w-8 h-8 object-contain" />
                     <h1 className="text-xl font-bold text-gray-900">Paywise</h1>
                 </div>
-                <Link to="/account" className="w-9 h-9 rounded-full bg-slate-100 border-2 border-slate-50 text-slate-950 flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-slate-200 transition">
-                    {user?.username?.charAt(0) || 'U'}
+                <Link to="/ai" className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-950 transition-all hover:scale-105 active:scale-95 group">
+                    <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
                 </Link>
             </header>
 

@@ -39,9 +39,12 @@ fetch('https://open.er-api.com/v6/latest/USD')
  * @param {string} to - Target ISO code (default: 'USD')
  */
 export const convertAmount = (amount, from = 'USD', to = 'USD') => {
-    if (!amount || from === to) return amount;
-    const rate_from = EXCHANGE_RATES[from] || 1;
-    const rate_to = EXCHANGE_RATES[to] || 1;
+    if (!amount) return 0;
+    const f = from.toUpperCase();
+    const t = to.toUpperCase();
+    if (f === t) return amount;
+    const rate_from = EXCHANGE_RATES[f] || 1;
+    const rate_to = EXCHANGE_RATES[t] || 1;
     return amount * (rate_to / rate_from);
 };
 
@@ -53,8 +56,10 @@ export const convertAmount = (amount, from = 'USD', to = 'USD') => {
  * @returns {string} - Formatted currency string
  */
 export const formatCurrency = (amount, targetCurrency = 'USD', sourceCurrency = 'USD') => {
-    const converted = convertAmount(amount, sourceCurrency, targetCurrency);
-    const symbol = CURRENCY_SYMBOLS[targetCurrency] || targetCurrency || '$';
+    const t = targetCurrency.toUpperCase();
+    const s = sourceCurrency.toUpperCase();
+    const converted = convertAmount(amount, s, t);
+    const symbol = CURRENCY_SYMBOLS[t] || t || '$';
     return `${symbol}${Math.abs(converted).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 };
 
