@@ -120,7 +120,7 @@ export default function GroupDetails() {
         expenses.forEach(exp => {
             const creditorId = String(exp.paidBy?._id || exp.paidBy);
             const sourceCurr = exp.currency || 'USD';
-            const targetCurr = displayCurrency || 'USD';
+            const targetCurr = 'USD';
             exp.splits.forEach(split => {
                 const debtorId = String(split.user?._id || split.user);
                 if (debtorId !== creditorId && pairwise[debtorId] && pairwise[debtorId][creditorId] !== undefined) {
@@ -345,7 +345,21 @@ export default function GroupDetails() {
         );
     }
 
-    const myBalance = balances[user.id] || 0;
+    const getMemberNetBalance = (memberId) => {
+        let net = 0;
+        const allMembers = [...(group?.members || []), ...(group?.pastMembers || [])];
+        allMembers.forEach(other => {
+            const otherId = String(other._id || other);
+            const mId = String(memberId);
+            if (otherId === mId) return;
+            const otherOwesMe = pairwiseBalances[otherId]?.[mId] || 0;
+            const iOweOther = pairwiseBalances[mId]?.[otherId] || 0;
+            net += otherOwesMe - iOweOther;
+        });
+        return net;
+    };
+
+    const myBalance = getMemberNetBalance(user.id || user._id);
 
     const displayItems = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -1093,15 +1107,15 @@ export default function GroupDetails() {
                                     </div>
                                 </div>
                                 <div className="text-right flex-shrink-0">
-                                    {balances[selectedMemberModal._id] < 0 ? (
+                                    {getMemberNetBalance(selectedMemberModal._id) < 0 ? (
                                         <>
                                             <p className="text-[11px] font-medium text-rose-600 uppercase tracking-wide">owes</p>
-                                            <p className="text-[20px] font-medium text-rose-600 leading-none mt-0.5">{formatCurrency(Math.abs(balances[selectedMemberModal._id]), user?.defaultCurrency)}</p>
+                                            <p className="text-[20px] font-medium text-rose-600 leading-none mt-0.5">{formatCurrency(Math.abs(getMemberNetBalance(selectedMemberModal._id)), user?.defaultCurrency)}</p>
                                         </>
-                                    ) : balances[selectedMemberModal._id] > 0 ? (
+                                    ) : getMemberNetBalance(selectedMemberModal._id) > 0 ? (
                                         <>
                                             <p className="text-[11px] font-medium text-slate-900 uppercase tracking-wide">gets back</p>
-                                            <p className="text-[20px] font-medium text-slate-900 leading-none mt-0.5">{formatCurrency(balances[selectedMemberModal._id], user?.defaultCurrency)}</p>
+                                            <p className="text-[20px] font-medium text-slate-900 leading-none mt-0.5">{formatCurrency(getMemberNetBalance(selectedMemberModal._id), user?.defaultCurrency)}</p>
                                         </>
                                     ) : (
                                         <p className="text-[16px] font-medium text-gray-400">settled up</p>
@@ -1239,7 +1253,7 @@ export default function GroupDetails() {
                                     return 0;
                                 })
                                 .map((member, index) => {
-                                    const b = balances[member._id] || 0;
+                                    const b = getMemberNetBalance(member._id);
                                     const displayName = member._id === user.id || member._id === user._id ? `${member.username}` : member.username;
                                     const isExpanded = expandedBalances[member._id];
 
