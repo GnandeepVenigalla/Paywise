@@ -6,7 +6,7 @@ import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
 import SplitwiseMigrationBanner from '../components/SplitwiseMigrationBanner';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, convertAmount } from '../utils/formatters';
 
 export default function Dashboard() {
     const { user, api } = useContext(AuthContext);
@@ -42,13 +42,15 @@ export default function Dashboard() {
             const res = await api.get('/groups');
             setGroups(res.data);
 
-            // Compute total net balance across all groups
-            let net = 0;
+            // Compute total net balance across all groups (server returns USD)
+            let netUSD = 0;
             res.data.forEach(g => {
                 const myBal = (g.balances || {})[user.id] || 0;
-                net += myBal;
+                netUSD += myBal;
             });
-            setTotalOwed(net);
+            // Convert from USD to user's display currency for consistent display
+            const displayCurr = user?.defaultCurrency || 'USD';
+            setTotalOwed(convertAmount(netUSD, 'USD', displayCurr));
         } catch (err) {
             console.error(err);
         }

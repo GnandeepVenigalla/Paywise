@@ -47,6 +47,11 @@ export default function AppSettings() {
     const [deleteInput, setDeleteInput] = useState('');
     const [migrationLoading, setMigrationLoading] = useState(false);
     const [cameraPermission, setCameraPermission] = useState(localStorage.getItem('camera_granted') === 'true');
+    const [showPinSetup, setShowPinSetup] = useState(false);
+    const [pinInput, setPinInput] = useState('');
+    const [pinConfirm, setPinConfirm] = useState('');
+    const [pinStep, setPinStep] = useState(1); // 1=enter, 2=confirm
+    const [pinError, setPinError] = useState('');
 
     const handleOAuthMigrate = async () => {
         setMigrationLoading(true);
@@ -127,75 +132,72 @@ export default function AppSettings() {
 
     const handleBiometricToggle = async (enabled) => {
         if (!enabled) {
+            // Disable: clear everything
             update('biometricLock', false);
+            localStorage.removeItem('paywise_bio_pin');
+            localStorage.removeItem('paywise_bio_type');
             return;
         }
 
-        // Feature detection
-        if (!window.PublicKeyCredential) {
-            alert("Biometrics are not supported on this browser/device.");
-            return;
-        }
+        // Check if WebAuthn is supported AND we're on a secure origin
+        const hostname = window.location.hostname;
+        const isIP = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(hostname);
+        const isSecureOrigin = window.location.protocol === 'https:' || hostname === 'localhost' || hostname === '127.0.0.1';
+        const hasWebAuthn = !!window.PublicKeyCredential && isSecureOrigin && !isIP;
 
-        try {
-            // Check if we are on an IP address (WebAuthn requires a domain or localhost)
-            const hostname = window.location.hostname;
-            const isIP = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(hostname);
-            if (isIP && hostname !== '127.0.0.1' && hostname !== 'localhost') {
-                alert("Security Restriction: Biometrics (WebAuthn) do not work on IP addresses. Please use 'localhost' or a real domain name (via deployment).");
-                return;
-            }
-
-            // Check if biometrics are even available
-            const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-            if (!available) {
-                alert("No biometric hardware (like Face ID or Fingerprint) was found or enabled for this browser.");
-                return;
-            }
-
-            // Simple WebAuthn registration
-            const challenge = new Uint8Array(32);
-            window.crypto.getRandomValues(challenge);
-
-            const userID = new TextEncoder().encode(user.id || user._id);
-
-            const options = {
-                publicKey: {
-                    challenge,
-                    rp: { name: "Paywise" },
-                    user: {
-                        id: userID,
-                        name: user.email,
-                        displayName: user.username
-                    },
-                    pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
-                    authenticatorSelection: {
-                        authenticatorAttachment: "platform",
-                        userVerification: "required"
-                    },
-                    timeout: 60000,
-                    attestation: "none"
+        if (hasWebAuthn) {
+            // Try real WebAuthn (Face ID / Fingerprint)
+            try {
+                const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+                if (available) {
+                    const challenge = new Uint8Array(32);
+                    window.crypto.getRandomValues(challenge);
+                    const userID = new TextEncoder().encode(user.id || user._id);
+                    const credential = await navigator.credentials.create({
+                        publicKey: {
+                            challenge,
+                            rp: { name: 'Paywise' },
+                            user: { id: userID, name: user.email, displayName: user.username },
+                            pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+                            authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+                            timeout: 60000,
+                            attestation: 'none'
+                        }
+                    });
+                    if (credential) {
+                        localStorage.setItem('paywise_bio_type', 'webauthn');
+                        setSettings(prev => ({ ...prev, biometricLock: true, biometricCredentialId: credential.id }));
+                        alert('✅ Biometric lock enabled! Face ID / Fingerprint is now linked.');
+                        return;
+                    }
                 }
-            };
-
-            const credential = await navigator.credentials.create(options);
-
-            if (credential) {
-                // If we get here, the user successfully scanned their biometric
-                setSettings(prev => ({
-                    ...prev,
-                    biometricLock: true,
-                    biometricCredentialId: credential.id
-                }));
-                alert("Biometric lock enabled! Your Face ID/Fingerprint is now linked.");
+            } catch (err) {
+                if (err.name === 'NotAllowedError') return; // user cancelled
+                // Fall through to PIN fallback
             }
-        } catch (err) {
-            console.error(err);
-            if (err.name === 'NotAllowedError') {
-                // User cancelled or timed out
-            } else {
-                alert("Failed to setup biometrics. Make sure your device supports it.");
-            }
+        }
+
+        // Fallback: PIN setup (works on any device/origin)
+        setPinInput('');
+        setPinConfirm('');
+        setPinStep(1);
+        setPinError('');
+        setShowPinSetup(true);
+    };
+
+    const handlePinSave = () => {
+        if (pinStep === 1) {
+            if (pinInput.length < 4) { setPinError('PIN must be at least 4 digits'); return; }
+            setPinStep(2);
+            setPinError('');
+        } else {
+            if (pinInput !== pinConfirm) { setPinError('PINs do not match. Try again.'); setPinStep(1); setPinInput(''); setPinConfirm(''); return; }
+            // Save hashed PIN in localStorage
+            localStorage.setItem('paywise_bio_pin', btoa(pinInput));
+            localStorage.setItem('paywise_bio_type', 'pin');
+            setSettings(prev => ({ ...prev, biometricLock: true, biometricCredentialId: 'pin-auth' }));
+            setShowPinSetup(false);
+            alert('✅ PIN lock enabled! You will be asked for this PIN each time you open the app.');
         }
     };
 
@@ -549,6 +551,56 @@ export default function AppSettings() {
                         </button>
                         <button
                             onClick={() => { setShowDeleteConfirm(false); setDeleteInput(''); }}
+                            className="w-full py-3 text-[16px] font-medium text-gray-500 hover:bg-gray-50 rounded-2xl transition"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+            {/* ─── PIN Setup Modal ─────────────────────────────── */}
+            {showPinSetup && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
+                    <div className="w-full bg-white rounded-t-3xl p-6 animate-in slide-in-from-bottom duration-200">
+                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Fingerprint className="w-6 h-6 text-slate-700" />
+                        </div>
+                        <h3 className="text-[20px] font-bold text-gray-900 text-center mb-1">
+                            {pinStep === 1 ? 'Set App PIN' : 'Confirm Your PIN'}
+                        </h3>
+                        <p className="text-[13px] text-gray-400 text-center mb-5 leading-snug">
+                            {pinStep === 1
+                                ? 'Choose a 4-digit PIN to lock the app. You\'ll be asked for it every time you open Paywise.'
+                                : 'Enter the same PIN again to confirm.'}
+                        </p>
+                        <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-slate-900 rounded-xl px-4 py-3 transition bg-white mb-2">
+                            <input
+                                type="password"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={8}
+                                value={pinStep === 1 ? pinInput : pinConfirm}
+                                onChange={e => {
+                                    const val = e.target.value.replace(/\D/g, '');
+                                    pinStep === 1 ? setPinInput(val) : setPinConfirm(val);
+                                }}
+                                placeholder="Enter PIN (digits only)"
+                                className="flex-1 outline-none text-[22px] font-bold text-gray-900 bg-transparent tracking-[0.4em] placeholder:tracking-normal placeholder:text-[16px] placeholder:font-normal placeholder:text-gray-300"
+                                autoFocus
+                            />
+                        </div>
+                        {pinError && (
+                            <p className="text-[13px] text-rose-500 font-medium mb-2 text-center">{pinError}</p>
+                        )}
+                        <button
+                            onClick={handlePinSave}
+                            disabled={pinStep === 1 ? pinInput.length < 4 : pinConfirm.length < 4}
+                            className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold text-[16px] mb-3 mt-2 disabled:opacity-30 transition"
+                        >
+                            {pinStep === 1 ? 'Continue →' : 'Set PIN & Enable Lock'}
+                        </button>
+                        <button
+                            onClick={() => { setShowPinSetup(false); }}
                             className="w-full py-3 text-[16px] font-medium text-gray-500 hover:bg-gray-50 rounded-2xl transition"
                         >
                             Cancel

@@ -17,10 +17,14 @@ export const useMonthlySpending = (expenses, user, displayCurrency) => {
         const targetCurr = displayCurrency || user?.defaultCurrency || 'USD';
 
         expenses.forEach(exp => {
-            // Exclude payments and grouped summaries from the chart logic
+            // Exclude payments, grouped summaries, interest accruals, loan entries, and settle-ups
             const desc = exp.description?.toLowerCase() || '';
             if (desc.includes('payment')) return;
+            if (desc.includes('settle up') || desc === 'settle up') return;
             if (exp.isGroupSummary) return;
+            if (exp.isLoan) return;          // personal loan in group → not real group spending
+            if (exp.parentLoan) return;      // interest accrual → not real group spending
+            if (desc.includes('interest') || desc.includes('intrest')) return;
 
             const d = new Date(exp.date);
             if (isNaN(d.getTime())) return;
