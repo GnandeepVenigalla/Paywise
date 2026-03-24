@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, HeartHandshake, Search, Plus, ArrowRight, ArrowLeft, Contact, Share2, Sparkles } from 'lucide-react';
+import { UserPlus, HeartHandshake, Search, Plus, ArrowRight, ArrowLeft, Contact, Share2, Sparkles, SlidersHorizontal, Check } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import { formatCurrency } from '../utils/formatters';
@@ -15,7 +15,12 @@ export default function Friends() {
     const [searchResults, setSearchResults] = useState([]);
     const [scannedResults, setScannedResults] = useState(null);
     const [isContactsSupported, setIsContactsSupported] = useState(false);
+    const [filter, setFilter] = useState('none');
+    const [showFilterModal, setShowFilterModal] = useState(false);
     const navigate = useNavigate();
+
+    const netBalance = friends.reduce((sum, friend) => sum + (friend.balance || 0), 0);
+    const displayCurr = user?.defaultCurrency || 'USD';
 
     useEffect(() => {
         if ('contacts' in navigator && 'ContactsManager' in window) {
@@ -52,7 +57,7 @@ export default function Friends() {
             try {
                 const res = await api.get(`/auth/users?q=${encodeURIComponent(q)}`);
                 const friendIds = friends.map(f => f.id);
-                const results = res.data.filter(u => u._id !== user.id && !friendIds.includes(u._id));
+                const results = res.data.filter(u => u._id !== user.id);
                 setSearchResults(results);
             } catch (err) {
                 console.error(err);
@@ -228,10 +233,11 @@ export default function Friends() {
                                         </div>
                                     </div>
                                     <button
+                                        disabled={friends.some(f => f.id === result._id)}
                                         onClick={() => handleAddFriend(result._id)}
-                                        className="px-3 py-1.5 bg-slate-50 text-slate-900 rounded-lg text-sm font-bold hover:bg-slate-100 transition"
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-bold transition ${friends.some(f => f.id === result._id) ? 'bg-emerald-50 text-emerald-600 opacity-80 cursor-default' : 'bg-slate-50 text-slate-900 hover:bg-slate-100 cursor-pointer'}`}
                                     >
-                                        Add
+                                        {friends.some(f => f.id === result._id) ? 'Added' : 'Add'}
                                     </button>
                                 </div>
                             ))}
@@ -248,10 +254,11 @@ export default function Friends() {
                                         </div>
                                     </div>
                                     <button
+                                        disabled={friends.some(f => f.id === result._id)}
                                         onClick={() => handleAddFriend(result._id)}
-                                        className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold hover:bg-emerald-100 transition"
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-bold transition ${friends.some(f => f.id === result._id) ? 'bg-emerald-100 text-emerald-800 opacity-80 cursor-default' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer'}`}
                                     >
-                                        Add
+                                        {friends.some(f => f.id === result._id) ? 'Added' : 'Add'}
                                     </button>
                                 </div>
                             ))}
@@ -320,8 +327,46 @@ export default function Friends() {
                             </div>
                         ) : (
                             <div className="space-y-4">
+                                {/* ── Balance Summary Card ──────────────────────────── */}
+                                <div className={`mb-6 bg-white rounded-2xl p-4 shadow-sm border border-gray-200 flex justify-between items-center transition-all`}>
+                                    <div className="flex items-center gap-1.5 text-[17px] font-semibold tracking-tight">
+                                        <span className="text-slate-800">Overall,</span>
+                                        <span className="text-slate-800">
+                                            {netBalance > 0 ? "you are owed" : netBalance < 0 ? "you owe" : "you are settled up"}
+                                        </span>
+                                        {netBalance !== 0 && (
+                                            <span className={`font-bold ml-0.5 ${netBalance > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                {formatCurrency(Math.abs(netBalance), displayCurr)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <button 
+                                        onClick={() => setShowFilterModal(true)} 
+                                        className="p-1 rounded-full hover:bg-slate-100 transition-colors text-slate-800 cursor-pointer"
+                                    >
+                                        <SlidersHorizontal className="w-[22px] h-[22px]" />
+                                    </button>
+                                </div>
+
                                 <h2 className="text-lg font-bold text-gray-800 mb-2">Your Friends</h2>
-                                {friends.map(friend => (
+                                {friends.filter(friend => {
+                                    if (filter === 'none') return true;
+                                    const bal = friend.balance || 0;
+                                    if (filter === 'outstanding') return bal !== 0;
+                                    if (filter === 'owe') return bal < 0;
+                                    if (filter === 'owed') return bal > 0;
+                                    return true;
+                                }).length === 0 ? (
+                                    <p className="text-gray-500 text-sm mt-4 text-center">No friends match this filter.</p>
+                                ) : (
+                                    friends.filter(friend => {
+                                        if (filter === 'none') return true;
+                                        const bal = friend.balance || 0;
+                                        if (filter === 'outstanding') return bal !== 0;
+                                        if (filter === 'owe') return bal < 0;
+                                        if (filter === 'owed') return bal > 0;
+                                        return true;
+                                    }).map(friend => (
                                     <Link
                                         to={`/friend/${friend.id}`}
                                         key={friend.id}
@@ -358,7 +403,7 @@ export default function Friends() {
                                             </div>
                                         </div>
                                     </Link>
-                                ))}
+                                )))}
                             </div>
                         )}
                     </>
@@ -366,6 +411,48 @@ export default function Friends() {
             </main>
 
             <BottomNav />
+
+            {/* Filter iOS-style Modal */}
+            {showFilterModal && (
+                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowFilterModal(false)} />
+                    
+                    <div className="w-full px-3 pb-6 max-h-[85vh] flex flex-col relative z-20 animate-in slide-in-from-bottom duration-300 gap-2">
+                        {/* Options Block */}
+                        <div className="bg-white rounded-[14px] flex flex-col overflow-hidden shadow-sm">
+                            <div className="p-3 text-center border-b border-gray-100">
+                                <h3 className="text-[13px] font-semibold text-gray-500">Set filter</h3>
+                            </div>
+                            
+                            {[
+                                { id: 'none', label: 'None' },
+                                { id: 'outstanding', label: 'Friends with outstanding balances' },
+                                { id: 'owe', label: 'Friend balances you owe' },
+                                { id: 'owed', label: 'Friend balances you are owed' }
+                            ].map((option, index, arr) => (
+                                <button
+                                    key={option.id}
+                                    onClick={() => { setFilter(option.id); setShowFilterModal(false); }}
+                                    className={`p-[18px] text-[19px] text-[#007AFF] relative bg-white hover:bg-gray-50 transition-colors ${index !== arr.length - 1 ? 'border-b border-gray-100' : ''}`}
+                                >
+                                    <span className={`block text-center ${filter === option.id ? 'font-semibold tracking-tight' : 'tracking-tight font-normal'}`}>{option.label}</span>
+                                    {filter === option.id && <Check className="w-[22px] h-[22px] text-[#007AFF] font-bold absolute right-[18px] top-1/2 -translate-y-1/2" />}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Cancel Button */}
+                        <div className="bg-white rounded-[14px] mt-1 shadow-sm">
+                            <button
+                                onClick={() => setShowFilterModal(false)}
+                                className="w-full p-[18px] text-[19px] font-bold text-[#007AFF] hover:bg-gray-50 transition-colors rounded-[14px]"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

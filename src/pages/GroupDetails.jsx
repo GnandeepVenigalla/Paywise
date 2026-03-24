@@ -231,6 +231,22 @@ export default function GroupDetails() {
         }
     };
 
+    const handleRemoveMember = async (userId) => {
+        if (Math.abs(getMemberNetBalance(userId)) > 0.01) {
+            alert("You cannot remove this person until all of their debts are settled up.");
+            return;
+        }
+        if (window.confirm('Are you sure you want to remove this member from the group?')) {
+            try {
+                await api.post(`/groups/${id}/remove/${userId}`);
+                setSelectedMemberModal(null);
+                fetchGroup();
+            } catch (err) {
+                alert(err.response?.data?.msg || 'Failed to remove member');
+            }
+        }
+    };
+
     const handleUpdateExpense = async (e) => {
         e.preventDefault();
         setIsSavingEdit(true);
@@ -249,11 +265,34 @@ export default function GroupDetails() {
             setSelectedExpense(null);
             fetchGroup();
         } catch (err) {
-            alert('Failed to update expense');
+            console.error(err);
         } finally {
             setIsSavingEdit(false);
         }
     };
+
+    const handleSettleIndividualExpense = async (expense, amount) => {
+        try {
+            const payerId = user.id || user._id; 
+            const receiverId = expense.paidBy._id || expense.paidBy;
+            
+            await api.post('/expenses', {
+                group: id,
+                amount: amount,
+                description: `Partial cash payment (Settle: ${expense.description})`,
+                paidBy: payerId,
+                currency: expense.currency || displayCurrency || 'USD',
+                splits: [{ user: receiverId, amount: amount }]
+            });
+            
+            setSelectedExpense(null);
+            fetchGroup();
+        } catch (err) {
+            console.error(err);
+            alert('Failed to settle expense.');
+        }
+    };
+    // handleUpdateExpense is above ^
     const toggleEditAssign = (itemId) => {
         if (selectedMemberIdsForEdit.length === 0) {
             alert("Please select members at the top first.");
@@ -361,7 +400,17 @@ export default function GroupDetails() {
 
     const myBalance = getMemberNetBalance(user.id || user._id);
 
-    const displayItems = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Filter out interest/loan entries from the group expenses tab.
+    // - parentLoan set → auto-generated interest accrual expense (belongs in Friends view)
+    // - description contains "interest" → manually entered or auto interest entry
+    // - isLoan: true → personal loan added to group (belongs in Friends/loan view)
+    const displayItems = [...expenses]
+        .filter(item =>
+            !item.parentLoan &&
+            !item.isLoan &&
+            !(item.description?.toLowerCase().includes('interest') || item.description?.toLowerCase().includes('intrest'))
+        )
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const inviteLinkUrl = `${window.location.href.split('#')[0]}#/join/${id}?v=s`;
 
@@ -373,7 +422,7 @@ export default function GroupDetails() {
                 <div className="relative px-4 z-10 flex flex-col justify-between h-full">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
+                            <button onClick={() => navigate('/dashboard')} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
                                 <ArrowLeft className="w-5 h-5 text-white" />
                             </button>
                         </div>
@@ -504,18 +553,18 @@ export default function GroupDetails() {
                                         {first && (
                                             <p className="text-[14px] text-gray-500">
                                                 {first.b > 0 ? (
-                                                    <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(first.b, displayCurrency)}</span></>
+                                                    <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency)}</span></>
                                                 ) : (
-                                                    <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(first.b, displayCurrency)}</span></>
+                                                    <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency)}</span></>
                                                 )}
                                             </p>
                                         )}
                                         {second && (
                                             <p className="text-[14px] text-gray-500">
                                                 {second.b > 0 ? (
-                                                    <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(second.b, displayCurrency)}</span></>
+                                                    <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency)}</span></>
                                                 ) : (
-                                                    <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(second.b, displayCurrency)}</span></>
+                                                    <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency)}</span></>
                                                 )}
                                             </p>
                                         )}
@@ -561,16 +610,56 @@ export default function GroupDetails() {
                                     const showHeader = monthYear !== lastMonth;
                                     lastMonth = monthYear;
 
-                                    const isSettleUp = item.description.toLowerCase() === 'settle up';
+                                    const isSettleUp =
+                                        item.description?.toLowerCase() === 'settle up' ||
+                                        item.description?.toLowerCase() === 'cash settle up' ||
+                                        item.description?.toLowerCase().startsWith('partial cash payment');
                                     const isPaidByMe = (item.paidBy?._id || item.paidBy) === (user?.id || user?._id);
 
-                                    // Calculate user's involvement for the component
+                                    // Render settle-up as a clean banner row, not an expense card
+                                    if (isSettleUp) {
+                                        const payerName = isPaidByMe ? 'You' : (item.paidBy?.username || 'Someone');
+                                        const receiverSplit = item.splits?.[0];
+                                        const receiverId = receiverSplit?.user?._id || receiverSplit?.user;
+                                        const myId = user?.id || user?._id;
+                                        const receiverName = receiverId === myId ? 'you' : (receiverSplit?.user?.username || 'someone');
+                                        return (
+                                            <div key={item._id || Math.random()}>
+                                                {showHeader && (
+                                                    <div className="px-5 py-3 bg-gray-50/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50">
+                                                        <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">{monthYear}</span>
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-100 bg-emerald-50/60">
+                                                    <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                                        <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[13.5px] font-semibold text-emerald-800 leading-snug">
+                                                            <span className="font-black">{payerName}</span> paid <span className="font-black">{receiverName}</span>
+                                                        </p>
+                                                        <p className="text-[11px] text-emerald-600 mt-0.5">{new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · Settlement</p>
+                                                    </div>
+                                                    <span className="text-[14px] font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                                                        {formatCurrency(item.amount, displayCurrency, item.currency || 'USD')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    // Calculate user's involvement for regular expenses
                                     let userSplit = 0;
-                                    const mySplit = item.splits?.find(s => (s.user._id || s.user) === (user.id || user._id));
+                                    const mySplit = item.splits?.find(s => (s.user?._id || s.user) === (user.id || user._id));
 
                                     if (isPaidByMe) {
-                                        // If I paid, userSplit is what OTHERS owe me (total - my share)
-                                        userSplit = item.amount - (mySplit ? mySplit.amount : 0);
+                                        // If I paid, userSplit is the sum of what all OTHERS owe me
+                                        const othersTotal = (item.splits || []).reduce((sum, s) => {
+                                            const sId = s.user?._id || s.user;
+                                            if (sId !== (user.id || user._id)) sum += s.amount;
+                                            return sum;
+                                        }, 0);
+                                        userSplit = othersTotal;
                                     } else {
                                         // If someone else paid, userSplit is what I owe (my share, as negative)
                                         userSplit = mySplit ? -mySplit.amount : 0;
@@ -584,7 +673,7 @@ export default function GroupDetails() {
                                                 </div>
                                             )}
                                             <ExpenseItem
-                                                description={isSettleUp ? `${isPaidByMe ? 'You' : item.paidBy.username} settled up` : item.description}
+                                                description={item.description}
                                                 amount={item.amount}
                                                 date={item.date}
                                                 payerName={isPaidByMe ? 'You' : (item.paidBy?.username || 'Someone')}
@@ -601,12 +690,10 @@ export default function GroupDetails() {
                                                     setEditAmount(item.amount.toString());
                                                     setEditItems(item.items || []);
                                                     setSelectedMemberIdsForEdit([user.id]);
-                                                    // Note: GroupDetails might have a different modal name or state
-                                                    // In this file it seems to be handled by a generic setSelectedExpense(item) 
-                                                    // which triggers a modal.
                                                 }}
                                             />
                                         </div>
+
                                     );
                                 });
                             })()}
@@ -816,6 +903,29 @@ export default function GroupDetails() {
                                                 ))}
                                             </div>
                                         </div>
+
+                                        {(() => {
+                                            if (selectedExpense.isLoan || selectedExpense.description?.toLowerCase().includes('settle')) return null;
+                                            const isPaidByMe = (selectedExpense.paidBy?._id || selectedExpense.paidBy) === (user?.id || user?._id);
+                                            const mySplit = selectedExpense.splits?.find(s => (s.user?._id || s.user) === (user?.id || user?._id));
+                                            
+                                            // Ensure there's a valid amount owed (not fully settled via a negative split)
+                                            if (!isPaidByMe && mySplit && mySplit.amount > 0) {
+                                                return (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSettleIndividualExpense(selectedExpense, mySplit.amount);
+                                                        }}
+                                                        className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                                                    >
+                                                        <Check className="w-5 h-5" />
+                                                        Settle my share ({formatCurrency(mySplit.amount, displayCurrency, selectedExpense.currency)})
+                                                    </button>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
 
                                         {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
                                             <button
@@ -1145,11 +1255,15 @@ export default function GroupDetails() {
                                         </div>
                                     </button>
                                 ) : (
-                                    <button onClick={() => alert('Remove functionality coming soon.')} className="px-6 py-4 flex items-start gap-5 hover:bg-rose-50/50 transition w-full text-left pb-6">
+                                    <button onClick={() => handleRemoveMember(selectedMemberModal._id)} className={`px-6 py-4 flex items-start gap-5 transition w-full text-left pb-6 ${Math.abs(getMemberNetBalance(selectedMemberModal._id)) > 0.01 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-50/50 cursor-pointer'}`}>
                                         <Trash2 className="w-[26px] h-[26px] text-gray-500 mt-1" strokeWidth={1.5} />
                                         <div className="flex-1">
                                             <span className="text-[18px] text-gray-800 font-medium block">Remove from group</span>
-                                            <p className="text-[14px] text-gray-500 mt-1 leading-[1.3] pr-2">You can't remove this person until their debts are settled up.</p>
+                                            {Math.abs(getMemberNetBalance(selectedMemberModal._id)) > 0.01 ? (
+                                                <p className="text-[14px] text-rose-500 mt-1 leading-[1.3] pr-2 font-medium">You can't remove this person until their debts are settled up.</p>
+                                            ) : (
+                                                <p className="text-[14px] text-gray-500 mt-1 leading-[1.3] pr-2">Remove this person from the group.</p>
+                                            )}
                                         </div>
                                     </button>
                                 )}
@@ -1287,9 +1401,9 @@ export default function GroupDetails() {
                                                         </p>
                                                         <p className="text-[14px] font-medium leading-snug mt-0.5">
                                                             {b < 0 ? (
-                                                                <span className="text-rose-600">owes {formatCurrency(Math.abs(b), user?.defaultCurrency)}</span>
+                                                                <span className="text-rose-600">owes {formatCurrency(Math.abs(b), displayCurrency)}</span>
                                                             ) : b > 0 ? (
-                                                                <span className="text-emerald-500">gets back {formatCurrency(b, user?.defaultCurrency)}</span>
+                                                                <span className="text-emerald-500">gets back {formatCurrency(b, displayCurrency)}</span>
                                                             ) : (
                                                                 <span className="text-gray-400">is settled up</span>
                                                             )}
@@ -1763,6 +1877,7 @@ export default function GroupDetails() {
                             await api.post('/expenses', {
                                 description: isPartial ? `Partial cash payment of ${formatCurrency(amt, displayCurrency)}` : 'Cash settle up',
                                 amount: amt,
+                                currency: displayCurrency,
                                 group: id,
                                 paidBy: payerId,
                                 splits: [{ user: receiverId, amount: amt }]

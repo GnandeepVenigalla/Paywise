@@ -36,7 +36,8 @@ Travel the world with confidence. Paywise handles multiple currencies with real-
 - **Framework:** React 19 (Vite)
 - **Styling:** Tailwind CSS 4
 - **Icons:** Lucide React
-- **OCR Engine:** Tesseract.js & Google Gemini AI
+- **OCR & AI Engine:** Tesseract.js & Google Gemini AI (1.5 Flash)
+- **Monetization:** Google AdSense (AdGate Integration)
 - **State Management:** React Context API
 - **Routing:** React Router 7
 - **Exports:** jsPDF (AutoTable) for financial reporting
@@ -44,6 +45,41 @@ Travel the world with confidence. Paywise handles multiple currencies with real-
 ---
 
 ## 📜 Version History & Release Log
+
+### v1.4.0 - The "Intelligence & Precision" Update
+*Released: March 24, 2026*
+
+#### 🤖 Paywise AI (Powered by Gemini)
+- **Conversational Expenses:** Add expenses, check balances ("Who owes me?"), or delete records using natural language.
+- **Floating AI Assistant:** Access the AI from any page with the new floating spark button.
+- **Action Confirmation:** AI proposes actions (Add, Delete, Settle) which you can confirm with one tap.
+- **Smart Suggestions:** Get personalized prompt suggestions based on your recent activity.
+
+#### 💰 Advanced Financial Features
+- **Partial Settlements:** Ability to record partial payments instead of just full balance clears.
+- **Individual Expense Settlement:** Settle specific bills within a group rather than just the total balance.
+- **Monthly Budgets:** Set spending limits and get visual warnings (orange balance) when approaching them.
+- **Default Split Methods:** Set your preferred split logic (Equal, Percentage, etc.) in settings.
+- **Privacy Mode:** "Hide Balance" feature to blur sensitive totals when using the app in public.
+
+#### 🔐 Security & Personalization
+- **Next-Gen Biometrics:** Secure your app with FaceID, TouchID, or Fingerprint (WebAuthn).
+- **Secure PIN Fallback:** Custom PIN lock for devices without biometric hardware.
+- **Profile Visibility:** Control whether people can find you via email discovery.
+- **Auto-Accept Friends:** Option to automatically approve friend requests from known contacts.
+- **Comprehensive Account Management:** Secure, verified account deletion flow.
+
+#### 🌍 Experience & Accessibility
+- **Multi-Language Support:** Now available in 10+ languages including Spanish, French, Hindi, and more.
+- **High Contrast Mode:** Enhanced UI visibility for better readability.
+- **Custom Localization:** Personalize date (MM/DD/YYYY vs DD/MM/YYYY) and time (12h/24h) formats.
+- **Payment Reminders:** Quick-share reminder templates for friends with outstanding balances.
+
+#### 🛠 Stability & Performance
+- **Global Error Boundary:** Improved app resilience with automated crash recovery and reporting.
+- **Cache Management:** Tools to clear local storage and fix sluggish behavior.
+- **Ad-Supported Access:** Integrated Google AdSense (AdGate) to unlock premium features for free.
+- **Refined Refactor:** Optimized 35+ core components for faster transitions and lower memory usage.
 
 ### v1.3.0 - The "Migration & Mobility" Update
 *Released: March 10, 2026*

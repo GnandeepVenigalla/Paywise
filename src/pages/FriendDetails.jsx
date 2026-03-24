@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder, Percent, Sparkles } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder, Percent, Sparkles, Check } from 'lucide-react';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -38,6 +38,7 @@ export default function FriendDetails() {
     const [settleMode, setSettleMode] = useState(null); // null | 'cash' | 'bank'
     const [cashStep, setCashStep] = useState(1); // 1=method picker, 2=cash amount
     const [partialAmount, setPartialAmount] = useState('');
+    const [settleNote, setSettleNote] = useState(''); // optional payment note
     const [isSettling, setIsSettling] = useState(false);
     const [friendNote, setFriendNote] = useState('');
     const [showNoteModal, setShowNoteModal] = useState(false);
@@ -64,16 +65,25 @@ export default function FriendDetails() {
 
     const projectedInterest = useMemo(() => {
         if (!expenses || !friend) return 0;
+        // If fully settled, no interest will be charged by the scheduler either
+        const balanceInUSD = Math.abs(balance); // balance from server is in USD
+        if (balanceInUSD < 0.01) return 0;
+
+        let remainingBalance = balanceInUSD; // track how much of the balance is still loan-covered
+
         return expenses.reduce((acc, exp) => {
-            // Only calculate for active loans
             if (exp.isLoan && exp.loanInterestRate > 0) {
                 const userSplit = getUserExpenseSplit(exp, user, friend._id || friend);
-                // Apply the rate to this specific transaction's split amount
-                return acc + (Math.abs(userSplit) * (exp.loanInterestRate / 100));
+                const sourceCurr = exp.currency || 'USD';
+                const splitInUSD = convertAmount(Math.abs(userSplit), sourceCurr, 'USD');
+                // Mirror the scheduler's logic: cap interest-bearing amount by the net balance
+                const interestBearingAmount = Math.min(splitInUSD, remainingBalance);
+                remainingBalance -= interestBearingAmount; // reduce remaining balance for next loan
+                return acc + (interestBearingAmount * (exp.loanInterestRate / 100));
             }
             return acc;
         }, 0);
-    }, [expenses, friend, user.id]);
+    }, [expenses, friend, user.id, balance]);
 
     const fetchFriendDetails = async () => {
         try {
@@ -144,6 +154,27 @@ export default function FriendDetails() {
         }
     };
 
+    const handleSettleIndividualExpense = async (expense, amount) => {
+        try {
+            const payerId = user.id || user._id; 
+            const receiverId = expense.paidBy._id || expense.paidBy;
+            
+            await api.post('/expenses', {
+                amount: amount,
+                description: `Partial cash payment (Settle: ${expense.description})`,
+                paidBy: payerId,
+                currency: expense.currency || user?.defaultCurrency || 'USD',
+                splits: [{ user: receiverId, amount: amount }]
+            });
+            
+            setSelectedExpense(null);
+            fetchFriendDetails();
+        } catch (err) {
+            console.error(err);
+            alert('Failed to settle expense.');
+        }
+    };
+
     const toggleEditAssign = (itemId) => {
         if (selectedMemberIdsForEdit.length === 0) {
             alert("Please select members at the top first.");
@@ -200,9 +231,14 @@ export default function FriendDetails() {
         }
         setIsSettling(true);
         try {
+            const baseDesc = isPartial
+                ? `Partial cash payment of ${formatCurrency(amt, user?.defaultCurrency)}`
+                : 'Cash settle up';
+            const fullDesc = settleNote?.trim() ? `${baseDesc} — ${settleNote.trim()}` : baseDesc;
             await api.post('/expenses', {
-                description: isPartial ? `Partial cash payment of ${formatCurrency(amt, user?.defaultCurrency)}` : 'Cash settle up',
+                description: fullDesc,
                 amount: amt,
+                currency: user?.defaultCurrency || 'USD',
                 group: null,
                 paidBy: balance > 0 ? friend._id : (user.id || user._id),
                 splits: [{
@@ -211,6 +247,7 @@ export default function FriendDetails() {
                 }]
             });
             setShowSettleUp(false);
+            setSettleNote('');
             fetchFriendDetails();
         } catch (err) {
             alert('Failed to record settlement.');
@@ -276,7 +313,7 @@ export default function FriendDetails() {
             <header className="bg-slate-950 text-white pt-6 pb-6 px-4 sticky top-0 z-10">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
+                        <button onClick={() => navigate('/friends')} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
                             <ArrowLeft className="w-5 h-5 text-white" />
                         </button>
                     </div>
@@ -316,7 +353,7 @@ export default function FriendDetails() {
                                         {balance > 0 ? 'owes you' : 'you owe'}
                                     </span>
                                     <span className={`text-2xl font-black tracking-tight ${balance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                        {balance > 0 ? '+' : '-'}{formatCurrency(balance, user?.defaultCurrency)}
+                                        {balance > 0 ? '+' : '-'}{formatCurrency(Math.abs(balance), user?.defaultCurrency)}
                                     </span>
                                 </div>
                             ) : (
@@ -381,7 +418,7 @@ export default function FriendDetails() {
                                         <p key={idx} className="text-[13.5px] text-gray-600 flex justify-between items-center">
                                             <span>{(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes you' : 'you owe'} in {item.name === 'non-group expenses' ? item.name : `"${item.name}"`}</span>
                                             <span className={`font-bold ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                {formatCurrency(item.balance, user?.defaultCurrency)}
+                                                {formatCurrency(Math.abs(item.balance), user?.defaultCurrency)}
                                             </span>
                                         </p>
                                     ));
@@ -436,11 +473,73 @@ export default function FriendDetails() {
                                     const isPaidByMe = item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id;
                                     const userSplit = getUserExpenseSplit(item, user, friend?._id || friend);
 
+                                    const isSettleUp =
+                                        item.description?.toLowerCase() === 'settle up' ||
+                                        item.description?.toLowerCase() === 'cash settle up' ||
+                                        item.description?.toLowerCase().startsWith('partial cash payment');
+
+                                    // Render settle-up as a clean banner, not a regular expense card
+                                    if (isSettleUp) {
+                                        const payerName = isPaidByMe ? 'You' : (item.paidBy?.username || friend?.username || 'Someone');
+                                        const receiverSplit = item.splits?.[0];
+                                        const receiverId = receiverSplit?.user?._id || receiverSplit?.user;
+                                        const myId = user?.id || user?._id;
+                                        const receiverName = receiverId === myId ? 'you' : (receiverSplit?.user?.username || friend?.username || 'someone');
+                                        const isPartial = item.description?.toLowerCase().startsWith('partial');
+                                        // Extract note — anything after " — " in the stored description
+                                        const notePart = item.description?.includes(' — ') ? item.description.split(' — ').slice(1).join(' — ') : null;
+                                        // Determine payment method from description
+                                        const isBankPayment = item.description?.toLowerCase().includes('bank') || item.description?.toLowerCase().includes('transfer');
+                                        return (
+                                            <div key={item._id || Math.random()}>
+                                                {showHeader && (
+                                                    <div className="px-5 py-3 bg-gray-50/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
+                                                        <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-[0.2em]">{monthYear}</span>
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center gap-3 px-5 py-4 border-b border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/60 dark:bg-emerald-950/20">
+                                                    {/* Icon */}
+                                                    <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center flex-shrink-0">
+                                                        <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                                    </div>
+                                                    {/* Text */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <p className="text-[13.5px] font-semibold text-emerald-800 dark:text-emerald-300 leading-snug">
+                                                                <span className="font-black">{payerName}</span> paid <span className="font-black">{receiverName}</span>
+                                                            </p>
+                                                            {/* Method badge */}
+                                                            <span className="text-[10px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-500 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                                                {isBankPayment ? '🏦 Bank' : '💵 Cash'}
+                                                            </span>
+                                                            {isPartial && (
+                                                                <span className="text-[10px] font-black uppercase tracking-wide text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                                                                    Partial
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {/* Note if present */}
+                                                        {notePart && (
+                                                            <p className="text-[11.5px] text-emerald-700 dark:text-emerald-400 mt-0.5 italic">📝 {notePart}</p>
+                                                        )}
+                                                        <p className="text-[11px] text-emerald-600/70 dark:text-emerald-500/70 mt-0.5">
+                                                            {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · Settlement
+                                                        </p>
+                                                    </div>
+                                                    {/* Amount */}
+                                                    <span className="text-[15px] font-black text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/50 px-3 py-1 rounded-full flex-shrink-0">
+                                                        {formatCurrency(item.amount, user?.defaultCurrency || 'USD', item.currency || 'USD')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
                                     return (
                                         <div key={item._id || Math.random()}>
                                             {showHeader && (
-                                                <div className="px-5 py-3 bg-gray-50/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50">
-                                                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">{monthYear}</span>
+                                                <div className="px-5 py-3 bg-gray-50/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
+                                                    <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-[0.2em]">{monthYear}</span>
                                                 </div>
                                             )}
                                             <ExpenseItem
@@ -715,6 +814,29 @@ export default function FriendDetails() {
                                                 ))}
                                             </div>
                                         </div>
+
+                                        {(() => {
+                                            if (selectedExpense.isLoan || selectedExpense.description?.toLowerCase().includes('settle')) return null;
+                                            const isPaidByMe = (selectedExpense.paidBy?._id || selectedExpense.paidBy) === (user?.id || user?._id);
+                                            const mySplit = selectedExpense.splits?.find(s => (s.user?._id || s.user) === (user?.id || user?._id));
+                                            
+                                            // Ensure there's a valid amount owed
+                                            if (!isPaidByMe && mySplit && mySplit.amount > 0) {
+                                                return (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSettleIndividualExpense(selectedExpense, mySplit.amount);
+                                                        }}
+                                                        className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                                                    >
+                                                        <Check className="w-5 h-5" />
+                                                        Settle my share ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense.currency)})
+                                                    </button>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
 
                                         {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
                                             <button
@@ -1346,6 +1468,22 @@ export default function FriendDetails() {
                                 <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balance, user?.defaultCurrency)}</span>
                             </button>
 
+                            {/* Optional note — applies to both full and partial */}
+                            <div className="mb-5">
+                                <label className="text-[13px] font-bold text-gray-500 mb-1.5 block">Add a note <span className="font-normal">(optional)</span></label>
+                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-slate-900 rounded-xl px-4 py-3 transition bg-white">
+                                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h6m-6 4h10M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <input
+                                        type="text"
+                                        maxLength={80}
+                                        placeholder="e.g. via GPay, UPI ref TXN123, in person..."
+                                        value={settleNote}
+                                        onChange={e => setSettleNote(e.target.value)}
+                                        className="flex-1 outline-none text-[15px] text-gray-900 bg-transparent placeholder-gray-300"
+                                    />
+                                </div>
+                            </div>
+
                             {/* Divider */}
                             <div className="flex items-center gap-3 my-2">
                                 <div className="flex-1 h-[1px] bg-gray-200" />
@@ -1371,6 +1509,8 @@ export default function FriendDetails() {
                                 </div>
                                 <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(Math.abs(balance - (parseFloat(partialAmount) || 0)), user?.defaultCurrency)}</p>
                             </div>
+
+
 
                             <button
                                 onClick={() => handleCashSettle(true)}
