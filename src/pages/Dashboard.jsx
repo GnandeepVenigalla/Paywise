@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Wallet, Layers, Plus, Upload, UserPlus, ChevronRight, Eye, Sparkles } from 'lucide-react';
+import { Wallet, Layers, Plus, Upload, UserPlus, ChevronRight, Sparkles, TrendingDown, TrendingUp, ArrowRightLeft, SlidersHorizontal, Check } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -14,10 +14,14 @@ export default function Dashboard() {
     const { hideBalance, monthlyBudget } = useAppSettings();
 
     const [groups, setGroups] = useState([]);
-    const [totalOwed, setTotalOwed] = useState(0);   // positive = owed to me
-    const [monthSpend, setMonthSpend] = useState(0);  // total I owe this month across groups
     const [isCreating, setIsCreating] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
+    const [filter, setFilter] = useState('none');
+    const [showFilterModal, setShowFilterModal] = useState(false);
+
+    // Balance breakdown: split into "I owe" and "Owed to me"
+    const [totalIOwe, setTotalIOwe] = useState(0);      // negative sum (what I owe others)
+    const [totalOwedToMe, setTotalOwedToMe] = useState(0);  // positive sum (what others owe me)
 
     useEffect(() => {
         const checkPendingJoin = async () => {
@@ -32,25 +36,42 @@ export default function Dashboard() {
                     console.error('Failed to join group from invite code:', err);
                 }
             }
-            fetchGroups();
+            fetchData();
         };
         checkPendingJoin();
     }, []);
 
-    const fetchGroups = async () => {
+    const fetchData = async () => {
         try {
-            const res = await api.get('/groups');
-            setGroups(res.data);
+            // Fetch groups + friends balance in parallel
+            const [groupsRes, friendsRes] = await Promise.all([
+                api.get('/groups'),
+                api.get('/auth/friends')
+            ]);
 
-            // Compute total net balance across all groups (server returns USD)
-            let netUSD = 0;
-            res.data.forEach(g => {
-                const myBal = (g.balances || {})[user.id] || 0;
-                netUSD += myBal;
-            });
-            // Convert from USD to user's display currency for consistent display
+            setGroups(groupsRes.data);
+
             const displayCurr = user?.defaultCurrency || 'USD';
-            setTotalOwed(convertAmount(netUSD, 'USD', displayCurr));
+            let owedToMe = 0;   // positive
+            let iOwe = 0;       // absolute value of negative
+
+            // Groups contribution
+            groupsRes.data.forEach(g => {
+                const myBal = (g.balances || {})[user.id] || 0;
+                const converted = convertAmount(myBal, 'USD', displayCurr);
+                if (converted > 0) owedToMe += converted;
+                else if (converted < 0) iOwe += Math.abs(converted);
+            });
+
+            // Friends contribution
+            friendsRes.data.forEach(f => {
+                const converted = convertAmount(f.balance || 0, 'USD', displayCurr);
+                if (converted > 0) owedToMe += converted;
+                else if (converted < 0) iOwe += Math.abs(converted);
+            });
+
+            setTotalOwedToMe(owedToMe);
+            setTotalIOwe(iOwe);
         } catch (err) {
             console.error(err);
         }
@@ -63,17 +84,15 @@ export default function Dashboard() {
             await api.post('/groups', { name: newGroupName, members: [] });
             setNewGroupName('');
             setIsCreating(false);
-            fetchGroups();
+            fetchData();
         } catch (err) {
             console.error(err);
         }
     };
 
-    // Budget warning: totalOwed negative means I owe. Use abs for "spending"
-    const budgetExceeded = monthlyBudget > 0 && Math.abs(Math.min(totalOwed, 0)) > monthlyBudget;
-    const balanceColor = budgetExceeded
-        ? 'text-orange-500'
-        : totalOwed > 0 ? 'text-emerald-500' : totalOwed < 0 ? 'text-rose-500' : 'text-gray-500';
+    const netBalance = totalOwedToMe - totalIOwe;
+    const displayCurr = user?.defaultCurrency || 'USD';
+    const budgetExceeded = monthlyBudget > 0 && totalIOwe > monthlyBudget;
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20">
@@ -89,6 +108,27 @@ export default function Dashboard() {
             </header>
 
             <main className="px-4 pt-6 max-w-md mx-auto">
+                {/* ── Balance Summary Card ──────────────────────────── */}
+                <div className={`mb-6 bg-white rounded-2xl p-4 shadow-sm border border-gray-200 flex justify-between items-center transition-all ${hideBalance ? 'privacy-blur' : ''}`}>
+                    <div className="flex items-center gap-1.5 text-[17px] font-semibold tracking-tight">
+                        <span className="text-slate-800">Overall,</span>
+                        <span className="text-slate-800">
+                            {netBalance > 0 ? "you are owed" : netBalance < 0 ? "you owe" : "you are settled up"}
+                        </span>
+                        {netBalance !== 0 && (
+                            <span className={`font-bold ml-0.5 ${netBalance > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                {formatCurrency(Math.abs(netBalance), displayCurr)}
+                            </span>
+                        )}
+                    </div>
+                    <button 
+                        onClick={() => setShowFilterModal(true)} 
+                        className="p-1 rounded-full hover:bg-slate-100 transition-colors text-slate-800 cursor-pointer"
+                    >
+                        <SlidersHorizontal className="w-[22px] h-[22px]" />
+                    </button>
+                </div>
+
                 {/* Invite Friends Banner */}
                 <Link to="/invite" className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-800 text-white px-5 py-4 rounded-3xl shadow-lg shadow-slate-800/20 mb-8 hover:from-slate-900 hover:to-slate-900 transition-all transform hover:-translate-y-1">
                     <div className="flex items-center gap-4">
@@ -133,14 +173,28 @@ export default function Dashboard() {
                 )}
 
                 <div className="space-y-4">
-                    {groups.length === 0 && !isCreating ? (
+                    {groups.filter(group => {
+                        if (filter === 'none') return true;
+                        const myBal = (group.balances || {})[user.id] || 0;
+                        if (filter === 'outstanding') return myBal !== 0;
+                        if (filter === 'owe') return myBal < 0;
+                        if (filter === 'owed') return myBal > 0;
+                        return true;
+                    }).length === 0 && !isCreating ? (
                         <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-300">
                             <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                            <p className="text-gray-500 font-medium">No groups yet.</p>
-                            <p className="text-sm text-gray-400 mt-1">Create a group to start splitting bills!</p>
+                            <p className="text-gray-500 font-medium">{filter === 'none' ? 'No groups yet.' : 'No groups match this filter.'}</p>
+                            <p className="text-sm text-gray-400 mt-1">{filter === 'none' ? 'Create a group to start splitting bills!' : 'Try changing your filter settings.'}</p>
                         </div>
                     ) : (
-                        groups.map(group => {
+                        groups.filter(group => {
+                            if (filter === 'none') return true;
+                            const myBal = (group.balances || {})[user.id] || 0;
+                            if (filter === 'outstanding') return myBal !== 0;
+                            if (filter === 'owe') return myBal < 0;
+                            if (filter === 'owed') return myBal > 0;
+                            return true;
+                        }).map(group => {
                             const myBal = (group.balances || {})[user.id] || 0;
                             return (
                                 <Link
@@ -175,6 +229,48 @@ export default function Dashboard() {
             </main>
 
             <BottomNav />
+
+            {/* Filter iOS-style Modal */}
+            {showFilterModal && (
+                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowFilterModal(false)} />
+                    
+                    <div className="w-full px-3 pb-6 max-h-[85vh] flex flex-col relative z-20 animate-in slide-in-from-bottom duration-300 gap-2">
+                        {/* Options Block */}
+                        <div className="bg-white rounded-[14px] flex flex-col overflow-hidden shadow-sm">
+                            <div className="p-3 text-center border-b border-gray-100">
+                                <h3 className="text-[13px] font-semibold text-gray-500">Set filter</h3>
+                            </div>
+                            
+                            {[
+                                { id: 'none', label: 'None' },
+                                { id: 'outstanding', label: 'Groups with outstanding balances' },
+                                { id: 'owe', label: 'Group balances you owe' },
+                                { id: 'owed', label: 'Group balances you are owed' }
+                            ].map((option, index, arr) => (
+                                <button
+                                    key={option.id}
+                                    onClick={() => { setFilter(option.id); setShowFilterModal(false); }}
+                                    className={`p-[18px] text-[19px] text-[#007AFF] relative bg-white hover:bg-gray-50 transition-colors ${index !== arr.length - 1 ? 'border-b border-gray-100' : ''}`}
+                                >
+                                    <span className={`block text-center ${filter === option.id ? 'font-semibold tracking-tight' : 'tracking-tight font-normal'}`}>{option.label}</span>
+                                    {filter === option.id && <Check className="w-[22px] h-[22px] text-[#007AFF] font-bold absolute right-[18px] top-1/2 -translate-y-1/2" />}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Cancel Button */}
+                        <div className="bg-white rounded-[14px] mt-1 shadow-sm">
+                            <button
+                                onClick={() => setShowFilterModal(false)}
+                                className="w-full p-[18px] text-[19px] font-bold text-[#007AFF] hover:bg-gray-50 transition-colors rounded-[14px]"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

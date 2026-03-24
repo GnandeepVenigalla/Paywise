@@ -17,6 +17,7 @@ export default function SplitItems() {
     const [paidBy, setPaidBy] = useState(user.id);
     const [isLoading, setIsLoading] = useState(false);
     const [saveReceipt, setSaveReceipt] = useState(true);
+    const [hasAutoSplit, setHasAutoSplit] = useState(false);
     const [currency, setCurrency] = useState(user?.defaultCurrency || 'USD');
     const [showCurrencyModal, setShowCurrencyModal] = useState(false);
     
@@ -31,6 +32,22 @@ export default function SplitItems() {
         const lower = name.toLowerCase();
         return COMMON_TAX_KEYWORDS.some(k => lower.includes(k));
     };
+
+    useEffect(() => {
+        if (group && items.length > 0 && !hasAutoSplit) {
+            const hasCommon = items.some(item => isCommonItem(item.name));
+            if (hasCommon) {
+                const allMemberIds = group.members.map(m => m._id);
+                setItems(prev => prev.map(item => {
+                    if (isCommonItem(item.name) && item.assignedTo.length === 0) {
+                        return { ...item, assignedTo: allMemberIds };
+                    }
+                    return item;
+                }));
+            }
+            setHasAutoSplit(true);
+        }
+    }, [group, items, hasAutoSplit]);
 
     useEffect(() => {
         fetchGroup();

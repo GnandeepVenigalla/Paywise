@@ -1,8 +1,10 @@
 import { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Wallet, Mail, Lock } from 'lucide-react';
+import { Mail, Lock } from 'lucide-react';
 import logoFull from '../assets/logo_full.png';
+import GoogleSignInButton from '../components/UI/GoogleSignInButton';
+
 export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -51,11 +53,10 @@ export default function Login() {
         }
     };
 
-
     return (
         <div className="flex bg-gray-50 flex-col items-center justify-center min-h-[100dvh] px-5 py-8">
             <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl transition-all border border-gray-100 mx-auto">
-                <div className="text-center mb-10">
+                <div className="text-center mb-8">
                     <div className="flex justify-center mb-6">
                         <img src={logoFull} alt="Paywise Logo" className="h-16 object-contain" />
                     </div>
@@ -64,52 +65,72 @@ export default function Login() {
                 </div>
 
                 {error && <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center">{error}</div>}
-
                 {success && <div className="mb-4 bg-green-50 text-green-700 p-3 rounded-lg text-sm text-center font-medium">{success}</div>}
 
                 {!isOtpMode ? (
-                    <form onSubmit={handleLogin} className="space-y-6">
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Mail className="h-5 w-5 text-gray-400" />
-                            </div>
-                            <input
-                                type="email"
-                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
-                                placeholder="Email address"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
+                    <>
+                        {/* Google SSO */}
+                        <div className="mb-5">
+                            <GoogleSignInButton 
+                                onError={msg => setError(msg)} 
+                                onRequireOtp={(googleEmail, msg) => {
+                                    setEmail(googleEmail);
+                                    setIsOtpMode(true);
+                                    setSuccess('A verification code was sent to your email.');
+                                }} 
                             />
                         </div>
 
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Lock className="h-5 w-5 text-gray-400" />
+                        {/* Divider */}
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="flex-1 h-px bg-gray-200" />
+                            <span className="text-xs text-gray-400 font-medium">or continue with email</span>
+                            <div className="flex-1 h-px bg-gray-200" />
+                        </div>
+
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Mail className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input
+                                    type="email"
+                                    className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
+                                    placeholder="Email address"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                />
                             </div>
-                            <input
-                                type="password"
-                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
-                                placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
-                        </div>
 
-                        <div className="flex justify-end mt-2 mb-6 text-sm">
-                            <Link to="/forgot-password" className="font-semibold text-slate-900 hover:text-slate-800 transition-colors">
-                                Forgot your password?
-                            </Link>
-                        </div>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Lock className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input
+                                    type="password"
+                                    className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all outline-none"
+                                    placeholder="Password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                />
+                            </div>
 
-                        <button
-                            type="submit"
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-950 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-800 transition-all"
-                        >
-                            Sign In
-                        </button>
-                    </form>
+                            <div className="flex justify-end text-sm">
+                                <Link to="/forgot-password" className="font-semibold text-slate-900 hover:text-slate-800 transition-colors">
+                                    Forgot your password?
+                                </Link>
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-950 hover:shadow-lg focus:outline-none transition-all"
+                            >
+                                Sign In
+                            </button>
+                        </form>
+                    </>
                 ) : (
                     <form onSubmit={handleVerifyOtp} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="text-center mb-2">
@@ -134,7 +155,7 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={otp.length < 6}
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-950 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-slate-900 hover:bg-slate-950 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Verify Account
                         </button>
@@ -146,7 +167,7 @@ export default function Login() {
                 )}
 
                 {!isOtpMode && (
-                    <p className="mt-8 text-center text-sm text-gray-600">
+                    <p className="mt-6 text-center text-sm text-gray-600">
                         Don't have an account?{' '}
                         <Link to="/register" className="font-semibold text-slate-900 hover:text-slate-800 transition-colors">
                             Sign up

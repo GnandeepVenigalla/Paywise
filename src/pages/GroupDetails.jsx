@@ -231,6 +231,22 @@ export default function GroupDetails() {
         }
     };
 
+    const handleRemoveMember = async (userId) => {
+        if (Math.abs(getMemberNetBalance(userId)) > 0.01) {
+            alert("You cannot remove this person until all of their debts are settled up.");
+            return;
+        }
+        if (window.confirm('Are you sure you want to remove this member from the group?')) {
+            try {
+                await api.post(`/groups/${id}/remove/${userId}`);
+                setSelectedMemberModal(null);
+                fetchGroup();
+            } catch (err) {
+                alert(err.response?.data?.msg || 'Failed to remove member');
+            }
+        }
+    };
+
     const handleUpdateExpense = async (e) => {
         e.preventDefault();
         setIsSavingEdit(true);
@@ -249,11 +265,34 @@ export default function GroupDetails() {
             setSelectedExpense(null);
             fetchGroup();
         } catch (err) {
-            alert('Failed to update expense');
+            console.error(err);
         } finally {
             setIsSavingEdit(false);
         }
     };
+
+    const handleSettleIndividualExpense = async (expense, amount) => {
+        try {
+            const payerId = user.id || user._id; 
+            const receiverId = expense.paidBy._id || expense.paidBy;
+            
+            await api.post('/expenses', {
+                group: id,
+                amount: amount,
+                description: `Partial cash payment (Settle: ${expense.description})`,
+                paidBy: payerId,
+                currency: expense.currency || displayCurrency || 'USD',
+                splits: [{ user: receiverId, amount: amount }]
+            });
+            
+            setSelectedExpense(null);
+            fetchGroup();
+        } catch (err) {
+            console.error(err);
+            alert('Failed to settle expense.');
+        }
+    };
+    // handleUpdateExpense is above ^
     const toggleEditAssign = (itemId) => {
         if (selectedMemberIdsForEdit.length === 0) {
             alert("Please select members at the top first.");
@@ -383,7 +422,7 @@ export default function GroupDetails() {
                 <div className="relative px-4 z-10 flex flex-col justify-between h-full">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
+                            <button onClick={() => navigate('/dashboard')} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
                                 <ArrowLeft className="w-5 h-5 text-white" />
                             </button>
                         </div>
@@ -865,6 +904,29 @@ export default function GroupDetails() {
                                             </div>
                                         </div>
 
+                                        {(() => {
+                                            if (selectedExpense.isLoan || selectedExpense.description?.toLowerCase().includes('settle')) return null;
+                                            const isPaidByMe = (selectedExpense.paidBy?._id || selectedExpense.paidBy) === (user?.id || user?._id);
+                                            const mySplit = selectedExpense.splits?.find(s => (s.user?._id || s.user) === (user?.id || user?._id));
+                                            
+                                            // Ensure there's a valid amount owed (not fully settled via a negative split)
+                                            if (!isPaidByMe && mySplit && mySplit.amount > 0) {
+                                                return (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSettleIndividualExpense(selectedExpense, mySplit.amount);
+                                                        }}
+                                                        className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                                                    >
+                                                        <Check className="w-5 h-5" />
+                                                        Settle my share ({formatCurrency(mySplit.amount, displayCurrency, selectedExpense.currency)})
+                                                    </button>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+
                                         {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
                                             <button
                                                 onClick={(e) => {
@@ -1193,11 +1255,15 @@ export default function GroupDetails() {
                                         </div>
                                     </button>
                                 ) : (
-                                    <button onClick={() => alert('Remove functionality coming soon.')} className="px-6 py-4 flex items-start gap-5 hover:bg-rose-50/50 transition w-full text-left pb-6">
+                                    <button onClick={() => handleRemoveMember(selectedMemberModal._id)} className={`px-6 py-4 flex items-start gap-5 transition w-full text-left pb-6 ${Math.abs(getMemberNetBalance(selectedMemberModal._id)) > 0.01 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-50/50 cursor-pointer'}`}>
                                         <Trash2 className="w-[26px] h-[26px] text-gray-500 mt-1" strokeWidth={1.5} />
                                         <div className="flex-1">
                                             <span className="text-[18px] text-gray-800 font-medium block">Remove from group</span>
-                                            <p className="text-[14px] text-gray-500 mt-1 leading-[1.3] pr-2">You can't remove this person until their debts are settled up.</p>
+                                            {Math.abs(getMemberNetBalance(selectedMemberModal._id)) > 0.01 ? (
+                                                <p className="text-[14px] text-rose-500 mt-1 leading-[1.3] pr-2 font-medium">You can't remove this person until their debts are settled up.</p>
+                                            ) : (
+                                                <p className="text-[14px] text-gray-500 mt-1 leading-[1.3] pr-2">Remove this person from the group.</p>
+                                            )}
                                         </div>
                                     </button>
                                 )}

@@ -288,7 +288,7 @@ export default function Account() {
             <div className="text-center mt-12 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.3.9 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.4.0 · © 2026</p>
                 </div>
                 <div
                     onClick={spawnKitty}

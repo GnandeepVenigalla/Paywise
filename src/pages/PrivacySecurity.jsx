@@ -60,10 +60,26 @@ export default function PrivacySecurity() {
                     </div>
                 </div>
 
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
+                    <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-slate-900" />
+                        3. Anti-Malware & Hacker Defense
+                    </h3>
+                    <div className="space-y-4 text-[15px] text-gray-600 leading-relaxed">
+                        <p>
+                            Paywise actively monitors and mitigates sophisticated cyber attacks, cross-site scripting, and malware distribution attempts to ensure complete device safety for all users.
+                        </p>
+                        <ul className="list-disc pl-5 space-y-2">
+                            <li><strong className="text-gray-800 font-semibold">Active Neutralization:</strong> Any payloads containing unauthorized scripts or malicious sequences are immediately blocked at the server level before ever reaching user devices.</li>
+                            <li><strong className="text-gray-800 font-semibold">Admin Reporting:</strong> Failed breach attempts, suspicious activity, and policy violations trigger an automatic incident report directly to system administrators for comprehensive forensic review.</li>
+                        </ul>
+                    </div>
+                </div>
+
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-8">
                     <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                         <FileText className="w-5 h-5 text-slate-900" />
-                        3. Does Paywise Share Your Information?
+                        4. Does Paywise Share Your Information?
                     </h3>
                     <div className="space-y-4 text-[15px] text-gray-600 leading-relaxed">
                         <p>
@@ -78,7 +94,7 @@ export default function PrivacySecurity() {
                 </div>
 
                 <div className="text-center text-[13px] text-gray-400 font-medium pb-8 uppercase tracking-widest">
-                    Last updated: February 2026
+                    Last updated: March 2026
                 </div>
             </main>
         </div>

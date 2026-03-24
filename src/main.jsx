@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App.jsx';
 import './index.css';
 
@@ -14,17 +15,15 @@ window.addEventListener('beforeinstallprompt', (e) => {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)
-      .then(registration => {
-        console.log('SW registered: ', registration);
-      })
-      .catch(error => {
-        console.log('SW registration failed: ', error);
-      });
+      .then(registration => console.log('SW registered: ', registration))
+      .catch(error => console.log('SW registration failed: ', error));
   });
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ''}>
+      <App />
+    </GoogleOAuthProvider>
   </React.StrictMode>,
 );

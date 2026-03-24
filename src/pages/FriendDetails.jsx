@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder, Percent, Sparkles } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder, Percent, Sparkles, Check } from 'lucide-react';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -154,6 +154,27 @@ export default function FriendDetails() {
         }
     };
 
+    const handleSettleIndividualExpense = async (expense, amount) => {
+        try {
+            const payerId = user.id || user._id; 
+            const receiverId = expense.paidBy._id || expense.paidBy;
+            
+            await api.post('/expenses', {
+                amount: amount,
+                description: `Partial cash payment (Settle: ${expense.description})`,
+                paidBy: payerId,
+                currency: expense.currency || user?.defaultCurrency || 'USD',
+                splits: [{ user: receiverId, amount: amount }]
+            });
+            
+            setSelectedExpense(null);
+            fetchFriendDetails();
+        } catch (err) {
+            console.error(err);
+            alert('Failed to settle expense.');
+        }
+    };
+
     const toggleEditAssign = (itemId) => {
         if (selectedMemberIdsForEdit.length === 0) {
             alert("Please select members at the top first.");
@@ -292,7 +313,7 @@ export default function FriendDetails() {
             <header className="bg-slate-950 text-white pt-6 pb-6 px-4 sticky top-0 z-10">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
+                        <button onClick={() => navigate('/friends')} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
                             <ArrowLeft className="w-5 h-5 text-white" />
                         </button>
                     </div>
@@ -793,6 +814,29 @@ export default function FriendDetails() {
                                                 ))}
                                             </div>
                                         </div>
+
+                                        {(() => {
+                                            if (selectedExpense.isLoan || selectedExpense.description?.toLowerCase().includes('settle')) return null;
+                                            const isPaidByMe = (selectedExpense.paidBy?._id || selectedExpense.paidBy) === (user?.id || user?._id);
+                                            const mySplit = selectedExpense.splits?.find(s => (s.user?._id || s.user) === (user?.id || user?._id));
+                                            
+                                            // Ensure there's a valid amount owed
+                                            if (!isPaidByMe && mySplit && mySplit.amount > 0) {
+                                                return (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSettleIndividualExpense(selectedExpense, mySplit.amount);
+                                                        }}
+                                                        className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                                                    >
+                                                        <Check className="w-5 h-5" />
+                                                        Settle my share ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense.currency)})
+                                                    </button>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
 
                                         {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
                                             <button
