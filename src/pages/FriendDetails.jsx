@@ -1,13 +1,18 @@
 import { useState, useEffect, useContext, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder, Percent, Sparkles, Check } from 'lucide-react';
+import { Dialog } from 'primereact/dialog';
+import { InputText } from 'primereact/inputtext';
+import { InputNumber } from 'primereact/inputnumber';
+import { Button } from 'primereact/button';
+import { InputSwitch } from 'primereact/inputswitch';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
 import ExpenseItem from '../components/UI/ExpenseItem';
 import { useMonthlySpending } from '../hooks/useMonthlySpending';
 import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS, convertAmount } from '../utils/formatters';
+import { X, HelpCircle, TrendingUp, PieChart, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, toggleItemAssignment } from '../utils/expenseUtils';
 
 export default function FriendDetails() {
@@ -63,27 +68,38 @@ export default function FriendDetails() {
         }
     }, [monthlySpending]);
 
-    const projectedInterest = useMemo(() => {
-        if (!expenses || !friend) return 0;
-        // If fully settled, no interest will be charged by the scheduler either
-        const balanceInUSD = Math.abs(balance); // balance from server is in USD
-        if (balanceInUSD < 0.01) return 0;
+    // Calculate projected monthly interest and total interest accrued so far
+    const interestStats = useMemo(() => {
+        if (!expenses || !friend || !user) return { projectedMonthly: 0, totalAccrued: 0 };
+        
+        const balanceInUSD = Math.abs(balance);
+        let remainingBalance = balanceInUSD;
+        let totalAccrued = 0;
 
-        let remainingBalance = balanceInUSD; // track how much of the balance is still loan-covered
+        const projectedMonthly = expenses.reduce((acc, exp) => {
+            // Calculate total interest added so far (accruals from the scheduler)
+            if (exp.parentLoan || exp.description?.toLowerCase().includes('interest accrual')) {
+                const userDelta = getUserExpenseSplit(exp, user, friend._id || friend);
+                totalAccrued += Math.abs(userDelta);
+            }
 
-        return expenses.reduce((acc, exp) => {
-            if (exp.isLoan && exp.loanInterestRate > 0) {
+            // Calculate next month's projected interest
+            if (exp.isLoan && exp.loanInterestRate > 0 && remainingBalance > 0.01) {
                 const userSplit = getUserExpenseSplit(exp, user, friend._id || friend);
                 const sourceCurr = exp.currency || 'USD';
                 const splitInUSD = convertAmount(Math.abs(userSplit), sourceCurr, 'USD');
-                // Mirror the scheduler's logic: cap interest-bearing amount by the net balance
+                
                 const interestBearingAmount = Math.min(splitInUSD, remainingBalance);
-                remainingBalance -= interestBearingAmount; // reduce remaining balance for next loan
-                return acc + (interestBearingAmount * (exp.loanInterestRate / 100));
+                remainingBalance -= interestBearingAmount;
+                
+                // (Rate / 100) / 12 for monthly projection
+                return acc + (interestBearingAmount * ((exp.loanInterestRate / 100) / 12));
             }
             return acc;
         }, 0);
-    }, [expenses, friend, user.id, balance]);
+
+        return { projectedMonthly, totalAccrued };
+    }, [expenses, friend, user?._id, user?.id, balance]);
 
     const fetchFriendDetails = async () => {
         try {
@@ -268,6 +284,8 @@ export default function FriendDetails() {
         );
     }
 
+    if (!friend) return null;
+
     const displayItems = [...expenses].map(exp => ({
         ...exp,
         isGroupSummary: false
@@ -310,19 +328,19 @@ export default function FriendDetails() {
     return (
         <div className="min-h-screen bg-white font-sans pb-24">
             {/* Header - Splitwise Style Top Dark Header */}
-            <header className="bg-slate-950 text-white pt-6 pb-6 px-4 sticky top-0 z-10">
+            <header className="bg-emerald-700 text-white pt-6 pb-6 px-4 sticky top-0 z-10">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <button onClick={() => navigate('/friends')} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
-                            <ArrowLeft className="w-5 h-5 text-white" />
+                            <i className="pi pi-arrow-left text-white text-[18px]"></i>
                         </button>
                     </div>
                     <div className="flex gap-3 items-center">
                         <Link to="/ai" className="w-9 h-9 rounded-full bg-white/20 border-2 border-white/40 text-white flex items-center justify-center shadow-sm cursor-pointer hover:bg-white/30 transition group">
-                            <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+                            <i className="pi pi-bolt group-hover:animate-pulse"></i>
                         </Link>
                         <button onClick={() => setShowSettings(true)} className="w-9 h-9 rounded-full bg-white/20 border-2 border-white/40 text-white flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-white/30 transition">
-                            <Settings className="w-5 h-5" />
+                            <i className="pi pi-cog"></i>
                         </button>
                     </div>
                 </div>
@@ -335,7 +353,7 @@ export default function FriendDetails() {
                             onClick={() => { setDraftNote(friendNote); setShowNoteModal(true); }}
                             className="bg-black/20 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 border border-white/20 shadow-sm hover:bg-black/30 max-w-[200px] truncate"
                         >
-                            <Edit2 className="w-3 h-3 flex-shrink-0" />
+                            <i className="pi pi-pencil text-[10px] flex-shrink-0" />
                             <span className="truncate">{friendNote ? friendNote : 'Add friend notes...'}</span>
                         </button>
                     </div>
@@ -361,24 +379,35 @@ export default function FriendDetails() {
                             )}
                         </div>
 
-                        {projectedInterest > 0 && (
-                            <div className="mb-4 bg-emerald-50/80 rounded-2xl p-4 border border-emerald-100 flex items-center justify-between shadow-sm">
-                                <div>
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                        <Percent className="w-3.5 h-3.5 text-emerald-600" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70">Next Month Interest</p>
+                        {(interestStats.projectedMonthly > 0 || interestStats.totalAccrued > 0) && (
+                            <div className="mb-4 bg-emerald-50/80 rounded-2xl p-4 border border-emerald-100 shadow-sm">
+                                <div className="flex items-center justify-between mb-3 border-b border-emerald-100 pb-3">
+                                    <div>
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <Percent className="w-3.5 h-3.5 text-emerald-600" />
+                                            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70">Next Month Interest</p>
+                                        </div>
+                                        <p className="text-[18px] font-black text-emerald-900 leading-none">
+                                            {formatCurrency(interestStats.projectedMonthly, user?.defaultCurrency)}
+                                        </p>
                                     </div>
-                                    <p className="text-[15px] font-black text-emerald-900 leading-none">
-                                        Estimated Interest <span className="mx-1 text-emerald-300 font-light">|</span> 
-                                        {formatCurrency(projectedInterest, user?.defaultCurrency)}
-                                    </p>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70 mb-1">Projected Bill</p>
+                                        <p className="text-[20px] font-black text-emerald-950 leading-none">
+                                            {balance > 0 ? '+' : '-'}{formatCurrency(Math.abs(balance) + interestStats.projectedMonthly, user?.defaultCurrency)}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70 mb-1">Projected Bill</p>
-                                    <p className="text-[18px] font-black text-emerald-950 leading-none">
-                                        {balance > 0 ? '+' : '-'}{formatCurrency(Math.abs(balance) + projectedInterest, user?.defaultCurrency)}
-                                    </p>
-                                </div>
+                                {interestStats.totalAccrued > 0 && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[12px] font-bold text-emerald-700 flex items-center gap-1">
+                                            <i className="pi pi-sparkles text-[10px]"></i> Total Interest Added
+                                        </span>
+                                        <span className="text-[13px] font-black text-emerald-800">
+                                            {formatCurrency(interestStats.totalAccrued, user?.defaultCurrency)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -493,7 +522,7 @@ export default function FriendDetails() {
                                         return (
                                             <div key={item._id || Math.random()}>
                                                 {showHeader && (
-                                                    <div className="px-5 py-3 bg-gray-50/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
+                                                    <div className="px-5 py-3 bg-gray-50/50 dark:bg-emerald-600/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
                                                         <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-[0.2em]">{monthYear}</span>
                                                     </div>
                                                 )}
@@ -538,7 +567,7 @@ export default function FriendDetails() {
                                     return (
                                         <div key={item._id || Math.random()}>
                                             {showHeader && (
-                                                <div className="px-5 py-3 bg-gray-50/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
+                                                <div className="px-5 py-3 bg-gray-50/50 dark:bg-emerald-600/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
                                                     <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-[0.2em]">{monthYear}</span>
                                                 </div>
                                             )}
@@ -584,9 +613,9 @@ export default function FriendDetails() {
             <div className="fixed bottom-6 right-5">
                 <Link
                     to={`/friend/${id}/add`}
-                    className="bg-slate-900 text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-slate-950 transition transform hover:scale-105"
+                    className="bg-emerald-600 text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-emerald-700 transition transform hover:scale-105"
                 >
-                    <Receipt className="w-5 h-5" />
+                    <i className="pi pi-receipt"></i>
                     Add expense
                 </Link>
             </div>
@@ -597,58 +626,50 @@ export default function FriendDetails() {
                     to={`/friend/${id}/scan`}
                     className="bg-white text-gray-600 rounded-full shadow-lg p-3 flex items-center justify-center font-bold hover:bg-gray-50 border border-gray-100 transition transform hover:scale-105"
                 >
-                    <Camera className="w-5 h-5" />
+                    <i className="pi pi-camera"></i>
                 </Link>
             </div>
 
-            {/* Expense Detail Modal */}
-            {
-                selectedExpense && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center animate-in fade-in p-0 sm:p-4">
-                        <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-bottom-8 shadow-2xl">
-                            {/* Modal Header */}
-                            <div className="bg-gray-50 px-5 py-4 flex justify-between items-center border-b border-gray-200">
-                                <h2 className="text-xl font-bold text-gray-900 line-clamp-1">{isEditingExpense ? 'Edit Expense' : 'Expense Details'}</h2>
-                                <div className="flex items-center gap-2">
-                                    {!isEditingExpense && (selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
-                                        <button onClick={() => setIsEditingExpense(true)} className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition">
-                                            <Edit2 className="w-5 h-5" />
-                                        </button>
-                                    )}
-                                    <button onClick={() => { setSelectedExpense(null); setIsEditingExpense(false); }} className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition">
-                                        <X className="w-6 h-6" />
-                                    </button>
+            <Dialog 
+                header={isEditingExpense ? 'Edit Expense' : 'Expense Details'} 
+                visible={!!selectedExpense} 
+                onHide={() => { setSelectedExpense(null); setIsEditingExpense(false); }}
+                className="w-full max-w-lg"
+                position="bottom"
+                draggable={false}
+                resizable={false}
+                contentClassName="p-0 bg-white dark:bg-slate-900"
+                headerClassName="bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100"
+            >
+                {selectedExpense && (
+                <div className="p-6">
+                    {isEditingExpense ? (
+                        <form onSubmit={handleUpdateExpense} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                                <InputText
+                                    value={editDescription}
+                                    onChange={e => setEditDescription(e.target.value)}
+                                    className="w-full py-3 px-4 rounded-xl border border-gray-300 outline-none"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Total Amount</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                                    <InputNumber
+                                        value={Number(editAmount)}
+                                        onValueChange={(e) => setEditAmount(e.value?.toString() || '0')}
+                                        mode="decimal"
+                                        minFractionDigits={2}
+                                        maxFractionDigits={2}
+                                        className="w-full"
+                                        inputClassName="w-full py-3 pl-8 pr-4 rounded-xl border border-gray-300 outline-none font-bold"
+                                        required
+                                    />
                                 </div>
                             </div>
-
-                            {/* Modal Body */}
-                            <div className="p-6">
-                                {isEditingExpense ? (
-                                    <form onSubmit={handleUpdateExpense} className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
-                                            <input
-                                                type="text"
-                                                value={editDescription}
-                                                onChange={e => setEditDescription(e.target.value)}
-                                                className="w-full py-3 px-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Total Amount</label>
-                                            <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={editAmount}
-                                                    onChange={e => setEditAmount(e.target.value)}
-                                                    className="w-full py-3 pl-8 pr-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm font-bold"
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
                                         <p className="text-xs text-gray-500 font-medium leading-relaxed">Changing the total amount will instantly update and mathematically recalculate the splits.</p>
 
                                         {editItems.length > 0 && (
@@ -668,7 +689,7 @@ export default function FriendDetails() {
                                                                 type="button"
                                                                 onClick={() => toggleEditMemberSelection(member._id)}
                                                                 className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 transition-all font-semibold text-xs ${isSelected
-                                                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                                                    ? 'border-emerald-600 bg-emerald-600 text-white'
                                                                     : 'border-gray-200 bg-white text-gray-600'
                                                                     }`}
                                                             >
@@ -711,18 +732,13 @@ export default function FriendDetails() {
                                         <div>
                                             <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                                                 <div className="flex items-center gap-2">
-                                                    <Banknote className={`w-5 h-5 ${editIsLoan ? 'text-emerald-600' : 'text-gray-400'}`} />
+                                                    <i className={`pi pi-briefcase text-[18px] ${editIsLoan ? 'text-emerald-600' : 'text-gray-400'}`} />
                                                     <span className="text-sm font-bold text-gray-800">Treat as Loan?</span>
                                                 </div>
-                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={editIsLoan}
-                                                        onChange={(e) => setEditIsLoan(e.target.checked)}
-                                                        className="sr-only peer"
-                                                    />
-                                                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                                </label>
+                                                <InputSwitch
+                                                    checked={editIsLoan}
+                                                    onChange={(e) => setEditIsLoan(e.value)}
+                                                />
                                             </div>
                                             {editIsLoan && (
                                                 <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -744,7 +760,7 @@ export default function FriendDetails() {
                                         <button
                                             type="submit"
                                             disabled={isSavingEdit}
-                                            className="w-full font-bold bg-slate-900 text-white rounded-xl py-3.5 shadow-md hover:bg-slate-950 transition disabled:opacity-50 mt-4"
+                                            className="w-full font-bold bg-emerald-600 text-white rounded-xl py-3.5 shadow-md hover:bg-emerald-700 transition disabled:opacity-50 mt-4"
                                         >
                                             {isSavingEdit ? 'Saving...' : 'Save Changes'}
                                         </button>
@@ -758,7 +774,7 @@ export default function FriendDetails() {
                                                         <img src={selectedExpense.billImage} alt="Bill" className="w-full h-full object-cover" />
                                                     </a>
                                                 ) : (
-                                                    selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? <Percent className="w-8 h-8" /> : (selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />)
+                                                    selectedExpense.isLoan ? <i className="pi pi-briefcase text-[1.5rem]" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? <i className="pi pi-percentage text-[1.5rem]" /> : (selectedExpense.group ? <i className="pi pi-folder text-[1.5rem]" /> : <i className="pi pi-receipt text-[1.5rem]" />)
                                                 )}
                                             </div>
                                             <div className="flex items-center justify-center gap-2 mb-1">
@@ -816,7 +832,7 @@ export default function FriendDetails() {
                                         </div>
 
                                         {(() => {
-                                            if (selectedExpense.isLoan || selectedExpense.description?.toLowerCase().includes('settle')) return null;
+                                            if (selectedExpense.description?.toLowerCase().includes('settle')) return null;
                                             const isPaidByMe = (selectedExpense.paidBy?._id || selectedExpense.paidBy) === (user?.id || user?._id);
                                             const mySplit = selectedExpense.splits?.find(s => (s.user?._id || s.user) === (user?.id || user?._id));
                                             
@@ -830,7 +846,7 @@ export default function FriendDetails() {
                                                         }}
                                                         className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
                                                     >
-                                                        <Check className="w-5 h-5" />
+                                                        <i className="pi pi-check text-[14px]"></i>
                                                         Settle my share ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense.currency)})
                                                     </button>
                                                 );
@@ -847,17 +863,15 @@ export default function FriendDetails() {
                                                 }}
                                                 className="w-full mt-4 font-bold bg-rose-50 text-rose-600 rounded-xl py-3.5 border border-rose-100 hover:bg-rose-100 transition flex items-center justify-center gap-2"
                                             >
-                                                <Trash2 className="w-5 h-5" />
+                                                <i className="pi pi-trash text-[14px]"></i>
                                                 Delete Entire Expense
                                             </button>
                                         )}
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    </div>
-                )
-            }
+                )}
+            </Dialog>
 
             {/* Friend Settings Full-Screen Modal */}
             {showSettings && (
@@ -865,7 +879,7 @@ export default function FriendDetails() {
                     {/* Header */}
                     <div className="flex items-center p-4 border-b border-gray-100">
                         <button onClick={() => setShowSettings(false)} className="p-2 -ml-2 text-gray-800 hover:bg-gray-100 rounded-full transition">
-                            <X className="w-6 h-6" />
+                            <i className="pi pi-times text-[20px]" />
                         </button>
                         <h2 className="text-lg font-medium text-gray-900 ml-4">Friend settings</h2>
                     </div>
@@ -873,7 +887,7 @@ export default function FriendDetails() {
                     <div className="flex-1 overflow-y-auto pb-10">
                         {/* Profile Info */}
                         <div className="p-6 flex items-center gap-4">
-                            <div className="w-16 h-16 bg-slate-950 text-white rounded-full flex items-center justify-center text-3xl font-black uppercase shadow-sm">
+                            <div className="w-16 h-16 bg-emerald-700 text-white rounded-full flex items-center justify-center text-3xl font-black uppercase shadow-sm">
                                 {friend.username?.charAt(0)}
                             </div>
                             <div>
@@ -924,7 +938,7 @@ export default function FriendDetails() {
                                         <div key={g._id} onClick={() => navigate(`/group/${(g.group?._id || g.group || 'none')}`)} className="px-6 py-3.5 flex items-center justify-between hover:bg-gray-50 cursor-pointer border-t border-b border-gray-100 -mt-[1px]">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-12 h-12 bg-gray-800 text-white rounded-lg shadow-sm border border-gray-200 flex items-center justify-center flex-shrink-0">
-                                                    <Folder className="w-6 h-6 opacity-90" />
+                                                    <i className="pi pi-folder text-[24px] opacity-90" />
                                                 </div>
                                                 <span className="text-[16px] text-gray-800">{(g.group?.name || (typeof g.group === 'string' ? "Shared Group" : "Unnamed Group"))}</span>
                                             </div>
@@ -945,11 +959,11 @@ export default function FriendDetails() {
                 <div className="fixed inset-0 bg-white z-[80] flex flex-col animate-in slide-in-from-bottom-2 duration-200">
                     <div className="flex items-center p-4 relative border-b border-gray-100">
                         <button onClick={() => setShowFriendTotals(false)} className="p-2 -ml-2 text-gray-800 hover:bg-gray-100 rounded-full transition absolute left-4 z-10">
-                            <X className="w-6 h-6" />
+                            <i className="pi pi-times text-[20px]" />
                         </button>
                         <h2 className="text-[17px] font-medium text-gray-900 w-full text-center">Charts</h2>
                         <button className="p-2 -mr-2 text-gray-800 hover:bg-gray-100 rounded-full transition absolute right-4">
-                            <HelpCircle className="w-[22px] h-[22px]" strokeWidth={1.5} />
+                            <i className="pi pi-question-circle text-[22px]" />
                         </button>
                     </div>
 
@@ -1009,7 +1023,7 @@ export default function FriendDetails() {
                                 <div>
                                     <div className="flex items-center gap-1">
                                         <p className="text-[14px] text-gray-800 font-bold">Total spent</p>
-                                        <HelpCircle className="w-[14px] h-[14px] text-gray-500" />
+                                        <i className="pi pi-question-circle text-[14px] text-gray-500" />
                                     </div>
                                     <div className="flex items-center gap-3 mt-1 relative">
                                         <div className="w-[6px] h-[20px] bg-[#5ab3ed] rounded-full" />
@@ -1022,7 +1036,7 @@ export default function FriendDetails() {
                                 <div>
                                     <div className="flex items-center gap-1">
                                         <p className="text-[14px] text-gray-800 font-bold">Your share</p>
-                                        <HelpCircle className="w-[14px] h-[14px] text-gray-500" />
+                                        <i className="pi pi-question-circle text-[14px] text-gray-500" />
                                     </div>
                                     <div className="flex flex-col mt-1 relative">
                                         <div className="flex items-center gap-3">
@@ -1077,7 +1091,7 @@ export default function FriendDetails() {
                                         {/* Insight Card 1 */}
                                         <div className="min-w-[160px] flex-1 bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm">
                                             <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mb-3">
-                                                <TrendingUp className="w-4 h-4 text-slate-900" />
+                                                <i className="pi pi-chart-line text-[16px] text-slate-900" />
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Payer</p>
                                             <p className="text-[16px] text-gray-900 font-medium leading-tight truncate">{topPayerString}</p>
@@ -1138,7 +1152,7 @@ export default function FriendDetails() {
                                         key={code}
                                         onClick={() => setTargetExportCurrency(code)}
                                         className={`flex-shrink-0 px-4 py-2 rounded-xl border-2 transition-all font-bold text-sm ${targetExportCurrency === code 
-                                            ? 'border-slate-900 bg-slate-900 text-white shadow-md' 
+                                            ? 'border-emerald-600 bg-emerald-600 text-white shadow-md' 
                                             : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
                                     >
                                         {code}
@@ -1347,7 +1361,7 @@ export default function FriendDetails() {
                                     onClick={handleShare}
                                     className="w-full flex items-center gap-4 bg-slate-50 border-2 border-[#d1f0e7] hover:bg-[#e6f7f3] rounded-2xl px-4 py-4 transition text-left"
                                 >
-                                    <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center flex-shrink-0">
                                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                         </svg>
@@ -1423,7 +1437,7 @@ export default function FriendDetails() {
                                 {/* Cash option */}
                                 <button
                                     onClick={() => { setSettleMode('cash'); setCashStep(2); }}
-                                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-900 bg-slate-50 hover:bg-slate-200 transition text-left"
+                                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-emerald-600 bg-slate-50 hover:bg-slate-200 transition text-left"
                                 >
                                     <div className="w-12 h-12 rounded-xl bg-[#d1f0e7] flex items-center justify-center">
                                         <Banknote className="w-6 h-6 text-slate-900" />
@@ -1443,7 +1457,7 @@ export default function FriendDetails() {
                         <div className="flex flex-col flex-1 px-5 pt-8">
                             {/* Summary */}
                             <div className="flex items-center gap-3 mb-8">
-                                <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center">
                                     <Banknote className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
@@ -1456,7 +1470,7 @@ export default function FriendDetails() {
                             <button
                                 onClick={() => handleCashSettle(false)}
                                 disabled={isSettling}
-                                className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-slate-900 bg-slate-50 hover:bg-slate-200 transition mb-4 disabled:opacity-50"
+                                className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-emerald-600 bg-slate-50 hover:bg-slate-200 transition mb-4 disabled:opacity-50"
                             >
                                 <div className="flex items-center gap-3">
                                     <CheckCircle2 className="w-6 h-6 text-slate-900" />
@@ -1471,7 +1485,7 @@ export default function FriendDetails() {
                             {/* Optional note — applies to both full and partial */}
                             <div className="mb-5">
                                 <label className="text-[13px] font-bold text-gray-500 mb-1.5 block">Add a note <span className="font-normal">(optional)</span></label>
-                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-slate-900 rounded-xl px-4 py-3 transition bg-white">
+                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-emerald-600 rounded-xl px-4 py-3 transition bg-white">
                                     <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h6m-6 4h10M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                     <input
                                         type="text"
@@ -1494,7 +1508,7 @@ export default function FriendDetails() {
                             {/* Partial input */}
                             <div className="mt-4">
                                 <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay</label>
-                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-slate-900 rounded-xl px-4 py-3 transition bg-white">
+                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-emerald-600 rounded-xl px-4 py-3 transition bg-white">
                                     <DollarSign className="w-5 h-5 text-gray-400 flex-shrink-0" />
                                     <input
                                         type="number"
@@ -1515,7 +1529,7 @@ export default function FriendDetails() {
                             <button
                                 onClick={() => handleCashSettle(true)}
                                 disabled={isSettling || !partialAmount || parseFloat(partialAmount) <= 0}
-                                className="mt-6 w-full bg-slate-900 text-white py-4 rounded-2xl text-[16px] font-bold shadow-md hover:bg-slate-950 transition disabled:opacity-40"
+                                className="mt-6 w-full bg-emerald-600 text-white py-4 rounded-2xl text-[16px] font-bold shadow-md hover:bg-emerald-700 transition disabled:opacity-40"
                             >
                                 {isSettling ? 'Recording...' : 'Pay with Cash'}
                             </button>
@@ -1569,7 +1583,7 @@ export default function FriendDetails() {
                                 <button
                                     onClick={handleReportUser}
                                     disabled={isReporting}
-                                    className="flex-1 py-3.5 rounded-xl font-bold bg-slate-950 text-white hover:bg-slate-900 transition disabled:opacity-50"
+                                    className="flex-1 py-3.5 rounded-xl font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition disabled:opacity-50"
                                 >
                                     {isReporting ? 'Submitting...' : 'Submit'}
                                 </button>

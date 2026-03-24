@@ -2,6 +2,9 @@ import { useEffect, useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Wallet, Layers, Plus, Upload, UserPlus, ChevronRight, Sparkles, TrendingDown, TrendingUp, ArrowRightLeft, SlidersHorizontal, Check } from 'lucide-react';
+import { Dialog } from 'primereact/dialog';
+import { InputText } from 'primereact/inputtext';
+import { Button } from 'primereact/button';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -102,8 +105,8 @@ export default function Dashboard() {
                     <img src={logoImg} alt="Paywise" className="w-8 h-8 object-contain" />
                     <h1 className="text-xl font-bold text-gray-900">Paywise</h1>
                 </div>
-                <Link to="/ai" className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-950 transition-all hover:scale-105 active:scale-95 group">
-                    <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+                <Link to="/ai" className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 group">
+                    <i className="pi pi-bolt group-hover:animate-pulse" style={{ fontSize: '1.2rem' }}></i>
                 </Link>
             </header>
 
@@ -125,31 +128,31 @@ export default function Dashboard() {
                         onClick={() => setShowFilterModal(true)} 
                         className="p-1 rounded-full hover:bg-slate-100 transition-colors text-slate-800 cursor-pointer"
                     >
-                        <SlidersHorizontal className="w-[22px] h-[22px]" />
+                        <i className="pi pi-sliders-h" style={{ fontSize: '1.4rem' }}></i>
                     </button>
                 </div>
 
                 {/* Invite Friends Banner */}
-                <Link to="/invite" className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-800 text-white px-5 py-4 rounded-3xl shadow-lg shadow-slate-800/20 mb-8 hover:from-slate-900 hover:to-slate-900 transition-all transform hover:-translate-y-1">
+                <Link to="/invite" className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-5 py-4 rounded-3xl shadow-lg shadow-slate-800/20 mb-8 hover:from-emerald-700 hover:to-emerald-800 transition-all transform hover:-translate-y-1">
                     <div className="flex items-center gap-4">
                         <div className="bg-white/20 p-2.5 rounded-2xl">
-                            <UserPlus className="w-6 h-6 text-white" />
+                            <i className="pi pi-user-plus text-white text-xl"></i>
                         </div>
                         <div>
                             <h3 className="font-bold text-lg tracking-tight">Invite Friends!</h3>
                             <p className="text-slate-50 text-xs font-medium opacity-90">Grow your squad to split bills</p>
                         </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-white/50" />
+                    <i className="pi pi-chevron-right text-white/50"></i>
                 </Link>
-
+                
                 <div className="flex justify-between items-end mb-6">
                     <h2 className="text-2xl font-bold text-gray-800">Your Groups</h2>
                     <button
                         onClick={() => setIsCreating(!isCreating)}
-                        className="flex items-center gap-1 text-sm font-semibold text-slate-900 hover:text-slate-950 bg-slate-50 px-3 py-1.5 rounded-full transition-colors"
+                        className="flex items-center gap-2 text-sm font-semibold text-emerald-900 hover:text-slate-950 bg-slate-50 px-3 py-1.5 rounded-full transition-colors"
                     >
-                        <Plus className="w-4 h-4" /> New Group
+                        <i className="pi pi-plus" style={{ fontSize: '0.8rem' }}></i> New Group
                     </button>
                 </div>
 
@@ -157,17 +160,14 @@ export default function Dashboard() {
                     <form onSubmit={createGroup} className="mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-top-2">
                         <label className="block text-sm font-medium text-gray-700 mb-2">Group Name</label>
                         <div className="flex gap-2">
-                            <input
-                                type="text"
+                            <InputText
                                 autoFocus
-                                className="flex-1 py-2 px-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none transition-all"
+                                className="flex-1 py-2 px-3 border border-gray-200 rounded-xl outline-none"
                                 value={newGroupName}
                                 onChange={e => setNewGroupName(e.target.value)}
                                 placeholder="e.g. Miami Trip"
                             />
-                            <button type="submit" className="bg-slate-900 text-white px-4 py-2 rounded-xl font-medium hover:bg-slate-950 transition-colors shadow-sm">
-                                Create
-                            </button>
+                            <Button type="submit" label="Create" className="p-button-sm p-button-rounded bg-emerald-600 border-none px-4" />
                         </div>
                     </form>
                 )}
@@ -182,7 +182,7 @@ export default function Dashboard() {
                         return true;
                     }).length === 0 && !isCreating ? (
                         <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-300">
-                            <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                            <i className="pi pi-database text-gray-300 text-4xl mb-3 block"></i>
                             <p className="text-gray-500 font-medium">{filter === 'none' ? 'No groups yet.' : 'No groups match this filter.'}</p>
                             <p className="text-sm text-gray-400 mt-1">{filter === 'none' ? 'Create a group to start splitting bills!' : 'Try changing your filter settings.'}</p>
                         </div>
@@ -203,8 +203,8 @@ export default function Dashboard() {
                                     className="block bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100 transition-all group"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-900 group-hover:bg-slate-100 group-hover:scale-105 transition-all">
-                                            <Layers className="w-6 h-6" />
+                                        <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-emerald-900 group-hover:bg-slate-100 group-hover:scale-105 transition-all">
+                                            <i className="pi pi-th-large text-xl"></i>
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h3 className="font-bold text-gray-800 text-lg truncate leading-tight">{group.name}</h3>
@@ -230,47 +230,34 @@ export default function Dashboard() {
 
             <BottomNav />
 
-            {/* Filter iOS-style Modal */}
-            {showFilterModal && (
-                <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowFilterModal(false)} />
-                    
-                    <div className="w-full px-3 pb-6 max-h-[85vh] flex flex-col relative z-20 animate-in slide-in-from-bottom duration-300 gap-2">
-                        {/* Options Block */}
-                        <div className="bg-white rounded-[14px] flex flex-col overflow-hidden shadow-sm">
-                            <div className="p-3 text-center border-b border-gray-100">
-                                <h3 className="text-[13px] font-semibold text-gray-500">Set filter</h3>
-                            </div>
-                            
-                            {[
-                                { id: 'none', label: 'None' },
-                                { id: 'outstanding', label: 'Groups with outstanding balances' },
-                                { id: 'owe', label: 'Group balances you owe' },
-                                { id: 'owed', label: 'Group balances you are owed' }
-                            ].map((option, index, arr) => (
-                                <button
-                                    key={option.id}
-                                    onClick={() => { setFilter(option.id); setShowFilterModal(false); }}
-                                    className={`p-[18px] text-[19px] text-[#007AFF] relative bg-white hover:bg-gray-50 transition-colors ${index !== arr.length - 1 ? 'border-b border-gray-100' : ''}`}
-                                >
-                                    <span className={`block text-center ${filter === option.id ? 'font-semibold tracking-tight' : 'tracking-tight font-normal'}`}>{option.label}</span>
-                                    {filter === option.id && <Check className="w-[22px] h-[22px] text-[#007AFF] font-bold absolute right-[18px] top-1/2 -translate-y-1/2" />}
-                                </button>
-                            ))}
-                        </div>
-                        
-                        {/* Cancel Button */}
-                        <div className="bg-white rounded-[14px] mt-1 shadow-sm">
-                            <button
-                                onClick={() => setShowFilterModal(false)}
-                                className="w-full p-[18px] text-[19px] font-bold text-[#007AFF] hover:bg-gray-50 transition-colors rounded-[14px]"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
+            <Dialog 
+                header="Set filter" 
+                visible={showFilterModal} 
+                onHide={() => setShowFilterModal(false)}
+                position="bottom" 
+                draggable={false} 
+                resizable={false}
+                className="w-full max-w-md prime-ios-dialog"
+                contentClassName="p-0 overflow-hidden rounded-t-3xl"
+            >
+                <div className="flex flex-col">
+                    {[
+                        { id: 'none', label: 'None' },
+                        { id: 'outstanding', label: 'Groups with outstanding balances' },
+                        { id: 'owe', label: 'Group balances you owe' },
+                        { id: 'owed', label: 'Group balances you are owed' }
+                    ].map((option, index, arr) => (
+                        <button
+                            key={option.id}
+                            onClick={() => { setFilter(option.id); setShowFilterModal(false); }}
+                            className={`p-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0`}
+                        >
+                            <span className={`text-[17px] ${filter === option.id ? 'font-bold text-emerald-900' : 'text-gray-600'}`}>{option.label}</span>
+                            {filter === option.id && <i className="pi pi-check text-emerald-500 font-bold text-lg"></i>}
+                        </button>
+                    ))}
                 </div>
-            )}
+            </Dialog>
         </div>
     );
 }

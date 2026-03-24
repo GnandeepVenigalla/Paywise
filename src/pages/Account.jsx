@@ -12,6 +12,7 @@ import Button from '../components/UI/Button';
 import { useInstallApp } from '../hooks/useInstallApp';
 import { useRef } from 'react';
 
+let memeCache = [];
 export default function Account() {
     const { user, logout, setUser, api } = useContext(AuthContext);
     const navigate = useNavigate();
@@ -43,61 +44,82 @@ export default function Account() {
         }
     };
 
-    const kittyImages = [
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50534.png`,
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50541.png`,
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50525.png`,
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50480.png`,
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50433.png`
+    const cuteCatJokes = [
+        "I demand tuna!", "Sleep loading...", "Did someone say treats?", "I am the boss",
+        "It's 3AM, time to run", "If I fits, I sits", "Error 404: Cat not found", "Hooman, serve me",
+        "This box is mine", "Pet me. Now stop.", "I saw a ghost", "You're late for lunch",
+        "Target acquired", "Nap time = all the time", "I'm not fat, I'm fluffy", "Monday mood",
+        "Why is the bowl half empty?", "I regret nothing", "What personal space?", "Boop the snoot",
+        "Invisible bugs exist", "Catch the red dot!", "Too cute to care", "I knock things over",
+        "Sunbeam detected", "Waiting for pets", "Zero regrets", "Pawsitive vibes only",
+        "You may admire me", "Just 5 more minutes"
     ];
 
-    const spawnKitty = () => {
-        const id = Date.now();
-        const src = kittyImages[Math.floor(Math.random() * kittyImages.length)];
+    const spawnKitty = async () => {
+        let memeUrl = '';
+        
+        if (memeCache.length === 0) {
+            try {
+                // Use TheCatAPI for 100% clean, instantly generated adorable cats (100,000+ images)
+                const res = await fetch('https://api.thecatapi.com/v1/images/search?limit=15', { cache: 'no-store' });
+                const data = await res.json();
+                memeCache = data.map(m => m.url); 
+            } catch {
+                memeCache = [
+                    'https://cdn2.thecatapi.com/images/1.jpg',
+                    'https://cdn2.thecatapi.com/images/2.jpg'
+                ];
+            }
+        }
+        
+        memeUrl = memeCache.pop() || 'https://cdn2.thecatapi.com/images/3.jpg';
+        const randomJoke = cuteCatJokes[Math.floor(Math.random() * cuteCatJokes.length)];
+
+        const id = Date.now() + Math.random();
+        const src = memeUrl;
 
         const edges = ['bottom', 'top', 'left', 'right'];
         const edge = edges[Math.floor(Math.random() * edges.length)];
 
-        let style = { width: '180px', height: 'auto', zIndex: 60 };
+        let style = { height: 'auto', zIndex: 60 };
         let animationClass = '';
 
         const offset = Math.floor(Math.random() * 60) + 10;
+        
+        // Always keep memes relatively upright so text is readable
+        style.transform = `rotate(${Math.floor(Math.random() * 20) - 10}deg)`;
 
         switch (edge) {
             case 'bottom':
-                style.bottom = '-20px';
+                style.bottom = '20px';
                 style.left = `${offset}%`;
-                style.transform = `rotate(${Math.floor(Math.random() * 40) - 20}deg)`;
-                animationClass = 'animate-in slide-in-from-bottom-[100%] duration-700';
+                animationClass = 'animate-in slide-in-from-bottom-[100%] duration-1000';
                 break;
             case 'top':
-                style.top = '-20px';
+                style.top = '20px';
                 style.left = `${offset}%`;
-                style.transform = `rotate(${180 + Math.floor(Math.random() * 40) - 20}deg)`;
-                animationClass = 'animate-in slide-in-from-top-[100%] duration-700';
+                animationClass = 'animate-in slide-in-from-top-[100%] duration-1000';
                 break;
             case 'left':
-                style.left = '-20px';
+                style.left = '20px';
                 style.top = `${offset}%`;
-                style.transform = `rotate(${90 + Math.floor(Math.random() * 40) - 20}deg)`;
-                animationClass = 'animate-in slide-in-from-left-[100%] duration-700';
+                animationClass = 'animate-in slide-in-from-left-[100%] duration-1000';
                 break;
             case 'right':
-                style.right = '-20px';
+                style.right = '20px';
                 style.top = `${offset}%`;
-                style.transform = `rotate(${-90 + Math.floor(Math.random() * 40) - 20}deg)`;
-                animationClass = 'animate-in slide-in-from-right-[100%] duration-700';
+                animationClass = 'animate-in slide-in-from-right-[100%] duration-1000';
                 break;
             default:
                 break;
         }
 
-        const newKitty = { id, src, style, animationClass };
+        const newKitty = { id, src, joke: randomJoke, style, animationClass };
         setKitties((prev) => [...prev, newKitty]);
 
         setTimeout(() => {
             setKitties((prev) => prev.filter(k => k.id !== id));
-        }, 3500);
+        }, 5000);
     };
 
     const CURRENCY_SYMBOLS = {
@@ -185,8 +207,7 @@ export default function Account() {
                     bg: 'bg-gray-50 dark:bg-slate-800',
                     label: 'Help & Support',
                     sub: 'FAQ, contact us',
-                    to: null,
-                    onClick: () => alert('Help & Support coming soon!'),
+                    to: '/account/help',
                 },
             ],
         },
@@ -288,26 +309,31 @@ export default function Account() {
             <div className="text-center mt-12 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.4.0 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.4.1 · © 2026</p>
                 </div>
                 <div
                     onClick={spawnKitty}
                     className="mt-3 text-emerald-600 font-medium text-[14px] cursor-pointer hover:underline inline-block select-none"
                 >
-                    GD Kitties!
+                    GD Kitty Memes!
                 </div>
             </div>
 
             {/* Render Kitties */}
             <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
                 {kitties.map((kitty) => (
-                    <img
+                    <div
                         key={kitty.id}
-                        src={kitty.src}
-                        alt="kitten"
-                        className={`absolute ${kitty.animationClass} object-contain transition-all`}
+                        className={`absolute ${kitty.animationClass} w-48 sm:w-64 bg-white dark:bg-slate-900 shadow-2xl rounded-xl border-[6px] border-white dark:border-slate-800 transition-all flex flex-col`}
                         style={kitty.style}
-                    />
+                    >
+                        <img src={kitty.src} alt="kitten" className="w-full h-40 sm:h-56 object-cover rounded-t-lg bg-gray-100 dark:bg-slate-950" />
+                        <div className="py-4 px-3 text-center bg-white dark:bg-slate-900 flex-1 flex items-center justify-center">
+                            <p className="font-extrabold text-[13px] sm:text-[16px] text-gray-800 dark:text-slate-100 tracking-tight leading-snug">
+                                {kitty.joke} <span className="text-[12px] sm:text-[14px]">😺</span>
+                            </p>
+                        </div>
+                    </div>
                 ))}
             </div>
 

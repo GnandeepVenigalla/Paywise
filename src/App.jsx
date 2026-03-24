@@ -23,6 +23,7 @@ import JoinGroup from './pages/JoinGroup';
 import SplitwiseCallback from './pages/SplitwiseCallback';
 import AiAssistant from './pages/AiAssistant';
 import BetaHandler from './pages/BetaHandler';
+import HelpSupport from './pages/HelpSupport';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 import logoImg from './assets/logo.png';
@@ -81,6 +82,7 @@ function App() {
                 <Route path="/account/privacy" element={<PrivateRoute><PrivacySecurity /></PrivateRoute>} />
                 <Route path="/account/currency" element={<PrivateRoute><CurrencySettings /></PrivateRoute>} />
                 <Route path="/account/app-settings" element={<PrivateRoute><AppSettings /></PrivateRoute>} />
+                <Route path="/account/help" element={<PrivateRoute><HelpSupport /></PrivateRoute>} />
                 <Route path="/account/blocked" element={<PrivateRoute><BlockedUsers /></PrivateRoute>} />
                 <Route path="/invite" element={<PrivateRoute><InviteFriend /></PrivateRoute>} />
                 <Route path="/join/:id" element={<JoinGroup />} />
