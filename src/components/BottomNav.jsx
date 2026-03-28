@@ -29,7 +29,7 @@ export default function BottomNav() {
     );
 
     return (
-        <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-100 pt-3 px-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex justify-between items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+        <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-100 pt-2 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex justify-between items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
             {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = location.pathname === tab.path || location.pathname.startsWith(tab.path + '/');

@@ -799,10 +799,12 @@ export default function FriendDetails() {
                                                     <i className={`pi pi-briefcase text-[18px] ${editIsLoan ? 'text-emerald-600' : 'text-gray-400'}`} />
                                                     <span className="text-sm font-bold text-gray-800">Treat as Loan?</span>
                                                 </div>
-                                                <InputSwitch
-                                                    checked={editIsLoan}
-                                                    onChange={(e) => setEditIsLoan(e.value)}
-                                                />
+                                                <div className="flex-shrink-0">
+                                                    <InputSwitch
+                                                        checked={editIsLoan}
+                                                        onChange={(e) => setEditIsLoan(e.value)}
+                                                    />
+                                                </div>
                                             </div>
                                             {editIsLoan && (
                                                 <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-200">

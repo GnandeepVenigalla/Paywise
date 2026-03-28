@@ -21,6 +21,7 @@ export default function Dashboard() {
     const [newGroupName, setNewGroupName] = useState('');
     const [filter, setFilter] = useState('none');
     const [showFilterModal, setShowFilterModal] = useState(false);
+    const [showSettled, setShowSettled] = useState(false);
 
     // Balance breakdown: split into "I owe" and "Owed to me"
     const [totalIOwe, setTotalIOwe] = useState(0);      // negative sum (what I owe others)
@@ -98,7 +99,7 @@ export default function Dashboard() {
     const budgetExceeded = monthlyBudget > 0 && totalIOwe > monthlyBudget;
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-20">
+        <div className="min-h-screen bg-gray-50 pb-12">
             {/* Header */}
             <header className="bg-white shadow-sm pt-8 pb-4 px-4 sticky top-0 z-10 flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -172,60 +173,91 @@ export default function Dashboard() {
                     </form>
                 )}
 
-                <div className="space-y-4">
-                    {groups.filter(group => {
+                {(() => {
+                    const filteredGroups = groups.filter(group => {
                         if (filter === 'none') return true;
-                        const myBal = (group.balances || {})[user.id] || 0;
+                        const myBal = Number((group.balances || {})[user.id] || 0);
                         if (filter === 'outstanding') return myBal !== 0;
                         if (filter === 'owe') return myBal < 0;
                         if (filter === 'owed') return myBal > 0;
                         return true;
-                    }).length === 0 && !isCreating ? (
-                        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-300">
-                            <i className="pi pi-database text-gray-300 text-4xl mb-3 block"></i>
-                            <p className="text-gray-500 font-medium">{filter === 'none' ? 'No groups yet.' : 'No groups match this filter.'}</p>
-                            <p className="text-sm text-gray-400 mt-1">{filter === 'none' ? 'Create a group to start splitting bills!' : 'Try changing your filter settings.'}</p>
-                        </div>
-                    ) : (
-                        groups.filter(group => {
-                            if (filter === 'none') return true;
-                            const myBal = (group.balances || {})[user.id] || 0;
-                            if (filter === 'outstanding') return myBal !== 0;
-                            if (filter === 'owe') return myBal < 0;
-                            if (filter === 'owed') return myBal > 0;
-                            return true;
-                        }).map(group => {
-                            const myBal = (group.balances || {})[user.id] || 0;
-                            return (
-                                <Link
-                                    to={`/group/${group._id}`}
-                                    key={group._id}
-                                    className="block bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100 transition-all group"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-emerald-900 group-hover:bg-slate-100 group-hover:scale-105 transition-all">
-                                            <i className="pi pi-th-large text-xl"></i>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-gray-800 text-lg truncate leading-tight">{group.name}</h3>
-                                            <p className="text-sm text-gray-500 mt-0.5">{group.members.length} member{group.members.length !== 1 && 's'}</p>
-                                        </div>
-                                        {myBal !== 0 && (
-                                            <div className={`text-right flex-shrink-0 ml-2 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                                <p className={`text-[10px] font-black uppercase tracking-tight mb-0.5 ${myBal > 0 ? 'text-emerald-500/80' : 'text-rose-500/80'}`}>
-                                                    {myBal > 0 ? 'you get back' : 'you owe'}
-                                                </p>
-                                                <p className={`text-[16px] font-black leading-none ${myBal > 0 ? 'text-emerald-500' : 'text-rose-600'}`}>
-                                                    {formatCurrency(myBal, user?.defaultCurrency)}
-                                                </p>
-                                            </div>
-                                        )}
+                    });
+                    
+                    const activeGroups = filteredGroups.filter(g => Number((g.balances || {})[user.id] || 0) !== 0);
+                    const settledGroups = filteredGroups.filter(g => Number((g.balances || {})[user.id] || 0) === 0);
+
+                    const renderGroup = (group) => {
+                        const myBal = Number((group.balances || {})[user.id] || 0);
+                        return (
+                            <Link
+                                to={`/group/${group._id}`}
+                                key={group._id}
+                                className="block bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100 transition-all group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-emerald-900 group-hover:bg-slate-100 group-hover:scale-105 transition-all">
+                                        <i className="pi pi-th-large text-xl"></i>
                                     </div>
-                                </Link>
-                            );
-                        })
-                    )}
-                </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-gray-800 text-lg truncate leading-tight">{group.name}</h3>
+                                        <p className="text-sm text-gray-500 mt-0.5">{group.members.length} member{group.members.length !== 1 && 's'}</p>
+                                    </div>
+                                    {myBal !== 0 ? (
+                                        <div className={`text-right flex-shrink-0 ml-2 ${hideBalance ? 'privacy-blur' : ''}`}>
+                                            <p className={`text-[10px] font-black uppercase tracking-tight mb-0.5 ${myBal > 0 ? 'text-emerald-500/80' : 'text-rose-500/80'}`}>
+                                                {myBal > 0 ? 'you get back' : 'you owe'}
+                                            </p>
+                                            <p className={`text-[16px] font-black leading-none ${myBal > 0 ? 'text-emerald-500' : 'text-rose-600'}`}>
+                                                {formatCurrency(Math.abs(myBal), user?.defaultCurrency)}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="text-right flex-shrink-0 ml-2">
+                                            <p className="text-[13px] font-bold text-gray-400 uppercase tracking-widest mt-1">settled</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </Link>
+                        );
+                    };
+
+                    return (
+                        <div className="space-y-4">
+                            {filteredGroups.length === 0 && !isCreating ? (
+                                <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-300">
+                                    <i className="pi pi-database text-gray-300 text-4xl mb-3 block"></i>
+                                    <p className="text-gray-500 font-medium">{filter === 'none' ? 'No groups yet.' : 'No groups match this filter.'}</p>
+                                    <p className="text-sm text-gray-400 mt-1">{filter === 'none' ? 'Create a group to start splitting bills!' : 'Try changing your filter settings.'}</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    {activeGroups.map(renderGroup)}
+                                    
+                                    {settledGroups.length > 0 && (
+                                        <div className="mt-5 pt-6 border-t border-gray-100/60">
+                                            <button
+                                                onClick={() => setShowSettled(!showSettled)}
+                                                className="w-full py-3.5 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 font-bold rounded-xl text-[14px] transition-colors flex items-center justify-center gap-2 shadow-sm"
+                                            >
+                                                {showSettled ? 'Hide settled up' : `Show settled up (${settledGroups.length})`}
+                                            </button>
+                                            
+                                            {showSettled && (
+                                                <div className="mt-3 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
+                                                    {settledGroups.map(renderGroup)}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {activeGroups.length === 0 && settledGroups.length > 0 && !showSettled && (
+                                        <p className="text-gray-400 text-sm mt-6 text-center bg-gray-50 rounded-xl p-4 font-medium border border-gray-100">All your groups are currently settled up. You're all square!</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
             </main>
 
             <BottomNav />

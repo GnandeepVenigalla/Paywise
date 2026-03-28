@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const res = await api.post('/auth/login', { email, password });
             localStorage.setItem('token', res.data.token);
-            setUser(res.data.user);
+            await loadUser(); // Load full user profile
             return res.data;
         } catch (err) {
             if (err.response?.data?.requireOtp) {
@@ -73,14 +73,14 @@ export const AuthProvider = ({ children }) => {
             return res.data;
         }
         localStorage.setItem('token', res.data.token);
-        setUser(res.data.user);
+        await loadUser(); // Load full user profile
         return res.data;
     };
 
     const verifyOtp = async (email, otp) => {
         const res = await api.post('/auth/verify-otp', { email, otp });
         localStorage.setItem('token', res.data.token);
-        setUser(res.data.user);
+        await loadUser(); // Load full user profile
         return res.data;
     };
 

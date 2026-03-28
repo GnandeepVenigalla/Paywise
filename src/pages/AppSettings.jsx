@@ -280,11 +280,13 @@ export default function AppSettings() {
 
     const ToggleRow = ({ label, sub, value, onChange, last }) => (
         <div className={`flex items-center justify-between px-5 py-4 ${!last ? 'border-b border-gray-50' : ''}`}>
-            <div className="flex-1 pr-4">
+            <div className="flex-1 pr-4 min-w-0">
                 <p className="text-[16px] font-medium text-gray-800">{label}</p>
                 {sub && <p className="text-[13px] text-gray-400 mt-0.5 leading-snug">{sub}</p>}
             </div>
-            <InputSwitch checked={value} onChange={e => onChange(e.value)} />
+            <div className="flex-shrink-0">
+                <InputSwitch checked={value} onChange={e => onChange(e.value)} />
+            </div>
         </div>
     );
 
@@ -474,11 +476,13 @@ export default function AppSettings() {
 
                 {/* Enable Custom Accent Toggle */}
                 <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-                    <div className="flex-1 pr-4">
+                    <div className="flex-1 pr-4 min-w-0">
                         <p className="text-[16px] font-medium text-gray-800">Custom Accent Color</p>
-                        <p className="text-[13px] text-gray-400 mt-0.5">Override the default green with your own color</p>
+                        <p className="text-[13px] text-gray-400 mt-0.5 leading-snug">Override the default green with your own color</p>
                     </div>
-                    <InputSwitch checked={ct.useCustomAccent} onChange={e => updateCustomTheme('useCustomAccent', e.value)} />
+                    <div className="flex-shrink-0">
+                        <InputSwitch checked={ct.useCustomAccent} onChange={e => updateCustomTheme('useCustomAccent', e.value)} />
+                    </div>
                 </div>
 
                 {/* Accent Color Presets */}

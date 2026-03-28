@@ -302,10 +302,12 @@ export default function AddFriendExpense() {
                             <i className={`pi pi-briefcase text-[18px] ${isLoan ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`} />
                             <span className="text-[15px] font-bold text-gray-800 dark:text-gray-100">Treat as Loan?</span>
                         </div>
-                        <InputSwitch
-                            checked={isLoan}
-                            onChange={(e) => setIsLoan(e.value)}
-                        />
+                        <div className="flex-shrink-0">
+                            <InputSwitch
+                                checked={isLoan}
+                                onChange={(e) => setIsLoan(e.value)}
+                            />
+                        </div>
                     </div>
                     <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug">
                         Loans can have custom interest rates applied automatically.

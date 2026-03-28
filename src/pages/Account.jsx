@@ -239,7 +239,7 @@ export default function Account() {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-28 font-sans text-gray-800 dark:text-gray-200 transition-colors">
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-12 font-sans text-gray-800 dark:text-gray-200 transition-colors">
             <header className="bg-white dark:bg-slate-900 pt-10 pb-5 px-6 sticky top-0 z-10 border-b border-gray-100 dark:border-slate-800">
                 <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Account</h1>
             </header>
@@ -337,10 +337,10 @@ export default function Account() {
                 </Button>
             </main>
 
-            <div className="text-center mt-12 mb-6">
+            <div className="text-center mt-8 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.4.2 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.4.3 · © 2026</p>
                 </div>
                 <div
                     onClick={spawnKitty}

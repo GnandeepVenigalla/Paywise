@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const Avatar = ({
     src,
@@ -26,12 +26,16 @@ const Avatar = ({
     const colorIndex = name ? name.length % colors.length : 0;
     const set = colors[colorIndex];
 
-    if (src) {
+    const [imgError, setImgError] = useState(false);
+
+    if (src && !imgError) {
         return (
             <img
                 src={src}
-                alt={name}
+                alt={name || 'Avatar'}
                 className={`${sizes[size]} ${baseStyles} ${className} object-cover`}
+                onError={() => setImgError(true)}
+                referrerPolicy="no-referrer"
             />
         );
     }
