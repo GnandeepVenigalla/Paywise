@@ -76,12 +76,12 @@ html.pw-radius-round {
   --radius-3xl: 28px;
 }
 html.pw-radius-pill {
-  --radius-sm:  999px;
-  --radius-md:  999px;
-  --radius-lg:  999px;
-  --radius-xl:  999px;
-  --radius-2xl: 999px;
-  --radius-3xl: 999px;
+  --radius-sm:  12px;
+  --radius-md:  18px;
+  --radius-lg:  24px;
+  --radius-xl:  32px;
+  --radius-2xl: 48px;
+  --radius-3xl: 64px;
   --radius-full: 999px;
 }
 
@@ -89,7 +89,7 @@ html.pw-radius-pill {
 html.pw-radius-sharp  .rounded-\[2rem\] { border-radius: 4px !important; }
 html.pw-radius-soft   .rounded-\[2rem\] { border-radius: 14px !important; }
 html.pw-radius-round  .rounded-\[2rem\] { border-radius: 20px !important; }
-html.pw-radius-pill   .rounded-\[2rem\] { border-radius: 999px !important; }
+html.pw-radius-pill   .rounded-\[2rem\] { border-radius: 48px !important; }
 
 /* ── Surface style variants ──────────────────────────────────────── */
 html.pw-surface-glass .bg-white {
@@ -360,10 +360,12 @@ html.theme-dark .p-accordion .p-accordion-header:not(.p-disabled).p-highlight .p
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
 
 /* Firefox */
 input[type=number] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }

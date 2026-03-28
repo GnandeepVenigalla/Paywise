@@ -51,7 +51,7 @@ const RADIUS_OPTIONS = [
     { value: 'sharp', label: 'Sharp', radius: '4px', icon: 'pi pi-stop' },
     { value: 'soft', label: 'Soft', radius: '12px', icon: 'pi pi-box' },
     { value: 'round', label: 'Round', radius: '20px', icon: 'pi pi-circle' },
-    { value: 'pill', label: 'Pill', radius: '9999px', icon: 'pi pi-circle-fill' },
+    { value: 'pill', label: 'Pill', radius: '48px', icon: 'pi pi-circle-fill' },
 ];
 
 const FONT_SCALE_OPTIONS = [
@@ -446,7 +446,7 @@ export default function AppSettings() {
                         style={{
                             background: '#fff',
                             borderColor: ct.surfaceStyle === 'bordered' ? previewAccent + '55' : '#f1f5f9',
-                            borderRadius: { sharp: '8px', soft: '12px', round: '20px', pill: '24px' }[ct.borderRadius] || '20px',
+                            borderRadius: { sharp: '4px', soft: '14px', round: '20px', pill: '48px' }[ct.borderRadius] || '20px',
                             boxShadow: ct.surfaceStyle === 'flat' ? 'none'
                                 : ct.surfaceStyle === 'glass' ? `0 4px 16px ${previewAccent}22, inset 0 0 0 1px ${previewAccent}22`
                                 : '0 2px 8px rgba(0,0,0,0.06)',
@@ -457,7 +457,7 @@ export default function AppSettings() {
                             className="w-10 h-10 flex items-center justify-center flex-shrink-0"
                             style={{
                                 background: previewAccent + '22',
-                                borderRadius: { sharp: '6px', soft: '10px', round: '14px', pill: '20px' }[ct.borderRadius] || '14px',
+                                borderRadius: { sharp: '2px', soft: '10px', round: '16px', pill: '32px' }[ct.borderRadius] || '16px',
                             }}
                         >
                             <i className="pi pi-wallet" style={{ color: previewAccent, fontSize: '18px' }}></i>

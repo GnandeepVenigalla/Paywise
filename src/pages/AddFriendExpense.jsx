@@ -153,7 +153,7 @@ export default function AddFriendExpense() {
         }
     ];
 
-    const isSaveEnabled = description.trim() !== '' && parsedAmount > 0;
+    const isSaveEnabled = description.trim() !== '' && parsedAmount > 0 && friend;
 
     return (
         <div className="min-h-screen bg-white dark:bg-slate-900 font-sans flex flex-col items-center transition-colors">

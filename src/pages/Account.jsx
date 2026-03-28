@@ -3,14 +3,14 @@ import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     LogOut, Camera, ChevronRight,
-    Bell, Shield, DollarSign, Settings, HelpCircle, UserX, Download, X, UserPlus
+    Bell, Shield, DollarSign, Settings, HelpCircle, UserX, Download, X, UserPlus, ShoppingCart, Banknote
 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import Avatar from '../components/UI/Avatar';
 import Card from '../components/UI/Card';
 import Button from '../components/UI/Button';
 import { useInstallApp } from '../hooks/useInstallApp';
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 
 let memeCache = [];
 export default function Account() {
@@ -20,6 +20,11 @@ export default function Account() {
     const { isInstallable, promptInstall, isIosPromptVisible, hideIosPrompt } = useInstallApp();
     const fileInputRef = useRef(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [pendingLoanCount, setPendingLoanCount] = useState(0);
+
+    useEffect(() => {
+        api.get('/loans/pending').then(res => setPendingLoanCount(res.data?.length || 0)).catch(() => {});
+    }, []);
 
     const handleProfilePicUpload = async (e) => {
         const file = e.target.files[0];
@@ -164,6 +169,14 @@ export default function Account() {
                     sub: currencyDisplay,
                     to: '/account/currency',
                 },
+                {
+                    icon: <Banknote className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+                    bg: 'bg-amber-50 dark:bg-amber-950/30',
+                    label: 'Loan Requests',
+                    sub: pendingLoanCount > 0 ? `${pendingLoanCount} pending acceptance` : 'Review incoming loan requests',
+                    to: '/loans',
+                    badge: pendingLoanCount > 0 ? pendingLoanCount : null,
+                },
             ],
         },
         {
@@ -208,6 +221,18 @@ export default function Account() {
                     label: 'Help & Support',
                     sub: 'FAQ, contact us',
                     to: '/account/help',
+                },
+            ],
+        },
+        {
+            label: 'Partner',
+            items: [
+                {
+                    icon: <ShoppingCart className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+                    bg: 'bg-amber-50 dark:bg-amber-950/30',
+                    label: 'Merchant Portal',
+                    sub: 'Manage your store and payments',
+                    onClick: () => window.location.href = 'https://merchant.paywiseapp.com',
                 },
             ],
         },
@@ -280,7 +305,13 @@ export default function Account() {
                                             <p className="text-[16px] font-bold text-gray-900 dark:text-slate-100 leading-tight">{item.label}</p>
                                             <p className="text-[13px] text-gray-400 dark:text-gray-500 mt-1 truncate">{item.sub}</p>
                                         </div>
-                                        <ChevronRight className="w-5 h-5 text-gray-300 dark:text-slate-700 flex-shrink-0" />
+                                        {item.badge ? (
+                                            <span className="bg-rose-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full flex-shrink-0 mr-1">
+                                                {item.badge}
+                                            </span>
+                                        ) : (
+                                            <ChevronRight className="w-5 h-5 text-gray-300 dark:text-slate-700 flex-shrink-0" />
+                                        )}
                                     </div>
                                 );
 
@@ -309,7 +340,7 @@ export default function Account() {
             <div className="text-center mt-12 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.4.1 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.4.2 · © 2026</p>
                 </div>
                 <div
                     onClick={spawnKitty}

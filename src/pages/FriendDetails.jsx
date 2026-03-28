@@ -12,7 +12,7 @@ import { useAppSettings } from '../hooks/useAppSettings';
 import ExpenseItem from '../components/UI/ExpenseItem';
 import { useMonthlySpending } from '../hooks/useMonthlySpending';
 import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS, convertAmount } from '../utils/formatters';
-import { X, HelpCircle, TrendingUp, PieChart, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { X, HelpCircle, TrendingUp, PieChart, ChevronLeft, ChevronRight, FileSpreadsheet, Percent, Receipt, FileText, Building2, Banknote, CheckCircle2, DollarSign } from 'lucide-react';
 import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, toggleItemAssignment } from '../utils/expenseUtils';
 
 export default function FriendDetails() {
@@ -56,6 +56,7 @@ export default function FriendDetails() {
     const [isReporting, setIsReporting] = useState(false);
     const [isBlocking, setIsBlocking] = useState(false);
     const [targetExportCurrency, setTargetExportCurrency] = useState(user?.defaultCurrency || 'USD');
+    const [loanRequests, setLoanRequests] = useState({}); // { expenseId: loanRequest }
 
     // Extract monthly spending aggregation logic to custom hook
     // Pass user.defaultCurrency so chart amounts are consistently converted
@@ -68,7 +69,7 @@ export default function FriendDetails() {
         }
     }, [monthlySpending]);
 
-    // Calculate projected monthly interest and total interest accrued so far
+    // Calculate projected monthly interest — only for ACCEPTED loans
     const interestStats = useMemo(() => {
         if (!expenses || !friend || !user) return { projectedMonthly: 0, totalAccrued: 0 };
         
@@ -77,29 +78,32 @@ export default function FriendDetails() {
         let totalAccrued = 0;
 
         const projectedMonthly = expenses.reduce((acc, exp) => {
+            if (!exp) return acc;
             // Calculate total interest added so far (accruals from the scheduler)
             if (exp.parentLoan || exp.description?.toLowerCase().includes('interest accrual')) {
-                const userDelta = getUserExpenseSplit(exp, user, friend._id || friend);
+                const userDelta = getUserExpenseSplit(exp, user, friend?._id || friend);
                 totalAccrued += Math.abs(userDelta);
             }
 
-            // Calculate next month's projected interest
-            if (exp.isLoan && exp.loanInterestRate > 0 && remainingBalance > 0.01) {
-                const userSplit = getUserExpenseSplit(exp, user, friend._id || friend);
+            // Only project interest for ACCEPTED loans (not pending)
+            const loanReq = loanRequests[exp._id];
+            const isAccepted = !loanReq || loanReq.status === 'accepted';
+
+            if (exp.isLoan && exp.loanInterestRate > 0 && remainingBalance > 0.01 && isAccepted) {
+                const userSplit = getUserExpenseSplit(exp, user, friend?._id || friend);
                 const sourceCurr = exp.currency || 'USD';
                 const splitInUSD = convertAmount(Math.abs(userSplit), sourceCurr, 'USD');
                 
                 const interestBearingAmount = Math.min(splitInUSD, remainingBalance);
                 remainingBalance -= interestBearingAmount;
                 
-                // (Rate / 100) / 12 for monthly projection
                 return acc + (interestBearingAmount * ((exp.loanInterestRate / 100) / 12));
             }
             return acc;
         }, 0);
 
         return { projectedMonthly, totalAccrued };
-    }, [expenses, friend, user?._id, user?.id, balance]);
+    }, [expenses, friend, user?._id, user?.id, balance, loanRequests]);
 
     const fetchFriendDetails = async () => {
         try {
@@ -107,6 +111,19 @@ export default function FriendDetails() {
             setFriend(res.data.friend);
             setExpenses(res.data.expenses);
             setBalance(res.data.balance);
+
+            // Fetch loan request status for all loan expenses
+            const loanExps = (res.data.expenses || []).filter(e => e.isLoan && e.loanInterestRate > 0);
+            if (loanExps.length > 0) {
+                const loanMap = {};
+                await Promise.all(loanExps.map(async (exp) => {
+                    try {
+                        const lr = await api.get(`/loans/expense/${exp._id}`);
+                        loanMap[exp._id] = lr.data;
+                    } catch { /* no loan request for this expense */ }
+                }));
+                setLoanRequests(loanMap);
+            }
         } catch (err) {
             console.error(err);
         }
@@ -174,10 +191,11 @@ export default function FriendDetails() {
         try {
             const payerId = user.id || user._id; 
             const receiverId = expense.paidBy._id || expense.paidBy;
+            const roundedAmount = Math.round(amount * 100) / 100;
             
             await api.post('/expenses', {
-                amount: amount,
-                description: `Partial cash payment (Settle: ${expense.description})`,
+                amount: roundedAmount,
+                description: `Cash settle up`,
                 paidBy: payerId,
                 currency: expense.currency || user?.defaultCurrency || 'USD',
                 splits: [{ user: receiverId, amount: amount }]
@@ -236,7 +254,7 @@ export default function FriendDetails() {
     };
 
     const handleCashSettle = async (isPartial) => {
-        const amt = isPartial ? parseFloat(partialAmount) : Math.abs(balance);
+        const amt = Math.round((isPartial ? parseFloat(partialAmount) : Math.abs(balance)) * 100) / 100;
         if (isNaN(amt) || amt <= 0) {
             alert('Please enter a valid amount.');
             return;
@@ -423,13 +441,21 @@ export default function FriendDetails() {
                                         let b = 0;
                                         
                                         if (isPaidByMe) {
-                                            const fSplit = (exp.splits || []).find(s => s?.user?._id === friend?._id || s?.user?._id === friend?.id || s?.user === friend?._id || s?.user === friend?.id);
+                                            const fSplit = (exp.splits || []).find(s => {
+                                                const sId = s?.user?._id || s?.user;
+                                                const friId = friend?._id || friend?.id || friend;
+                                                return sId === friId;
+                                            });
                                             if (fSplit) {
                                                 // Convert to USD base for internal summing
                                                 b = convertAmount(fSplit.amount, sourceCurr, 'USD');
                                             }
-                                        } else if (exp.paidBy?._id === friend?._id || exp.paidBy?._id === friend?.id || exp.paidBy === friend?._id || exp.paidBy === friend?.id) {
-                                            const mySplit = (exp.splits || []).find(s => s?.user?._id === user.id || s?.user?._id === user._id || s?.user === user.id || s?.user === user._id);
+                                        } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
+                                            const mySplit = (exp.splits || []).find(s => {
+                                                const sId = s?.user?._id || s?.user;
+                                                const myId = user?.id || user?._id;
+                                                return sId === myId;
+                                            });
                                             if (mySplit) {
                                                 // Convert to USD base for internal summing
                                                 b = -convertAmount(mySplit.amount, sourceCurr, 'USD');
@@ -559,6 +585,16 @@ export default function FriendDetails() {
                                                     <span className="text-[15px] font-black text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/50 px-3 py-1 rounded-full flex-shrink-0">
                                                         {formatCurrency(item.amount, user?.defaultCurrency || 'USD', item.currency || 'USD')}
                                                     </span>
+                                                    {/* Delete button — only shown for entries the current user owns */}
+                                                    {((item.addedBy?._id || item.addedBy) === (user?.id || user?._id) || (item.paidBy?._id || item.paidBy) === (user?.id || user?._id)) && (
+                                                        <button
+                                                            onClick={() => deleteExpense(item._id, item.description)}
+                                                            className="ml-1 p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition flex-shrink-0"
+                                                            title="Delete this settlement"
+                                                        >
+                                                            <i className="pi pi-trash text-[12px]" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -571,6 +607,34 @@ export default function FriendDetails() {
                                                     <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-[0.2em]">{monthYear}</span>
                                                 </div>
                                             )}
+                                            {/* Pending loan acceptance banner */}
+                                            {(() => {
+                                                const loanReq = loanRequests[item._id];
+                                                const myId = user?.id || user?._id;
+                                                const isLender = loanReq && (loanReq.lender?._id || loanReq.lender)?.toString() === myId?.toString();
+                                                if (!loanReq || loanReq.status !== 'pending') return null;
+                                                return (
+                                                    <div className={`px-4 py-3 border-l-4 flex items-start gap-3 text-[13px] ${isLender ? 'bg-amber-50/80 border-amber-400' : 'bg-blue-50/80 border-blue-400'}`}>
+                                                        <span className="text-lg flex-shrink-0">{isLender ? '⏳' : '📬'}</span>
+                                                        <div className="flex-1">
+                                                            {isLender ? (
+                                                                <>
+                                                                    <p className="font-bold text-amber-800">Awaiting {friend?.username}&apos;s acceptance</p>
+                                                                    <p className="text-amber-700 text-[11.5px] mt-0.5">Interest won&apos;t accrue until they accept. Avoid giving more loans until they respond.</p>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <p className="font-bold text-blue-800">Loan request pending your decision</p>
+                                                                    <p className="text-blue-700 text-[11.5px] mt-0.5">{loanReq.requiresPasswordConfirmation ? '🔒 Requires your password (amount exceeds $100).' : 'Review and accept or reject below.'}</p>
+                                                                    <button onClick={(e) => { e.stopPropagation(); navigate('/loans'); }} className="mt-2 text-[12px] font-black text-white bg-blue-500 hover:bg-blue-600 px-3 py-1.5 rounded-full transition">
+                                                                        Review Loan Request →
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
                                             <ExpenseItem
                                                 description={item.isGroupSummary ? `Group Action: ${item.group.name}` : item.description}
                                                 amount={item.amount || Math.abs(item.balance)}
@@ -800,10 +864,10 @@ export default function FriendDetails() {
                                                     )}
                                                 </div>
                                             )}
-                                            <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense.amount, user?.defaultCurrency, selectedExpense.currency)}</p>
-                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
-                                            {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
-                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
+                                            <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense?.amount || 0, user?.defaultCurrency, selectedExpense?.currency)}</p>
+                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {(selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === user.id ? 'You' : (selectedExpense?.paidBy?.username || friend?.username || 'Someone')}</p>
+                                            {selectedExpense?.addedBy && (selectedExpense.addedBy._id || selectedExpense.addedBy) !== (selectedExpense.paidBy?._id || selectedExpense.paidBy) && (
+                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {(selectedExpense.addedBy._id || selectedExpense.addedBy) === user.id ? 'you' : (selectedExpense.addedBy.username || 'someone')}</p>
                                             )}
                                             {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
                                             <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
@@ -820,12 +884,12 @@ export default function FriendDetails() {
                                         <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 max-h-48 overflow-y-auto">
                                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Split Details</h4>
                                             <div className="space-y-2">
-                                                {selectedExpense.splits.map(split => (
-                                                    <div key={split.user._id || split.user} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
+                                                {(selectedExpense?.splits || []).map((split, sIdx) => (
+                                                    <div key={split?.user?._id || split?.user || sIdx} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
                                                         <span className="font-semibold text-gray-700 text-sm">
-                                                            {split.user._id === user.id ? 'You' : (split.user.username || friend.username)}
+                                                            {(split?.user?._id || split?.user) === user.id ? 'You' : (split?.user?.username || friend?.username || 'Guest')}
                                                         </span>
-                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split.amount, user?.defaultCurrency, selectedExpense.currency)}</span>
+                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split?.amount || 0, user?.defaultCurrency, selectedExpense?.currency)}</span>
                                                     </div>
                                                 ))}
                                             </div>

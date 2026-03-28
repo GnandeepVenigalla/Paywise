@@ -24,6 +24,9 @@ import SplitwiseCallback from './pages/SplitwiseCallback';
 import AiAssistant from './pages/AiAssistant';
 import BetaHandler from './pages/BetaHandler';
 import HelpSupport from './pages/HelpSupport';
+import Katha from './pages/Katha';
+import KathaDetail from './pages/KathaDetail';
+import LoanRequests from './pages/LoanRequests';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 import logoImg from './assets/logo.png';
@@ -76,6 +79,8 @@ function App() {
                 <Route path="/friend/:id/scan" element={<PrivateRoute><ScanBill /></PrivateRoute>} />
                 <Route path="/friend/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
                 <Route path="/activity" element={<PrivateRoute><Activity /></PrivateRoute>} />
+                <Route path="/katha" element={<PrivateRoute><Katha /></PrivateRoute>} />
+                <Route path="/katha/:merchantId" element={<PrivateRoute><KathaDetail /></PrivateRoute>} />
                 <Route path="/account" element={<PrivateRoute><Account /></PrivateRoute>} />
                 <Route path="/account/settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
                 <Route path="/account/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
@@ -91,6 +96,7 @@ function App() {
                 <Route path="/group/:id/split" element={<PrivateRoute><SplitItems /></PrivateRoute>} />
                 <Route path="/group/:id/add" element={<PrivateRoute><AddExpense /></PrivateRoute>} />
                 <Route path="/ai" element={<PrivateRoute><AiAssistant /></PrivateRoute>} />
+                <Route path="/loans" element={<PrivateRoute><LoanRequests /></PrivateRoute>} />
                 <Route path="/beta" element={<BetaHandler />} />
                 <Route path="/" element={<Navigate to="/dashboard" />} />
               </Routes>

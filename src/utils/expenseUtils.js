@@ -61,20 +61,27 @@ export const isPaidByMember = (expense, user) => {
  * @returns {number}
  */
 export const getUserExpenseSplit = (expense, user, otherMemberId) => {
+    if (!expense || !user) return 0;
     const isPaidByMe = isPaidByMember(expense, user);
     const uId = user?.id || user?._id;
 
     if (expense.isGroupSummary) {
-        return expense.balance;
+        return expense.balance || 0;
     }
 
     if (isPaidByMe) {
         // Current user paid, they lent money to the other member
-        const otherSplit = expense.splits?.find(s => (s.user._id || s.user) === otherMemberId);
+        const otherSplit = expense.splits?.find(s => {
+            const sUserId = s?.user?._id || s?.user;
+            return sUserId && sUserId === otherMemberId;
+        });
         return otherSplit ? otherSplit.amount : 0;
     } else {
         // Someone else paid, current user owes money
-        const mySplit = expense.splits?.find(s => (s.user._id || s.user) === uId);
+        const mySplit = expense.splits?.find(s => {
+            const sUserId = s?.user?._id || s?.user;
+            return sUserId && sUserId === uId;
+        });
         return mySplit ? -mySplit.amount : 0;
     }
 };
