@@ -5,7 +5,7 @@ import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { Button } from 'primereact/button';
-import { InputSwitch } from 'primereact/inputswitch';
+import Toggle from '../components/UI/Toggle';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -1050,7 +1050,7 @@ export default function GroupDetails() {
                                     <p className="text-[14px] text-gray-500 leading-snug mt-1">Automatically combines debts to reduce the total number of repayments between group members. <br /><span className="text-slate-900 font-medium">Learn more</span></p>
                                 </div>
                                 <div className="flex-shrink-0 mt-1">
-                                    <InputSwitch checked={simplifyDebts} onChange={(e) => setSimplifyDebts(e.value)} />
+                                    <Toggle checked={simplifyDebts} onChange={setSimplifyDebts} />
                                 </div>
                             </div>
 

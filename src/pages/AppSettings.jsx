@@ -1,7 +1,7 @@
 import { useState, useContext, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { InputSwitch } from 'primereact/inputswitch';
+import Toggle from '../components/UI/Toggle';
 import { Dropdown } from 'primereact/dropdown';
 import { InputNumber } from 'primereact/inputnumber';
 import { InputText } from 'primereact/inputtext';
@@ -285,7 +285,7 @@ export default function AppSettings() {
                 {sub && <p className="text-[13px] text-gray-400 mt-0.5 leading-snug">{sub}</p>}
             </div>
             <div className="flex-shrink-0">
-                <InputSwitch checked={value} onChange={e => onChange(e.value)} />
+                <Toggle checked={value} onChange={onChange} />
             </div>
         </div>
     );
@@ -481,7 +481,7 @@ export default function AppSettings() {
                         <p className="text-[13px] text-gray-400 mt-0.5 leading-snug">Override the default green with your own color</p>
                     </div>
                     <div className="flex-shrink-0">
-                        <InputSwitch checked={ct.useCustomAccent} onChange={e => updateCustomTheme('useCustomAccent', e.value)} />
+                        <Toggle checked={ct.useCustomAccent} onChange={v => updateCustomTheme('useCustomAccent', v)} />
                     </div>
                 </div>
 

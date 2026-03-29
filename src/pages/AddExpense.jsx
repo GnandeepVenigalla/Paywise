@@ -4,7 +4,6 @@ import { AuthContext } from '../context/AuthContext';
 import { InputNumber } from 'primereact/inputnumber';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
-import { InputSwitch } from 'primereact/inputswitch';
 import { useAppSettings } from '../hooks/useAppSettings';
 import AdGate from '../components/UI/AdGate';
 import Avatar from '../components/UI/Avatar';

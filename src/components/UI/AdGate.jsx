@@ -65,12 +65,19 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                         <p className="text-base text-gray-500 dark:text-gray-400 mb-10 font-medium max-w-[280px] leading-relaxed">
                             Support Paywise by watching a short ad and gain instant access to our advanced {type === 'ai' ? 'AI Assistant' : type === 'camera' ? 'Camera Scanner' : 'features'}.
                         </p>
-                        <button 
+                        <a 
+                            href="#/" 
                             onClick={startAd}
-                            className="w-full bg-slate-900 dark:bg-indigo-600 text-white h-16 rounded-[24px] font-black text-lg flex items-center justify-center gap-3 active:scale-95 transition-all shadow-2xl shadow-indigo-500/20"
+                            className="w-full block decoration-none"
+                            data-vignette-zone="10804063"
                         >
-                            <PlayCircle className="w-6 h-6" /> Start Ad
-                        </button>
+                            <button 
+                                type="button"
+                                className="w-full bg-slate-900 dark:bg-indigo-600 text-white h-16 rounded-[24px] font-black text-lg flex items-center justify-center gap-3 active:scale-95 transition-all shadow-2xl shadow-indigo-500/20"
+                            >
+                                <PlayCircle className="w-6 h-6" /> Start Ad
+                            </button>
+                        </a>
                         <button onClick={onClose} className="mt-6 text-xs font-black text-gray-400 uppercase tracking-[0.2em] hover:text-gray-900 dark:hover:text-white transition-colors">Not Now</button>
                     </div>
                 );

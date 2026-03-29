@@ -5,7 +5,7 @@ import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { Button } from 'primereact/button';
-import { InputSwitch } from 'primereact/inputswitch';
+import Toggle from '../components/UI/Toggle';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -361,11 +361,56 @@ export default function FriendDetails() {
 
     if (!friend) return null;
 
-    const displayItems = [...expenses].map(exp => ({
-        ...exp,
-        isGroupSummary: false
-    }));
-    displayItems.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // ────────────────────────────────────────────────────────
+    // GROUPING LOGIC: Collapse expenses from the same group
+    // ────────────────────────────────────────────────────────
+    const groupedMap = new Map();
+    const resultItems = [];
+
+    expenses.forEach(exp => {
+        if (!exp) return;
+        const gid = exp.group?._id || exp.group?.id || exp.group;
+        
+        if (gid) {
+            const gidStr = gid.toString();
+            if (!groupedMap.has(gidStr)) {
+                groupedMap.set(gidStr, {
+                    _id: `group-summary-${gidStr}`,
+                    description: exp.group?.name || "Group Expenses",
+                    date: exp.date,
+                    amount: 0,
+                    isGroupSummary: true,
+                    group: exp.group,
+                    paidBy: null, // Multiple
+                    currency: exp.currency || user?.defaultCurrency || 'USD'
+                });
+                resultItems.push(groupedMap.get(gidStr));
+            }
+            
+            const summary = groupedMap.get(gidStr);
+            // Use the most recent date
+            if (new Date(exp.date) > new Date(summary.date)) summary.date = exp.date;
+            
+            // Calculate the specific balance contribution of this expense to the friend relationship
+            const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+            const sourceCurr = exp.currency || 'USD';
+            let b = 0;
+            
+            if (isPaidByMe) {
+                const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
+                if (fSplit) b = convertAmount(fSplit.amount, sourceCurr, 'USD');
+            } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
+                const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
+                if (mySplit) b = -convertAmount(mySplit.amount, sourceCurr, 'USD');
+            }
+            // Add to the USD-based total but we will display it in default currency
+            summary.amount += b;
+        } else {
+            resultItems.push({ ...exp, isGroupSummary: false });
+        }
+    });
+
+    const displayItems = resultItems.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // Calculate group balances safely for the settings page
     const groupBalances = {};
@@ -400,7 +445,10 @@ export default function FriendDetails() {
         });
     }
 
+    const favsHidden = showSettings || showFriendTotals || showExportOptions || showSettleUp || showNoteModal || showReminderModal || showReportModal || !!selectedExpense || showAdGate;
+
     return (
+        <>
         <div className="min-h-screen bg-white font-sans pb-24">
             {/* Header - Splitwise Style Top Dark Header */}
             <header className="bg-emerald-700 text-white pt-6 pb-6 px-4 sticky top-0 z-10">
@@ -582,25 +630,25 @@ export default function FriendDetails() {
                                     const showHeader = monthYear !== lastMonth;
                                     lastMonth = monthYear;
 
-                                    const isPaidByMe = item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id;
-                                    const userSplit = getUserExpenseSplit(item, user, friend?._id || friend);
+                                    const isPaidByMe = !item.isGroupSummary && (item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id);
+                                    
+                                    // Summarized userSplit should be the calculated net amount from grouping logic
+                                    const userSplit = item.isGroupSummary ? item.amount : getUserExpenseSplit(item, user, friend?._id || friend);
 
-                                    const isSettleUp =
+                                    const isSettleUp = !item.isGroupSummary && (
                                         item.description?.toLowerCase() === 'settle up' ||
                                         item.description?.toLowerCase() === 'cash settle up' ||
-                                        item.description?.toLowerCase().startsWith('partial cash payment');
+                                        item.description?.toLowerCase().startsWith('partial cash payment')
+                                    );
 
                                     // Render settle-up as a clean banner, not a regular expense card
                                     if (isSettleUp) {
                                         const payerName = isPaidByMe ? 'You' : (item.paidBy?.username || friend?.username || 'Someone');
-                                        const receiverSplit = item.splits?.[0];
-                                        const receiverId = receiverSplit?.user?._id || receiverSplit?.user;
+                                        const receiverId = item.splits?.[0]?.user?._id || item.splits?.[0]?.user;
                                         const myId = user?.id || user?._id;
-                                        const receiverName = receiverId === myId ? 'you' : (receiverSplit?.user?.username || friend?.username || 'someone');
+                                        const receiverName = receiverId === myId ? 'you' : (item.splits?.[0]?.user?.username || friend?.username || 'someone');
                                         const isPartial = item.description?.toLowerCase().startsWith('partial');
-                                        // Extract note — anything after " — " in the stored description
                                         const notePart = item.description?.includes(' — ') ? item.description.split(' — ').slice(1).join(' — ') : null;
-                                        // Determine payment method from description
                                         const isBankPayment = item.description?.toLowerCase().includes('bank') || item.description?.toLowerCase().includes('transfer');
                                         return (
                                             <div key={item._id || Math.random()}>
@@ -610,39 +658,26 @@ export default function FriendDetails() {
                                                     </div>
                                                 )}
                                                 <div className="flex items-center gap-3 px-5 py-4 border-b border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/60 dark:bg-emerald-950/20">
-                                                    {/* Icon */}
                                                     <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center flex-shrink-0">
                                                         <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                                                     </div>
-                                                    {/* Text */}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             <p className="text-[13.5px] font-semibold text-emerald-800 dark:text-emerald-300 leading-snug">
                                                                 <span className="font-black">{payerName}</span> paid <span className="font-black">{receiverName}</span>
                                                             </p>
-                                                            {/* Method badge */}
                                                             <span className="text-[10px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-500 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                                                                 {isBankPayment ? '🏦 Bank' : '💵 Cash'}
                                                             </span>
-                                                            {isPartial && (
-                                                                <span className="text-[10px] font-black uppercase tracking-wide text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                                                                    Partial
-                                                                </span>
-                                                            )}
                                                         </div>
-                                                        {/* Note if present */}
-                                                        {notePart && (
-                                                            <p className="text-[11.5px] text-emerald-700 dark:text-emerald-400 mt-0.5 italic">📝 {notePart}</p>
-                                                        )}
+                                                        {notePart && <p className="text-[11.5px] text-emerald-700 dark:text-emerald-400 mt-0.5 italic">📝 {notePart}</p>}
                                                         <p className="text-[11px] text-emerald-600/70 dark:text-emerald-500/70 mt-0.5">
                                                             {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · Settlement
                                                         </p>
                                                     </div>
-                                                    {/* Amount */}
                                                     <span className="text-[15px] font-black text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/50 px-3 py-1 rounded-full flex-shrink-0">
                                                         {formatCurrency(item.amount, user?.defaultCurrency || 'USD', item.currency || 'USD')}
                                                     </span>
-                                                    {/* Delete button — only shown for entries the current user owns */}
                                                     {((item.addedBy?._id || item.addedBy) === (user?.id || user?._id) || (item.paidBy?._id || item.paidBy) === (user?.id || user?._id)) && (
                                                         <button
                                                             onClick={() => deleteExpense(item._id, item.description)}
@@ -664,8 +699,8 @@ export default function FriendDetails() {
                                                     <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-[0.2em]">{monthYear}</span>
                                                 </div>
                                             )}
-                                            {/* Pending loan acceptance banner */}
-                                            {(() => {
+                                            {/* Loan Acceptance Banner */}
+                                            {!item.isGroupSummary && (() => {
                                                 const loanReq = loanRequests[item._id];
                                                 const myId = user?.id || user?._id;
                                                 const isLender = loanReq && (loanReq.lender?._id || loanReq.lender)?.toString() === myId?.toString();
@@ -677,15 +712,12 @@ export default function FriendDetails() {
                                                             {isLender ? (
                                                                 <>
                                                                     <p className="font-bold text-amber-800">Awaiting {friend?.username}&apos;s acceptance</p>
-                                                                    <p className="text-amber-700 text-[11.5px] mt-0.5">Interest won&apos;t accrue until they accept. Avoid giving more loans until they respond.</p>
+                                                                    <p className="text-amber-700 text-[11.5px] mt-0.5">Interest won&apos;t accrue until they accept.</p>
                                                                 </>
                                                             ) : (
                                                                 <>
                                                                     <p className="font-bold text-blue-800">Loan request pending your decision</p>
-                                                                    <p className="text-blue-700 text-[11.5px] mt-0.5">{loanReq.requiresPasswordConfirmation ? '🔒 Requires your password (amount exceeds $100).' : 'Review and accept or reject below.'}</p>
-                                                                    <button onClick={(e) => { e.stopPropagation(); navigate('/loans'); }} className="mt-2 text-[12px] font-black text-white bg-blue-500 hover:bg-blue-600 px-3 py-1.5 rounded-full transition">
-                                                                        Review Loan Request →
-                                                                    </button>
+                                                                    <p className="text-blue-700 text-[11.5px] mt-0.5">Review and decide in the Loans section.</p>
                                                                 </>
                                                             )}
                                                         </div>
@@ -693,22 +725,22 @@ export default function FriendDetails() {
                                                 );
                                             })()}
                                             <ExpenseItem
-                                                description={item.isGroupSummary ? `Group Action: ${item.group.name}` : item.description}
-                                                amount={item.amount || Math.abs(item.balance)}
+                                                description={item.isGroupSummary ? `Group: ${item.description}` : item.description}
+                                                amount={Math.abs(userSplit)}
                                                 date={item.date}
-                                                payerName={item.isGroupSummary ? 'Multiple' : (isPaidByMe ? 'You' : (item.paidBy?.username || friend.username))}
+                                                payerName={item.isGroupSummary ? 'Group Activity' : (isPaidByMe ? 'You' : (item.paidBy?.username || friend.username))}
                                                 userSplit={userSplit}
                                                 targetCurrency={user?.defaultCurrency || 'USD'}
                                                 sourceCurrency={item.currency || 'USD'}
-                                                isGroup={!!item.group}
-                                                groupName={item.group?.name}
-                                                isLoan={item.isLoan}
-                                                parentLoan={item.parentLoan}
-                                                billImage={item.billImage}
+                                                isGroup={!!(item.group || item.isGroupSummary)}
+                                                groupName={item.group?.name || item.description}
+                                                isLoan={!item.isGroupSummary && item.isLoan}
+                                                parentLoan={!item.isGroupSummary && item.parentLoan}
+                                                billImage={!item.isGroupSummary && item.billImage}
                                                 onClick={() => {
                                                     if (item.isGroupSummary) {
-                                                        const groupUrl = `#/group/${item.group.id}`;
-                                                        window.location.href = groupUrl;
+                                                        const gId = item.group?._id || item.group?.id || item.group;
+                                                        navigate(`/group/${gId}`);
                                                     } else {
                                                         setSelectedExpense(item);
                                                         setIsEditingExpense(false);
@@ -730,28 +762,7 @@ export default function FriendDetails() {
                 </div>
             </main>
 
-            {/* Custom Green Floating Action Button */}
-            <div className="fixed bottom-6 right-5 z-20">
-                <Link
-                    to={`/friend/${id}/add`}
-                    onClick={handleAddExpenseClick}
-                    className="bg-emerald-600 text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-emerald-700 transition transform hover:scale-105"
-                >
-                    <i className="pi pi-receipt"></i>
-                    Add expense
-                </Link>
-            </div>
 
-            {/* Camera Scan Optional Button Bottom Left */}
-            <div className="fixed bottom-6 left-5 z-20">
-                <Link
-                    to={`/friend/${id}/scan`}
-                    onClick={handleScanBillClick}
-                    className="bg-white text-gray-600 rounded-full shadow-lg p-3 flex items-center justify-center font-bold hover:bg-gray-50 border border-gray-100 transition transform hover:scale-105"
-                >
-                    <i className="pi pi-camera"></i>
-                </Link>
-            </div>
 
             <Dialog 
                 header={isEditingExpense ? 'Edit Expense' : 'Expense Details'} 
@@ -859,10 +870,7 @@ export default function FriendDetails() {
                                                     <span className="text-sm font-bold text-gray-800">Treat as Loan?</span>
                                                 </div>
                                                 <div className="flex-shrink-0">
-                                                    <InputSwitch
-                                                        checked={editIsLoan}
-                                                        onChange={(e) => setEditIsLoan(e.value)}
-                                                    />
+                                                    <Toggle checked={editIsLoan} onChange={setEditIsLoan} />
                                                 </div>
                                             </div>
                                             {editIsLoan && (
@@ -1725,5 +1733,34 @@ export default function FriendDetails() {
                 type={adType} 
             />
         </div>
+
+            {/* ── Floating Action Buttons (always fixed to viewport) ── */}
+            {!favsHidden && (
+                <>
+                    {/* Add Expense FAB - bottom right */}
+                    <div className="fixed bottom-6 right-5 z-[55] pointer-events-auto">
+                        <Link
+                            to={`/friend/${id}/add`}
+                            onClick={handleAddExpenseClick}
+                            className="bg-emerald-600 text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-emerald-700 transition transform hover:scale-105"
+                        >
+                            <i className="pi pi-receipt"></i>
+                            Add expense
+                        </Link>
+                    </div>
+
+                    {/* Scan Bill FAB - bottom left */}
+                    <div className="fixed bottom-6 left-5 z-[55] pointer-events-auto">
+                        <Link
+                            to={`/friend/${id}/scan`}
+                            onClick={handleScanBillClick}
+                            className="bg-white text-gray-600 rounded-full shadow-lg p-3 flex items-center justify-center font-bold hover:bg-gray-50 border border-gray-100 transition transform hover:scale-105"
+                        >
+                            <i className="pi pi-camera"></i>
+                        </Link>
+                    </div>
+                </>
+            )}
+        </>
     );
 }

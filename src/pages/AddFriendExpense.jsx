@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { InputNumber } from 'primereact/inputnumber';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
-import { InputSwitch } from 'primereact/inputswitch';
+import Toggle from '../components/UI/Toggle';
 import { useAppSettings } from '../hooks/useAppSettings';
 import AdGate from '../components/UI/AdGate';
 import Avatar from '../components/UI/Avatar';
@@ -303,10 +303,7 @@ export default function AddFriendExpense() {
                             <span className="text-[15px] font-bold text-gray-800 dark:text-gray-100">Treat as Loan?</span>
                         </div>
                         <div className="flex-shrink-0">
-                            <InputSwitch
-                                checked={isLoan}
-                                onChange={(e) => setIsLoan(e.value)}
-                            />
+                            <Toggle checked={isLoan} onChange={setIsLoan} />
                         </div>
                     </div>
                     <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug">
