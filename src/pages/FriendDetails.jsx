@@ -63,6 +63,13 @@ export default function FriendDetails() {
     const [adPendingRoute, setAdPendingRoute] = useState(null);
     const [adType, setAdType] = useState('camera'); // 'camera' or 'ai'
 
+    // Loan Handling State
+    const [handlingLoan, setHandlingLoan] = useState(null);
+    const [loanPassword, setLoanPassword] = useState('');
+    const [showLoanPasswordModal, setShowLoanPasswordModal] = useState(false);
+    const [isSubmittingLoan, setIsSubmittingLoan] = useState(false);
+    const [showLoanPass, setShowLoanPass] = useState(false);
+
     const handleAddExpenseClick = (e) => {
         e.preventDefault();
         const today = new Date().toDateString();
@@ -176,13 +183,49 @@ export default function FriendDetails() {
                 await Promise.all(loanExps.map(async (exp) => {
                     try {
                         const lr = await api.get(`/loans/expense/${exp._id}`);
-                        loanMap[exp._id] = lr.data;
+                        if (lr.data) loanMap[exp._id] = lr.data;
                     } catch { /* no loan request for this expense */ }
                 }));
                 setLoanRequests(loanMap);
             }
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleAcceptLoan = async (loan) => {
+        if (!loan) return;
+        // If it requires password and we don't have it yet, show modal
+        if (loan.requiresPasswordConfirmation && !loanPassword) {
+            setHandlingLoan(loan);
+            setShowLoanPasswordModal(true);
+            return;
+        }
+
+        setIsSubmittingLoan(true);
+        try {
+            await api.post(`/loans/${loan._id}/accept`, { password: loanPassword });
+            setLoanPassword('');
+            setShowLoanPasswordModal(false);
+            setHandlingLoan(null);
+            fetchFriendDetails();
+        } catch (err) {
+            alert(err.response?.data?.msg || 'Failed to accept loan.');
+        } finally {
+            setIsSubmittingLoan(false);
+        }
+    };
+
+    const handleRejectLoan = async (loanId) => {
+        if (!window.confirm("Reject this loan request? It will remain as a regular split with no interest.")) return;
+        setIsSubmittingLoan(true);
+        try {
+            await api.post(`/loans/${loanId}/reject`);
+            fetchFriendDetails();
+        } catch (err) {
+            alert(err.response?.data?.msg || 'Failed to reject loan.');
+        } finally {
+            setIsSubmittingLoan(false);
         }
     };
 
@@ -706,21 +749,43 @@ export default function FriendDetails() {
                                                 const isLender = loanReq && (loanReq.lender?._id || loanReq.lender)?.toString() === myId?.toString();
                                                 if (!loanReq || loanReq.status !== 'pending') return null;
                                                 return (
-                                                    <div className={`px-4 py-3 border-l-4 flex items-start gap-3 text-[13px] ${isLender ? 'bg-amber-50/80 border-amber-400' : 'bg-blue-50/80 border-blue-400'}`}>
-                                                        <span className="text-lg flex-shrink-0">{isLender ? '⏳' : '📬'}</span>
-                                                        <div className="flex-1">
-                                                            {isLender ? (
-                                                                <>
-                                                                    <p className="font-bold text-amber-800">Awaiting {friend?.username}&apos;s acceptance</p>
-                                                                    <p className="text-amber-700 text-[11.5px] mt-0.5">Interest won&apos;t accrue until they accept.</p>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <p className="font-bold text-blue-800">Loan request pending your decision</p>
-                                                                    <p className="text-blue-700 text-[11.5px] mt-0.5">Review and decide in the Loans section.</p>
-                                                                </>
-                                                            )}
+                                                    <div className={`px-4 py-3 border-l-4 flex flex-col gap-3 text-[13px] ${isLender ? 'bg-amber-50/80 border-amber-400' : 'bg-blue-50/80 border-blue-400'}`}>
+                                                        <div className="flex items-start gap-3">
+                                                            <span className="text-lg flex-shrink-0">{isLender ? '⏳' : '📬'}</span>
+                                                            <div className="flex-1">
+                                                                {isLender ? (
+                                                                    <>
+                                                                        <p className="font-bold text-amber-800 uppercase tracking-tight text-[11px]">Loan Pending</p>
+                                                                        <p className="text-amber-700 text-[13px] mt-0.5 leading-snug">Awaiting {friend?.username}&apos;s acceptance. Interest starts from that day.</p>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <p className="font-bold text-blue-800 uppercase tracking-tight text-[11px]">Loan Request</p>
+                                                                        <p className="text-blue-700 text-[13px] mt-0.5 leading-snug">{friend?.username} wants you to accept this as a loan at {item.loanInterestRate}% APR.</p>
+                                                                    </>
+                                                                )}
+                                                            </div>
                                                         </div>
+                                                        {!isLender && (
+                                                            <div className="flex gap-2.5 mt-1">
+                                                                <button 
+                                                                    onClick={() => handleAcceptLoan(loanReq)}
+                                                                    disabled={isSubmittingLoan}
+                                                                    className="flex-1 bg-emerald-600 text-white font-bold py-2 rounded-lg text-[12.5px] shadow-sm active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                                                                >
+                                                                    {isSubmittingLoan ? <i className="pi pi-spin pi-spinner text-[12px]" /> : <ShieldCheck className="w-4 h-4" />}
+                                                                    Accept
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleRejectLoan(loanReq._id)}
+                                                                    disabled={isSubmittingLoan}
+                                                                    className="flex-1 bg-white border border-rose-200 text-rose-600 font-bold py-2 rounded-lg text-[12.5px] shadow-sm active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                                                                >
+                                                                    <ShieldX className="w-4 h-4" />
+                                                                    Decline
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })()}
@@ -1732,6 +1797,56 @@ export default function FriendDetails() {
                 onFinish={handleAdFinish} 
                 type={adType} 
             />
+
+            {/* Loan Password Modal */}
+            {showLoanPasswordModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] px-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center mb-4">
+                                <Lock className="w-6 h-6 text-rose-500" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Password Required</h3>
+                            <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                                This loan exceeds <strong>$100</strong>. For your security, please confirm your Paywise account password to accept.
+                            </p>
+
+                            <div className="relative mb-6">
+                                <input
+                                    type={showLoanPass ? 'text' : 'password'}
+                                    value={loanPassword}
+                                    onChange={e => setLoanPassword(e.target.value)}
+                                    placeholder="Confirm password"
+                                    className="w-full bg-gray-50 border-2 border-slate-200 focus:border-slate-800 rounded-2xl px-4 py-4 pr-12 text-[16px] outline-none transition-all"
+                                    autoFocus
+                                />
+                                <button
+                                    onClick={() => setShowLoanPass(!showLoanPass)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+                                >
+                                    {showLoanPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => { setShowLoanPasswordModal(false); setHandlingLoan(null); }}
+                                    className="flex-1 py-4 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleAcceptLoan(handlingLoan)}
+                                    disabled={!loanPassword || isSubmittingLoan}
+                                    className="flex-1 py-4 rounded-xl font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50 shadow-lg shadow-emerald-500/20"
+                                >
+                                    {isSubmittingLoan ? 'Verifying...' : 'Confirm'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
 
             {/* ── Floating Action Buttons (always fixed to viewport) ── */}
