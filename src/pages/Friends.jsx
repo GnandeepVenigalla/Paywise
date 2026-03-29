@@ -207,7 +207,7 @@ export default function Friends() {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-12">
+        <div className="min-h-screen bg-gray-50 pb-24">
             {/* Header */}
             <header className="bg-white shadow-sm pt-8 pb-4 px-4 sticky top-0 z-10 flex justify-between items-center">
                 <div className="flex items-center gap-2">

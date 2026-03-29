@@ -44,14 +44,12 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
     const startAd = () => {
         setStatus('loading');
         trackAdEvent('adRequests');
-        // Simulate ad loading from AdSense
+        // Simulate ad loading from Monetag
         setTimeout(() => {
             setStatus('playing');
             trackAdEvent('adImpressions');
-            // Try to push AdSense ad
-            try {
-                (window.adsbygoogle = window.adsbygoogle || []).push({});
-            } catch (e) {}
+            // Monetag ads are typically handled via push notifications, pop-unders, 
+            // or in-page overlays triggered elsewhere. Wait for timer.
         }, 1500);
     };
 
@@ -91,14 +89,13 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
             case 'playing':
                 return (
                     <div className="flex flex-col items-center justify-center w-full h-full min-h-[450px] relative">
-                         {/* Seamless Ad Integration - No visible box unless ad fills */}
-                         <div className="w-full h-full flex items-center justify-center bg-slate-50/50 dark:bg-black/20">
-                            <ins className="adsbygoogle"
-                                style={{ display: 'block', width: '100%', height: '100%', minHeight: '350px' }}
-                                data-ad-client="ca-pub-7749956119820849"
-                                data-ad-slot="8452361092"
-                                data-ad-format="auto"
-                                data-full-width-responsive="true"></ins>
+                         {/* Seamless Ad Integration - Monetag Placeholder */}
+                         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50/50 dark:bg-black/20 p-8 text-center pt-24">
+                            <Sparkles className="w-12 h-12 text-indigo-400 opacity-50 mb-6 animate-pulse" />
+                            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">Supporting Paywise</h3>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm max-w-[240px] leading-relaxed">
+                                Please wait a few seconds while we prepare your premium features...
+                            </p>
                          </div>
 
                          <div className="absolute top-8 right-8 z-30 bg-white dark:bg-slate-900 shadow-2xl px-6 py-2.5 rounded-full border border-indigo-500/30">
