@@ -66,7 +66,7 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                             Support Paywise by watching a short ad and gain instant access to our advanced {type === 'ai' ? 'AI Assistant' : type === 'camera' ? 'Camera Scanner' : 'features'}.
                         </p>
                         <a 
-                            href="#/" 
+                            href="javascript:void(0)" 
                             onClick={startAd}
                             className="w-full block decoration-none"
                             data-vignette-zone="10804063"
