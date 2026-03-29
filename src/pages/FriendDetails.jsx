@@ -145,7 +145,7 @@ export default function FriendDetails() {
             if (!exp) return acc;
             // Calculate total interest added so far (accruals from the scheduler)
             if (exp.parentLoan || exp.description?.toLowerCase().includes('interest accrual')) {
-                const userDelta = getUserExpenseSplit(exp, user, friend?._id || friend);
+                const userDelta = user ? getUserExpenseSplit(exp, user, friend?._id || friend) : 0;
                 totalAccrued += Math.abs(userDelta);
             }
 
@@ -154,7 +154,7 @@ export default function FriendDetails() {
             const isAccepted = !loanReq || loanReq.status === 'accepted';
 
             if (exp.isLoan && exp.loanInterestRate > 0 && remainingBalance > 0.01 && isAccepted) {
-                const userSplit = getUserExpenseSplit(exp, user, friend?._id || friend);
+                const userSplit = user ? getUserExpenseSplit(exp, user, friend?._id || friend) : 0;
                 const sourceCurr = exp.currency || 'USD';
                 const splitInUSD = convertAmount(Math.abs(userSplit), sourceCurr, 'USD');
                 
@@ -208,7 +208,7 @@ export default function FriendDetails() {
             setLoanPassword('');
             setShowLoanPasswordModal(false);
             setHandlingLoan(null);
-            fetchFriendDetails();
+            fetchFriendDetails(); // Refresh to update status
         } catch (err) {
             alert(err.response?.data?.msg || 'Failed to accept loan.');
         } finally {
@@ -289,7 +289,7 @@ export default function FriendDetails() {
 
     const handleSettleIndividualExpense = async (expense, amount) => {
         try {
-            const payerId = user.id || user._id; 
+            const payerId = user?.id || user?._id; 
             const receiverId = expense.paidBy._id || expense.paidBy;
             const roundedAmount = Math.round(amount * 100) / 100;
             
@@ -316,7 +316,7 @@ export default function FriendDetails() {
         }
 
         const members = [
-            { _id: user.id || user._id, username: 'You' },
+            { _id: user?.id || user?._id, username: 'You' },
             { _id: friend._id, username: friend.username }
         ];
 
@@ -374,9 +374,9 @@ export default function FriendDetails() {
                 amount: amt,
                 currency: user?.defaultCurrency || 'USD',
                 group: null,
-                paidBy: balance > 0 ? friend._id : (user.id || user._id),
+                paidBy: balance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
                 splits: [{
-                    user: balance > 0 ? (user.id || user._id) : friend._id,
+                    user: balance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
                     amount: amt
                 }]
             });
@@ -435,7 +435,8 @@ export default function FriendDetails() {
             if (new Date(exp.date) > new Date(summary.date)) summary.date = exp.date;
             
             // Calculate the specific balance contribution of this expense to the friend relationship
-            const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+            const myId = user?.id || user?._id;
+            const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
             const sourceCurr = exp.currency || 'USD';
             let b = 0;
             
@@ -443,7 +444,7 @@ export default function FriendDetails() {
                 const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
                 if (fSplit) b = convertAmount(fSplit.amount, sourceCurr, 'USD');
             } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
-                const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
+                const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === myId);
                 if (mySplit) b = -convertAmount(mySplit.amount, sourceCurr, 'USD');
             }
             // Add to the USD-based total but we will display it in default currency
@@ -468,7 +469,7 @@ export default function FriendDetails() {
                         balance: 0
                     };
                 }
-                const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+                const isPaidByMe = exp.paidBy?._id === (user?.id || user?._id) || exp.paidBy === (user?.id || user?._id);
                 const sourceCurr = exp.currency || 'USD';
                 
                 if (isPaidByMe) {
@@ -478,7 +479,7 @@ export default function FriendDetails() {
                         groupBalances[gid].balance += convertAmount(fSplit.amount, sourceCurr, 'USD');
                     }
                 } else if (exp.paidBy?._id === friend?._id || exp.paidBy?._id === friend?.id || exp.paidBy === friend?._id || exp.paidBy === friend?.id) {
-                    const mySplit = (exp.splits || []).find(s => s?.user?._id === user.id || s?.user?._id === user._id || s?.user === user.id || s?.user === user._id);
+                    const mySplit = (exp.splits || []).find(s => s?.user?._id === (user?.id || user?._id) || s?.user === (user?.id || user?._id));
                     if (mySplit) {
                         // Convert to USD base for internal summing
                         groupBalances[gid].balance -= convertAmount(mySplit.amount, sourceCurr, 'USD');
@@ -584,7 +585,8 @@ export default function FriendDetails() {
                                     const breakdowns = {}; // { groupId/null: { name, balance } }
                                     (expenses || []).forEach(exp => {
                                         if (!exp) return;
-                                        const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+                                        const myId = user?.id || user?._id;
+                                        const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
                                         const sourceCurr = exp.currency || 'USD';
                                         let b = 0;
                                         
@@ -673,10 +675,11 @@ export default function FriendDetails() {
                                     const showHeader = monthYear !== lastMonth;
                                     lastMonth = monthYear;
 
-                                    const isPaidByMe = !item.isGroupSummary && (item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id);
+                                    const myId = user?.id || user?._id;
+                                    const isPaidByMe = !item.isGroupSummary && (item.paidBy?._id === myId || item.paidBy === myId);
                                     
                                     // Summarized userSplit should be the calculated net amount from grouping logic
-                                    const userSplit = item.isGroupSummary ? item.amount : getUserExpenseSplit(item, user, friend?._id || friend);
+                                    const userSplit = item.isGroupSummary ? item.amount : (user ? getUserExpenseSplit(item, user, friend?._id || friend) : 0);
 
                                     const isSettleUp = !item.isGroupSummary && (
                                         item.description?.toLowerCase() === 'settle up' ||
@@ -748,6 +751,7 @@ export default function FriendDetails() {
                                                 const myId = user?.id || user?._id;
                                                 const isLender = loanReq && (loanReq.lender?._id || loanReq.lender)?.toString() === myId?.toString();
                                                 if (!loanReq || loanReq.status !== 'pending') return null;
+                                                const requiresPass = loanReq.requiresPasswordConfirmation;
                                                 return (
                                                     <div className={`px-4 py-3 border-l-4 flex flex-col gap-3 text-[13px] ${isLender ? 'bg-amber-50/80 border-amber-400' : 'bg-blue-50/80 border-blue-400'}`}>
                                                         <div className="flex items-start gap-3">
@@ -761,7 +765,10 @@ export default function FriendDetails() {
                                                                 ) : (
                                                                     <>
                                                                         <p className="font-bold text-blue-800 uppercase tracking-tight text-[11px]">Loan Request</p>
-                                                                        <p className="text-blue-700 text-[13px] mt-0.5 leading-snug">{friend?.username} wants you to accept this as a loan at {item.loanInterestRate}% APR.</p>
+                                                                        <p className="text-blue-700 text-[13px] mt-0.5 leading-snug">
+                                                                            {friend?.username} sent you a loan request ({item.loanInterestRate}% APR). 
+                                                                            {requiresPass && <span className="block font-bold text-rose-600 mt-1">🔒 Requires your password (amount exceeds $100).</span>}
+                                                                        </p>
                                                                     </>
                                                                 )}
                                                             </div>
@@ -814,7 +821,7 @@ export default function FriendDetails() {
                                                         setEditItems(item.items || []);
                                                         setEditIsLoan(item.isLoan || false);
                                                         setEditLoanInterestRate(item.loanInterestRate || 0);
-                                                        setSelectedMemberIdsForEdit([user.id]);
+                                                        setSelectedMemberIdsForEdit([user?.id || user?._id]);
                                                     }
                                                 }}
                                             />
@@ -878,7 +885,7 @@ export default function FriendDetails() {
                                                 {/* Member selection pills for editing */}
                                                 <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
                                                     {[
-                                                        { _id: user.id || user._id, username: 'Me' },
+                                                        { _id: user?.id || user?._id, username: 'Me' },
                                                         { _id: friend._id, username: friend.username }
                                                     ].map(member => {
                                                         const isSelected = selectedMemberIdsForEdit.includes(member._id);
@@ -915,7 +922,7 @@ export default function FriendDetails() {
                                                                         <div className="flex flex-wrap gap-1 mt-1">
                                                                             {item.assignedTo.map(u => (
                                                                                 <span key={u._id || u} className="text-[10px] bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded-full font-bold">
-                                                                                    {(u._id === (user.id || user._id) || u === (user.id || user._id)) ? 'Me' : friend.username}
+                                                                                    {(u._id === (user?.id || user?._id) || u === (user?.id || user?._id)) ? 'Me' : friend?.username}
                                                                                 </span>
                                                                             ))}
                                                                         </div>
@@ -999,9 +1006,9 @@ export default function FriendDetails() {
                                                 </div>
                                             )}
                                             <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense?.amount || 0, user?.defaultCurrency, selectedExpense?.currency)}</p>
-                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {(selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === user.id ? 'You' : (selectedExpense?.paidBy?.username || friend?.username || 'Someone')}</p>
+                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {(selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === (user?.id || user?._id) ? 'You' : (selectedExpense?.paidBy?.username || friend?.username || 'Someone')}</p>
                                             {selectedExpense?.addedBy && (selectedExpense.addedBy._id || selectedExpense.addedBy) !== (selectedExpense.paidBy?._id || selectedExpense.paidBy) && (
-                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {(selectedExpense.addedBy._id || selectedExpense.addedBy) === user.id ? 'you' : (selectedExpense.addedBy.username || 'someone')}</p>
+                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {(selectedExpense.addedBy?._id || selectedExpense.addedBy) === (user?.id || user?._id) ? 'you' : (selectedExpense.addedBy?.username || 'someone')}</p>
                                             )}
                                             {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
                                             <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
@@ -1021,7 +1028,7 @@ export default function FriendDetails() {
                                                 {(selectedExpense?.splits || []).map((split, sIdx) => (
                                                     <div key={split?.user?._id || split?.user || sIdx} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
                                                         <span className="font-semibold text-gray-700 text-sm">
-                                                            {(split?.user?._id || split?.user) === user.id ? 'You' : (split?.user?.username || friend?.username || 'Guest')}
+                                                            {(split?.user?._id || split?.user) === (user?.id || user?._id) ? 'You' : (split?.user?.username || friend?.username || 'Guest')}
                                                         </span>
                                                         <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split?.amount || 0, user?.defaultCurrency, selectedExpense?.currency)}</span>
                                                     </div>
@@ -1052,7 +1059,7 @@ export default function FriendDetails() {
                                             return null;
                                         })()}
 
-                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
+                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === (user?.id || user?._id)) : (selectedExpense.paidBy._id === (user?.id || user?._id))) && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
