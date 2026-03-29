@@ -14,6 +14,7 @@ import { useMonthlySpending } from '../hooks/useMonthlySpending';
 import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS, convertAmount } from '../utils/formatters';
 import { X, HelpCircle, TrendingUp, PieChart, ChevronLeft, ChevronRight, FileSpreadsheet, Percent, Receipt, FileText, Building2, Banknote, CheckCircle2, DollarSign } from 'lucide-react';
 import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, toggleItemAssignment } from '../utils/expenseUtils';
+import AdGate from '../components/UI/AdGate';
 
 export default function FriendDetails() {
     const { id } = useParams();
@@ -57,6 +58,62 @@ export default function FriendDetails() {
     const [isBlocking, setIsBlocking] = useState(false);
     const [targetExportCurrency, setTargetExportCurrency] = useState(user?.defaultCurrency || 'USD');
     const [loanRequests, setLoanRequests] = useState({}); // { expenseId: loanRequest }
+
+    const [showAdGate, setShowAdGate] = useState(false);
+    const [adPendingRoute, setAdPendingRoute] = useState(null);
+    const [adType, setAdType] = useState('camera'); // 'camera' or 'ai'
+
+    const handleAddExpenseClick = (e) => {
+        e.preventDefault();
+        const today = new Date().toDateString();
+        const key = `daily_add_expense_count_${user?.id || user?._id}`;
+        let data;
+        try {
+            data = JSON.parse(localStorage.getItem(key) || '{"date":"","count":0}');
+        } catch (err) {
+            data = { date: '', count: 0 };
+        }
+        
+        if (data.date !== today) {
+            data = { date: today, count: 0 };
+        }
+
+        if (data.count >= 4) {
+            setAdType('ai');
+            setAdPendingRoute(`/friend/${id}/add`);
+            setShowAdGate(true);
+        } else {
+            data.count += 1;
+            localStorage.setItem(key, JSON.stringify(data));
+            navigate(`/friend/${id}/add`);
+        }
+    };
+
+    const handleScanBillClick = (e) => {
+        e.preventDefault();
+        setAdType('camera');
+        setAdPendingRoute(`/friend/${id}/scan`);
+        setShowAdGate(true);
+    };
+
+    const handleAdFinish = () => {
+        setShowAdGate(false);
+        if (adPendingRoute === `/friend/${id}/add`) {
+            const today = new Date().toDateString();
+            const key = `daily_add_expense_count_${user?.id || user?._id}`;
+            let data = { date: today, count: 0 };
+            try {
+                data = JSON.parse(localStorage.getItem(key) || '{"date":"","count":0}');
+            } catch(e) {}
+            if (data.date !== today) data = { date: today, count: 0 };
+            data.count += 1;
+            localStorage.setItem(key, JSON.stringify(data));
+        }
+        if (adPendingRoute) {
+            navigate(adPendingRoute);
+            setAdPendingRoute(null);
+        }
+    };
 
     // Extract monthly spending aggregation logic to custom hook
     // Pass user.defaultCurrency so chart amounts are consistently converted
@@ -674,24 +731,24 @@ export default function FriendDetails() {
             </main>
 
             {/* Custom Green Floating Action Button */}
-            <div className="fixed bottom-6 right-5">
-                <Link
-                    to={`/friend/${id}/add`}
+            <div className="fixed bottom-6 right-5 z-20">
+                <button
+                    onClick={handleAddExpenseClick}
                     className="bg-emerald-600 text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-emerald-700 transition transform hover:scale-105"
                 >
                     <i className="pi pi-receipt"></i>
                     Add expense
-                </Link>
+                </button>
             </div>
 
             {/* Camera Scan Optional Button Bottom Left */}
-            <div className="fixed bottom-6 left-5">
-                <Link
-                    to={`/friend/${id}/scan`}
+            <div className="fixed bottom-6 left-5 z-20">
+                <button
+                    onClick={handleScanBillClick}
                     className="bg-white text-gray-600 rounded-full shadow-lg p-3 flex items-center justify-center font-bold hover:bg-gray-50 border border-gray-100 transition transform hover:scale-105"
                 >
                     <i className="pi pi-camera"></i>
-                </Link>
+                </button>
             </div>
 
             <Dialog 
@@ -1658,6 +1715,13 @@ export default function FriendDetails() {
                     </div>
                 </div>
             )}
+
+            <AdGate 
+                isOpen={showAdGate} 
+                onClose={() => setShowAdGate(false)} 
+                onFinish={handleAdFinish} 
+                type={adType} 
+            />
         </div>
     );
 }
