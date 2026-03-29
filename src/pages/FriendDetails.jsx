@@ -732,23 +732,25 @@ export default function FriendDetails() {
 
             {/* Custom Green Floating Action Button */}
             <div className="fixed bottom-6 right-5 z-20">
-                <button
+                <Link
+                    to={`/friend/${id}/add`}
                     onClick={handleAddExpenseClick}
                     className="bg-emerald-600 text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-emerald-700 transition transform hover:scale-105"
                 >
                     <i className="pi pi-receipt"></i>
                     Add expense
-                </button>
+                </Link>
             </div>
 
             {/* Camera Scan Optional Button Bottom Left */}
             <div className="fixed bottom-6 left-5 z-20">
-                <button
+                <Link
+                    to={`/friend/${id}/scan`}
                     onClick={handleScanBillClick}
                     className="bg-white text-gray-600 rounded-full shadow-lg p-3 flex items-center justify-center font-bold hover:bg-gray-50 border border-gray-100 transition transform hover:scale-105"
                 >
                     <i className="pi pi-camera"></i>
-                </button>
+                </Link>
             </div>
 
             <Dialog 

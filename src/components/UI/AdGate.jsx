@@ -29,9 +29,9 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
         }
     }, [status]);
 
-    if (!isOpen) return null;
-
     const { api } = useContext(AuthContext);
+
+    if (!isOpen) return null;
 
     const trackAdEvent = async (type) => {
         try {
