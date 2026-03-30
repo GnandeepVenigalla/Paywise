@@ -16,22 +16,26 @@ import Activity from './pages/Activity';
 import Account from './pages/Account';
 import AccountSettings from './pages/AccountSettings';
 import Notifications from './pages/Notifications';
+import PrivacySecurity from './pages/PrivacySecurity';
+import CurrencySettings from './pages/CurrencySettings';
+import AppSettings from './pages/AppSettings';
+import JoinGroup from './pages/JoinGroup';
+import SplitwiseCallback from './pages/SplitwiseCallback';
 import AiAssistant from './pages/AiAssistant';
 import BetaHandler from './pages/BetaHandler';
 import HelpSupport from './pages/HelpSupport';
 import TermsOfService from './pages/TermsOfService';
-import PrivacySecurity from './pages/PrivacySecurity';
-import BetaLanding from './pages/BetaHandler';
-import HelpSupport from './pages/HelpSupport';
 import Katha from './pages/Katha';
 import KathaDetail from './pages/KathaDetail';
 import LoanRequests from './pages/LoanRequests';
+import BlockedUsers from './pages/BlockedUsers';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 import logoImg from './assets/logo.png';
 import { useAppSettings } from './hooks/useAppSettings';
 import BiometricGate from './components/BiometricGate';
 import ErrorBoundary from './components/ErrorBoundary';
+import InstallGate from './components/InstallGate';
 
 // Applies theme + high contrast to <html> globally
 function ThemeApplier() {
@@ -53,9 +57,6 @@ const PrivateRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />;
 };
 
-import BlockedUsers from './pages/BlockedUsers';
-import InstallGate from './components/InstallGate';
-
 function App() {
   return (
     <Router>
@@ -66,6 +67,10 @@ function App() {
           <div className="min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden bg-gray-50 text-gray-900 font-sans relative">
             <BiometricGate>
               <Routes>
+                {/* Public Legal Routes */}
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/privacy" element={<PrivacySecurity />} />
+
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -97,8 +102,6 @@ function App() {
                 <Route path="/ai" element={<PrivateRoute><AiAssistant /></PrivateRoute>} />
                 <Route path="/loans" element={<PrivateRoute><LoanRequests /></PrivateRoute>} />
                 <Route path="/beta" element={<BetaHandler />} />
-                <Route path="/terms" element={<TermsOfService />} />
-                <Route path="/privacy" element={<PrivacySecurity />} />
                 <Route path="/" element={<Navigate to="/dashboard" />} />
               </Routes>
             </BiometricGate>
