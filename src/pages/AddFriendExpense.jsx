@@ -187,11 +187,11 @@ export default function AddFriendExpense() {
                         <span className="text-[15px] text-gray-700 dark:text-gray-300">With <b className="dark:text-white">you</b> and:</span>
                         <div className="flex items-center gap-1.5 border border-gray-200 dark:border-slate-700 rounded-full pr-3 pl-1 py-1 cursor-pointer">
                             <div className="w-6 h-6 bg-[#0E3552] text-white rounded-full flex items-center justify-center font-bold text-xs uppercase overflow-hidden relative">
-                                {friend.username.charAt(0)}
+                                {friend?.username?.charAt(0) || '?'}
                                 <div className="absolute top-0 right-0 w-1/2 h-full bg-white/10" />
                                 <div className="absolute bottom-0 left-0 w-full h-1/2 bg-black/20" />
                             </div>
-                            <span className="text-[14px] font-medium text-gray-800 dark:text-gray-100">{friend.username}</span>
+                            <span className="text-[14px] font-medium text-gray-800 dark:text-gray-100">{friend?.username || 'Friend'}</span>
                         </div>
                     </div>
                 )}

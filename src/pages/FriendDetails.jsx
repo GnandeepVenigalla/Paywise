@@ -12,7 +12,7 @@ import { useAppSettings } from '../hooks/useAppSettings';
 import ExpenseItem from '../components/UI/ExpenseItem';
 import { useMonthlySpending } from '../hooks/useMonthlySpending';
 import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS, convertAmount } from '../utils/formatters';
-import { X, HelpCircle, TrendingUp, PieChart, ChevronLeft, ChevronRight, FileSpreadsheet, Percent, Receipt, FileText, Building2, Banknote, CheckCircle2, DollarSign } from 'lucide-react';
+import { X, HelpCircle, TrendingUp, PieChart, ChevronLeft, ChevronRight, FileSpreadsheet, Percent, Receipt, FileText, Building2, Banknote, CheckCircle2, DollarSign, Eye, EyeOff, Lock, ShieldCheck, ShieldX } from 'lucide-react';
 import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, toggleItemAssignment } from '../utils/expenseUtils';
 import AdGate from '../components/UI/AdGate';
 
@@ -325,7 +325,7 @@ export default function FriendDetails() {
 
         const members = [
             { _id: user?.id || user?._id, username: 'You' },
-            { _id: friend._id, username: friend.username }
+            { _id: friend?._id, username: friend?.username || 'Friend' }
         ];
 
         setEditItems(prev => toggleItemAssignment(prev, itemId, selectedMemberIdsForEdit, members));
@@ -352,7 +352,7 @@ export default function FriendDetails() {
 
     const openSettleUp = () => {
         if (balance === 0) {
-            alert("You and " + friend.username + " are already settled up!");
+            alert("You and " + (friend?.username || 'your friend') + " are already settled up!");
             return;
         }
         setSettleMode(null);
@@ -808,7 +808,7 @@ export default function FriendDetails() {
                                                 description={item.isGroupSummary ? `Group: ${item.description}` : item.description}
                                                 amount={Math.abs(userSplit)}
                                                 date={item.date}
-                                                payerName={item.isGroupSummary ? 'Group Activity' : (isPaidByMe ? 'You' : (item.paidBy?.username || friend.username))}
+                                                payerName={item.isGroupSummary ? 'Group Activity' : (isPaidByMe ? 'You' : (item.paidBy?.username || friend?.username || 'Friend'))}
                                                 userSplit={userSplit}
                                                 targetCurrency={user?.defaultCurrency || 'USD'}
                                                 sourceCurrency={item.currency || 'USD'}
