@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { InputNumber } from 'primereact/inputnumber';
@@ -16,6 +16,7 @@ export default function AddExpense() {
     const { defaultSplitMethod } = useAppSettings();
 
     const [showAd, setShowAd] = useState(false);
+    const hasSubmittedRef = useRef(false);
 
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
@@ -74,7 +75,7 @@ export default function AddExpense() {
         fetchGroup();
     }, [id, api]);
 
-    const parsedAmount = parseFloat(amount) || 0;
+    const parsedAmount = useMemo(() => parseFloat(amount) || 0, [amount]);
 
     const buildSplits = () => {
         const total = parsedAmount;
@@ -115,14 +116,30 @@ export default function AddExpense() {
         return splits;
     };
 
-    const handleSubmit = async (e) => {
+    const isSaveEnabled = useMemo(() => {
+        return !!description?.trim() && (group?.groupType === 'community' || parsedAmount > 0) && members.length > 0;
+    }, [description, group?.groupType, parsedAmount, members.length]);
+
+    const handleSubmit = async (e, ignoreLoading = false) => {
         if (e) e.preventDefault();
-        if (!description || parsedAmount <= 0 || members.length === 0) return;
+        if (hasSubmittedRef.current) return;
+        if (isLoading && !ignoreLoading) return;
+        
+        if (!isSaveEnabled) {
+            setIsLoading(false);
+            hasSubmittedRef.current = false;
+            return;
+        }
+
+        hasSubmittedRef.current = true;
+        setIsLoading(true);
 
         if (payerMode === 'multiple') {
             const sumPayers = Object.values(multiplePayersAmounts).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
             if (Math.abs(sumPayers - parsedAmount) > 0.01) {
                 alert(`The paid amounts must add up to ${currSym}${parsedAmount.toFixed(2)}.`);
+                hasSubmittedRef.current = false;
+                setIsLoading(false);
                 return;
             }
         }
@@ -131,26 +148,28 @@ export default function AddExpense() {
             const sumExact = Object.values(exactAmounts).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
             if (Math.abs(sumExact - parsedAmount) > 0.01) {
                 alert(`The exact amounts must add up to ${currSym}${parsedAmount.toFixed(2)}.`);
+                hasSubmittedRef.current = false;
+                setIsLoading(false);
                 return;
             }
         } else if (splitMethod === 'percentage') {
             const sumPct = Object.values(percentages).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
             if (Math.abs(sumPct - 100) > 0.1) {
                 alert(`The percentages must add up to exactly 100%. Currently at ${sumPct}%.`);
+                hasSubmittedRef.current = false;
+                setIsLoading(false);
                 return;
             }
         }
 
-        setIsLoading(true);
-
         try {
             const expRes = await api.post('/expenses', {
                 description,
-                amount: parsedAmount,
+                amount: group?.groupType === 'community' ? 0 : parsedAmount,
                 currency: currency,
                 group: id,
                 paidBy: payerMode === 'multiple' ? 'multiple' : paidBy,
-                splits: buildSplits(),
+                splits: group?.groupType === 'community' ? [] : buildSplits(),
                 isLoan: isLoan,
                 loanInterestRate: isLoan ? loanInterestRate : 0
             });
@@ -173,10 +192,9 @@ export default function AddExpense() {
             console.error(err);
             alert('Error adding expense');
             setIsLoading(false);
+            hasSubmittedRef.current = false;
         }
     };
-
-    const isSaveEnabled = description.trim() !== '' && parsedAmount > 0;
 
     const handleToggleEqually = (mId) => {
         if (selectedEqually.includes(mId)) {
@@ -291,18 +309,20 @@ export default function AddExpense() {
                 <button onClick={() => navigate(-1)} className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition">
                     <i className="pi pi-times text-[1.2rem] text-gray-700 dark:text-gray-300"></i>
                 </button>
-                <h1 className="text-[17px] font-medium text-gray-800 dark:text-gray-100 absolute left-1/2 -translate-x-1/2">
-                    Add an expense
+                <h1 className="text-[17px] font-bold text-gray-800 dark:text-gray-100 absolute left-1/2 -translate-x-1/2">
+                    {group?.groupType === 'community' ? 'Record turn' : 'Add an expense'}
                 </h1>
                 <button
                     onClick={(e) => {
+                        if (isLoading || hasSubmittedRef.current) return;
                         if (expenseCount >= 4) {
+                            setIsLoading(true); // Lock the UI
                             setShowAd(true);
                         } else {
                             handleSubmit(e);
                         }
                     }}
-                    disabled={!isSaveEnabled || isLoading}
+                    disabled={(!isSaveEnabled || isLoading)}
                     className={`font-bold text-[16px] px-2 transition ${isSaveEnabled ? 'text-[#19876e] hover:opacity-80' : 'text-gray-300 dark:text-gray-600'}`}
                 >
                     Save
@@ -312,11 +332,19 @@ export default function AddExpense() {
             <main className="w-full max-w-lg px-4 flex flex-col items-center pt-2">
                 {/* Group Info Pill */}
                 {group && (
-                    <div className="flex items-center gap-2 mb-10 w-full justify-center">
-                        <span className="text-[15px] text-gray-700 dark:text-gray-300">With <b className="dark:text-white">you</b> and:</span>
-                        <div className="flex flex-col border border-gray-200 dark:border-slate-700 rounded-full px-4 py-1">
-                            <span className="text-[13px] font-bold text-gray-800 dark:text-gray-100">{group.name}</span>
+                    <div className="flex flex-col items-center gap-2 mb-10 w-full justify-center">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[15px] text-gray-700 dark:text-gray-300">With <b className="dark:text-white">you</b> and:</span>
+                            <div className="flex flex-col border border-gray-200 dark:border-slate-700 rounded-full px-4 py-1">
+                                <span className="text-[13px] font-bold text-gray-800 dark:text-gray-100">{group.name}</span>
+                            </div>
                         </div>
+                        {group.groupType === 'community' && (
+                            <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/50 px-3 py-1 rounded-full flex items-center gap-1.5 animate-pulse">
+                                <i className="pi pi-sync text-orange-500 text-[10px]"></i>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-400">Community Cycle Mode</span>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -335,28 +363,43 @@ export default function AddExpense() {
                         />
                     </div>
 
-                    <div className="flex items-center gap-3 w-full border-b-[2px] border-[#19876e] pb-1">
-                        <button 
-                            onClick={() => setShowCurrencyModal(true)}
-                            type="button"
-                            className="w-12 h-12 bg-white dark:bg-slate-800 rounded-md border border-gray-200 dark:border-slate-700 shadow-sm flex items-center justify-center active:scale-95 transition-transform"
-                        >
-                            <span className="text-xl font-bold text-gray-700 dark:text-gray-200">{currSym}</span>
-                        </button>
-                        <InputNumber
-                            value={amount}
-                            onValueChange={(e) => setAmount(e.value)}
-                            mode="decimal"
-                            minFractionDigits={2}
-                            maxFractionDigits={2}
-                            placeholder="0.00"
-                            className="w-full"
-                            inputClassName="bg-transparent text-[32px] text-gray-900 dark:text-white outline-none w-full placeholder:text-gray-300 dark:placeholder:text-gray-600 font-medium"
-                        />
-                    </div>
+                    {group?.groupType !== 'community' && (
+                        <div className="flex items-center gap-3 w-full border-b-[2px] border-[#19876e] pb-1">
+                            <button 
+                                onClick={() => setShowCurrencyModal(true)}
+                                type="button"
+                                className="w-12 h-12 bg-white dark:bg-slate-800 rounded-md border border-gray-200 dark:border-slate-700 shadow-sm flex items-center justify-center active:scale-95 transition-transform"
+                            >
+                                <span className="text-xl font-bold text-gray-700 dark:text-gray-200">{currSym}</span>
+                            </button>
+                            <InputNumber
+                                value={amount}
+                                onValueChange={(e) => setAmount(e.value)}
+                                mode="decimal"
+                                minFractionDigits={2}
+                                maxFractionDigits={2}
+                                placeholder="0.00"
+                                className="w-full"
+                                inputClassName="bg-transparent text-[32px] text-gray-900 dark:text-white outline-none w-full placeholder:text-gray-300 dark:placeholder:text-gray-600 font-medium"
+                            />
+                        </div>
+                    )}
 
                     {/* Action Sentence */}
-                    {parsedAmount > 0 ? (
+                    {group?.groupType === 'community' ? (
+                        <div className="mt-8 mb-2 text-center">
+                            <button 
+                                type="button"
+                                onClick={() => setShowPayerModal(true)}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-50 text-orange-700 rounded-2xl border border-orange-200 font-bold text-[14px] hover:bg-orange-100 transition shadow-sm active:scale-95"
+                            >
+                                <i className="pi pi-user text-xs"></i>
+                                {String(paidBy) === String(user?._id || user?.id) ? 'You paid this time' : `${members.find(m => String(m._id || m.id) === String(paidBy))?.username || 'Someone'} paid this time`}
+                                <i className="pi pi-chevron-down text-[10px] opacity-50 ml-1"></i>
+                            </button>
+                            <p className="text-[12px] text-gray-400 mt-2 font-medium">Capture who picked up the tab to update the cycle.</p>
+                        </div>
+                    ) : parsedAmount > 0 ? (
                         <div className="mt-8 mb-2 text-[15px] text-gray-800 dark:text-gray-200 flex items-center gap-1.5 flex-wrap justify-center font-medium">
                             Paid by <button
                                 type="button"
@@ -364,13 +407,17 @@ export default function AddExpense() {
                                 className="px-2 py-1.5 rounded-[6px] border border-gray-300 dark:border-slate-600 shadow-sm bg-white dark:bg-slate-800 dark:hover:bg-slate-700 hover:bg-gray-50 transition"
                             >
                                 {payerMode === 'multiple' ? 'multiple people' : (String(paidBy) === String(user?._id || user?.id) ? 'you' : members.find(m => String(m._id || m.id) === String(paidBy))?.username || 'someone')}
-                            </button> and split <button
-                                type="button"
-                                onClick={() => setShowSplitModal(true)}
-                                className="px-2 py-1.5 rounded-[6px] border border-gray-300 dark:border-slate-600 shadow-sm bg-white dark:bg-slate-800 dark:hover:bg-slate-700 hover:bg-gray-50 transition"
-                            >
-                                {splitMethod === 'equally' ? (selectedEqually.length === members.length ? 'equally' : 'unequally') : splitMethod === 'exact' ? 'by exact amounts' : splitMethod === 'percentage' ? 'by percentages' : splitMethod === 'shares' ? 'by shares' : 'by adjustments'}
-                            </button>.
+                            </button> {group?.groupType === 'community' ? 'for the community' : (
+                                <>
+                                    and split <button
+                                        type="button"
+                                        onClick={() => setShowSplitModal(true)}
+                                        className="px-2 py-1.5 rounded-[6px] border border-gray-300 dark:border-slate-600 shadow-sm bg-white dark:bg-slate-800 dark:hover:bg-slate-700 hover:bg-gray-50 transition"
+                                    >
+                                        {splitMethod === 'equally' ? (selectedEqually.length === members.length ? 'equally' : 'unequally') : splitMethod === 'exact' ? 'by exact amounts' : splitMethod === 'percentage' ? 'by percentages' : splitMethod === 'shares' ? 'by shares' : 'by adjustments'}
+                                    </button>
+                                </>
+                            )}.
                         </div>
                     ) : (
                         <div className="mt-4 px-4 py-2 border rounded-[6px] text-[14px] shadow-sm bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60">
@@ -672,7 +719,7 @@ export default function AddExpense() {
                     return (
                         <div className="p-4 bg-gray-50 dark:bg-slate-950 flex flex-col items-center justify-center border-t border-gray-100 dark:border-slate-800 transition">
                             <span className="font-bold text-[15px] text-gray-900 dark:text-white">{currSym}{sumPayers.toFixed(2)} of {currSym}{parsedAmount.toFixed(2)}</span>
-                            <span className={`text-[12px] font-medium ${Math.abs(diff) < 0.01 ? 'text-gray-400 dark:text-gray-500' : diff > 0 ? 'text-gray-500 dark:text-gray-400' : 'text-rose-500'}`}>
+                            <span className={`text-[12px] font-medium ${Math.abs(diff) < 0.01 ? 'text-gray-400 dark:text-gray-400' : diff > 0 ? 'text-gray-500 dark:text-gray-400' : 'text-rose-500'}`}>
                                 {Math.abs(diff) < 0.01 ? '0.00 left' : `${currSym}${diff.toFixed(2)} ${diff > 0 ? 'left' : 'over'}`}
                             </span>
                         </div>
@@ -737,10 +784,14 @@ export default function AddExpense() {
 
             <AdGate 
                 isOpen={showAd}
-                onClose={() => setShowAd(false)}
+                onClose={() => {
+                    setShowAd(false);
+                    setIsLoading(false);
+                    hasSubmittedRef.current = false;
+                }}
                 onFinish={() => {
                     setShowAd(false);
-                    handleSubmit();
+                    handleSubmit(null, true); 
                 }}
                 type="premium"
             />

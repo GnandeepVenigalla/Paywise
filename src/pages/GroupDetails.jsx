@@ -523,82 +523,149 @@ export default function GroupDetails() {
                 )}
 
                 <div className="px-5 py-4 border-b border-gray-100 mb-2">
-                    {/* Overall balance summary — clean like Splitwise */}
-                    <div className="mb-3">
-                        {myBalance === 0 ? (
-                            <p className="text-[17px] font-bold text-gray-700">You are all settled up</p>
-                        ) : myBalance > 0 ? (
-                            <p className="text-[17px] font-bold text-gray-800">
-                                You are owed{' '}
-                                <span className={`text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                    {formatCurrency(myBalance, displayCurrency)}
-                                </span>
-                                {' '}overall
-                            </p>
-                        ) : (
-                            <p className="text-[17px] font-bold text-gray-800">
-                                You owe{' '}
-                                <span className={`text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                    {formatCurrency(myBalance, displayCurrency)}
-                                </span>
-                                {' '}overall
-                            </p>
-                        )}
+                    {group.groupType === 'community' ? (
+                        /* Community Cycle Status */
+                        <div className="mb-2">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex flex-col">
+                                    <h3 className="text-[13px] font-black uppercase tracking-[0.1em] text-orange-500 mb-0.5">Community Cycle</h3>
+                                    <p className="text-[20px] font-black text-gray-900 leading-tight">
+                                        {group.paymentCycle?.filter(c => c.hasPaid).length || 0} of {group.members?.length || 0} members paid
+                                    </p>
+                                </div>
+                                <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center border border-orange-100">
+                                    <i className="pi pi-sync text-orange-500 text-xl"></i>
+                                </div>
+                            </div>
+                            
+                            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden mb-5 flex shadow-inner">
+                                {group.members.map((member, idx) => {
+                                    const cycleInfo = group.paymentCycle?.find(c => (c.user?._id || c.user) === (member._id || member));
+                                    const hasPaid = cycleInfo?.hasPaid;
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            className={`h-full flex-1 border-r border-white last:border-0 transition-all duration-700 ${hasPaid ? 'bg-orange-500 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]' : 'bg-gray-200'}`}
+                                            title={member.username}
+                                        />
+                                    );
+                                })}
+                            </div>
 
-                        {/* Per-member balances */}
-                        <div className="mt-1.5 space-y-0.5">
-                            {(() => {
-                                let othersBalances = [];
-                                [...(group.members || []), ...(group.pastMembers || [])].filter(m => m._id !== user.id).forEach(member => {
-                                    const b = (pairwiseBalances[member._id]?.[user.id] || 0) - (pairwiseBalances[user.id]?.[member._id] || 0);
-                                    if (Math.abs(b) > 0.001) othersBalances.push({ member, b });
-                                });
-                                if (othersBalances.length === 0) return null;
-                                const [first, second, ...rest] = othersBalances;
-                                return (
-                                    <>
-                                        {first && (
-                                            <p className="text-[14px] text-gray-500">
-                                                {first.b > 0 ? (
-                                                    <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency)}</span></>
-                                                ) : (
-                                                    <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency)}</span></>
-                                                )}
-                                            </p>
-                                        )}
-                                        {second && (
-                                            <p className="text-[14px] text-gray-500">
-                                                {second.b > 0 ? (
-                                                    <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency)}</span></>
-                                                ) : (
-                                                    <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency)}</span></>
-                                                )}
-                                            </p>
-                                        )}
-                                        {rest.length > 0 && (
-                                            <p className="text-[13px] text-gray-400">Plus {rest.length} more balances</p>
-                                        )}
-                                    </>
-                                );
-                            })()}
+                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                {(() => {
+                                    const remaining = group.members.filter(m => {
+                                        const c = group.paymentCycle?.find(cp => (cp.user?._id || cp.user) === (m._id || m));
+                                        return !c?.hasPaid;
+                                    });
+
+                                    if (remaining.length === 0) {
+                                        return (
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                                    <i className="pi pi-check text-emerald-600 text-sm"></i>
+                                                </div>
+                                                <p className="text-[14px] font-bold text-gray-800">Everyone has paid! Resetting for the next trip...</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div>
+                                            <p className="text-[12px] font-black uppercase tracking-wider text-gray-400 mb-2">Who's paying next?</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {remaining.map(m => (
+                                                    <div key={m._id} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[14px] font-bold text-gray-700 shadow-sm transition-transform hover:scale-105">
+                                                        <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></div>
+                                                        {m.username}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        /* Overall balance summary — clean like Splitwise */
+                        <>
+                            <div className="mb-3">
+                                {myBalance === 0 ? (
+                                    <p className="text-[17px] font-bold text-gray-700">You are all settled up</p>
+                                ) : myBalance > 0 ? (
+                                    <p className="text-[17px] font-bold text-gray-800">
+                                        You are owed{' '}
+                                        <span className={`text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>
+                                            {formatCurrency(myBalance, displayCurrency)}
+                                        </span>
+                                        {' '}overall
+                                    </p>
+                                ) : (
+                                    <p className="text-[17px] font-bold text-gray-800">
+                                        You owe{' '}
+                                        <span className={`text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>
+                                            {formatCurrency(myBalance, displayCurrency)}
+                                        </span>
+                                        {' '}overall
+                                    </p>
+                                )}
 
-                    {/* Action buttons */}
-                    <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide items-center">
-                        <button onClick={() => setShowGroupSettleUp(true)} className="bg-[#e11d48] text-white px-5 py-2.5 rounded-lg hover:bg-[#be123c] font-bold shadow-sm whitespace-nowrap transition cursor-pointer">
-                            Settle up
-                        </button>
-                        <button onClick={() => setShowGroupBalances(true)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition cursor-pointer">
-                            Balances
-                        </button>
-                        <button onClick={() => setShowGroupTotals(true)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition cursor-pointer">
-                            Totals
-                        </button>
-                        <button onClick={() => setShowExportOptions(true)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition cursor-pointer flex items-center gap-1.5">
-                            Export
-                        </button>
-                    </div>
+                                {/* Per-member balances */}
+                                <div className="mt-1.5 space-y-0.5">
+                                    {(() => {
+                                        let othersBalances = [];
+                                        [...(group.members || []), ...(group.pastMembers || [])].filter(m => m._id !== user.id).forEach(member => {
+                                            const b = (pairwiseBalances[member._id]?.[user.id] || 0) - (pairwiseBalances[user.id]?.[member._id] || 0);
+                                            if (Math.abs(b) > 0.001) othersBalances.push({ member, b });
+                                        });
+                                        if (othersBalances.length === 0) return null;
+                                        const [first, second, ...rest] = othersBalances;
+                                        return (
+                                            <>
+                                                {first && (
+                                                    <p className="text-[14px] text-gray-500">
+                                                        {first.b > 0 ? (
+                                                            <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency)}</span></>
+                                                        ) : (
+                                                            <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency)}</span></>
+                                                        )}
+                                                    </p>
+                                                )}
+                                                {second && (
+                                                    <p className="text-[14px] text-gray-500">
+                                                        {second.b > 0 ? (
+                                                            <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency)}</span></>
+                                                        ) : (
+                                                            <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency)}</span></>
+                                                        )}
+                                                    </p>
+                                                )}
+                                                {rest.length > 0 && (
+                                                    <p className="text-[13px] text-gray-400">Plus {rest.length} more balances</p>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide items-center">
+                                <button onClick={() => setShowGroupSettleUp(true)} className="bg-[#e11d48] text-white px-5 py-2.5 rounded-lg hover:bg-[#be123c] font-bold shadow-sm whitespace-nowrap transition cursor-pointer">
+                                    Settle up
+                                </button>
+                                <button onClick={() => setShowGroupBalances(true)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition cursor-pointer">
+                                    Balances
+                                </button>
+                                <button onClick={() => setShowGroupTotals(true)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition cursor-pointer">
+                                    Totals
+                                </button>
+                                <button onClick={() => setShowExportOptions(true)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-bold shadow-sm whitespace-nowrap hover:bg-gray-50 transition cursor-pointer flex items-center gap-1.5">
+                                    Export
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
 
 
@@ -647,9 +714,11 @@ export default function GroupDetails() {
                                                         </p>
                                                         <p className="text-[11px] text-emerald-600 mt-0.5">{new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · Settlement</p>
                                                     </div>
-                                                    <span className="text-[14px] font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
-                                                        {formatCurrency(item.amount, displayCurrency, item.currency || 'USD')}
-                                                    </span>
+                                                    {group.groupType !== 'community' && (
+                                                        <span className="text-[14px] font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                                                            {formatCurrency(item.amount, displayCurrency, item.currency || 'USD')}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -690,6 +759,7 @@ export default function GroupDetails() {
                                                 isLoan={item.isLoan}
                                                 parentLoan={item.parentLoan}
                                                 billImage={item.billImage}
+                                                isCommunity={group.groupType === 'community'}
                                                 onClick={() => {
                                                     setSelectedExpense(item);
                                                     setIsEditingExpense(false);
@@ -749,7 +819,9 @@ export default function GroupDetails() {
                 headerClassName="p-0 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 border-0"
                 header={
                     <div className="flex justify-between items-center w-full px-5 py-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 line-clamp-1">{isEditingExpense ? 'Edit Expense' : 'Expense Details'}</h2>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 line-clamp-1">
+                            {isEditingExpense ? (group.groupType === 'community' ? 'Edit Turn' : 'Edit Expense') : (group.groupType === 'community' ? 'Turn Details' : 'Expense Details')}
+                        </h2>
                         <div className="flex items-center gap-2">
                             {!isEditingExpense && (selectedExpense?.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense?.paidBy?._id === user.id)) && (
                                 <button
@@ -783,20 +855,24 @@ export default function GroupDetails() {
                                     required
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Total Amount</label>
-                                <InputNumber
-                                    value={parseFloat(editAmount)}
-                                    onValueChange={(e) => setEditAmount(e.value?.toString())}
-                                    mode="currency"
-                                    currency={selectedExpense?.currency || 'USD'}
-                                    locale="en-US"
-                                    className="w-full"
-                                    inputClassName="w-full py-3 px-4 rounded-xl border border-gray-300 outline-none shadow-sm font-bold"
-                                    required
-                                />
-                            </div>
-                            <p className="text-xs text-gray-500 font-medium leading-relaxed">Changing the total amount will instantly update and mathematically recalculate all member splits based on their assigned portions.</p>
+                            {group.groupType !== 'community' && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Total Amount</label>
+                                        <InputNumber
+                                            value={parseFloat(editAmount)}
+                                            onValueChange={(e) => setEditAmount(e.value?.toString())}
+                                            mode="currency"
+                                            currency={selectedExpense?.currency || 'USD'}
+                                            locale="en-US"
+                                            className="w-full"
+                                            inputClassName="w-full py-3 px-4 rounded-xl border border-gray-300 outline-none shadow-sm font-bold"
+                                            required
+                                        />
+                                    </div>
+                                    <p className="text-xs text-gray-500 font-medium leading-relaxed">Changing the total amount will instantly update and mathematically recalculate all member splits based on their assigned portions.</p>
+                                </>
+                            )}
                             {editItems.length > 0 && (
                                 <div className="space-y-4 pt-2 border-t border-gray-100 mt-4">
                                     <h4 className="text-sm font-bold text-gray-700">Edit Item Assignments</h4>
@@ -885,7 +961,9 @@ export default function GroupDetails() {
                                         <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-[0.15em] shadow-sm">Interest Accrual</span>
                                     </div>
                                 )}
-                                <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(selectedExpense.amount, displayCurrency, selectedExpense.currency)}</p>
+                                {group.groupType !== 'community' && (
+                                    <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(selectedExpense.amount, displayCurrency, selectedExpense.currency)}</p>
+                                )}
                                 <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy?._id === user.id ? 'You' : (selectedExpense.paidBy?.username || 'Someone')}</p>
                                 {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy?._id && (
                                     <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
@@ -901,19 +979,21 @@ export default function GroupDetails() {
                                 )}
                             </div>
 
-                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 max-h-48 overflow-y-auto">
-                                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Split Details</h4>
-                                <div className="space-y-2">
-                                    {selectedExpense.splits?.map(split => (
-                                        <div key={split.user?._id || split.user} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
-                                            <span className="font-semibold text-gray-700 text-sm">
-                                                {split.user?._id === user.id ? 'You' : (split.user?.username || 'Someone')}
-                                            </span>
-                                            <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split.amount, displayCurrency, selectedExpense.currency)}</span>
-                                        </div>
-                                    ))}
+                            {group.groupType !== 'community' && (
+                                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 max-h-48 overflow-y-auto">
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Split Details</h4>
+                                    <div className="space-y-2">
+                                        {selectedExpense.splits?.map(split => (
+                                            <div key={split.user?._id || split.user} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
+                                                <span className="font-semibold text-gray-700 text-sm">
+                                                    {split.user?._id === user.id ? 'You' : (split.user?.username || 'Someone')}
+                                                </span>
+                                                <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split.amount, displayCurrency, selectedExpense.currency)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             {(() => {
                                 if (selectedExpense.description?.toLowerCase().includes('settle')) return null;

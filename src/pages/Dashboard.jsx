@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext } from 'react';
+import { useEffect, useState, useContext, useMemo } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Wallet, Layers, Plus, Upload, UserPlus, ChevronRight, Sparkles, TrendingDown, TrendingUp, ArrowRightLeft, SlidersHorizontal, Check } from 'lucide-react';
@@ -19,9 +19,31 @@ export default function Dashboard() {
     const [groups, setGroups] = useState([]);
     const [isCreating, setIsCreating] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
+    const [newGroupType, setNewGroupType] = useState('default');
+    const [activeTab, setActiveTab] = useState('standard'); // 'standard' or 'community'
     const [filter, setFilter] = useState('none');
     const [showFilterModal, setShowFilterModal] = useState(false);
     const [showSettled, setShowSettled] = useState(false);
+
+    const groupsWithBalances = useMemo(() => {
+        return (groups || []).map(g => {
+            const myBal = (g.balances || {})[user.id || user._id] || 0;
+            return {
+                ...g,
+                myBalance: myBal
+            };
+        });
+    }, [groups, user.id, user._id]);
+
+    const activeGroups = groupsWithBalances.filter(g => 
+        (g.groupType === 'community') || 
+        (Math.abs(g.myBalance) > 0.01)
+    );
+    
+    const settledGroups = groupsWithBalances.filter(g => 
+        (g.groupType !== 'community') && 
+        (Math.abs(g.myBalance) <= 0.01)
+    );
 
     // Balance breakdown: split into "I owe" and "Owed to me"
     const [totalIOwe, setTotalIOwe] = useState(0);      // negative sum (what I owe others)
@@ -85,8 +107,13 @@ export default function Dashboard() {
         e.preventDefault();
         if (!newGroupName.trim()) return;
         try {
-            await api.post('/groups', { name: newGroupName, members: [] });
+            await api.post('/groups', { 
+                name: newGroupName, 
+                members: [],
+                groupType: newGroupType 
+            });
             setNewGroupName('');
+            setNewGroupType('default');
             setIsCreating(false);
             fetchData();
         } catch (err) {
@@ -96,7 +123,6 @@ export default function Dashboard() {
 
     const netBalance = totalOwedToMe - totalIOwe;
     const displayCurr = user?.defaultCurrency || 'USD';
-    const budgetExceeded = monthlyBudget > 0 && totalIOwe > monthlyBudget;
 
     return (
         <div className="min-h-screen bg-gray-50 pb-24">
@@ -147,117 +173,197 @@ export default function Dashboard() {
                     <i className="pi pi-chevron-right text-white/50"></i>
                 </Link>
                 
-                <div className="flex justify-between items-end mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800">Your Groups</h2>
-                    <button
-                        onClick={() => setIsCreating(!isCreating)}
-                        className="flex items-center gap-2 text-sm font-semibold text-emerald-900 hover:text-slate-950 bg-slate-50 px-3 py-1.5 rounded-full transition-colors"
+                {/* Title and Tabs Section */}
+                <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-[17px] font-black text-gray-900 tracking-tight">Your Groups</h2>
+                    <button onClick={() => setIsCreating(!isCreating)} className="flex items-center gap-1.5 text-emerald-600 font-bold text-[14px]">
+                        <i className={`pi ${isCreating ? 'pi-times' : 'pi-plus'} text-xs`}></i>
+                        {isCreating ? 'Cancel' : 'New Group'}
+                    </button>
+                </div>
+
+                {/* Modern TAB Switcher */}
+                <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-2xl w-fit">
+                    <button 
+                        onClick={() => setActiveTab('standard')}
+                        className={`px-6 py-2 rounded-xl text-[14px] font-bold transition-all ${activeTab === 'standard' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        <i className="pi pi-plus" style={{ fontSize: '0.8rem' }}></i> New Group
+                        Standard
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('community')}
+                        className={`px-6 py-2 rounded-xl text-[14px] font-bold transition-all ${activeTab === 'community' ? 'bg-white text-orange-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Community
                     </button>
                 </div>
 
                 {isCreating && (
-                    <form onSubmit={createGroup} className="mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-top-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Group Name</label>
-                        <div className="flex gap-2">
-                            <InputText
-                                autoFocus
-                                className="flex-1 py-2 px-3 border border-gray-200 rounded-xl outline-none"
-                                value={newGroupName}
-                                onChange={e => setNewGroupName(e.target.value)}
-                                placeholder="e.g. Miami Trip"
-                            />
-                            <Button type="submit" label="Create" className="p-button-sm p-button-rounded bg-emerald-600 border-none px-4" />
+                    <form onSubmit={createGroup} className="mb-6 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-top-2">
+                        <label className="block text-sm font-black uppercase tracking-wider text-gray-400 mb-3 ml-1">New Group Details</label>
+                        <div className="space-y-4">
+                            <div>
+                                <InputText
+                                    autoFocus
+                                    className="w-full py-3 px-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-semibold"
+                                    value={newGroupName}
+                                    onChange={e => setNewGroupName(e.target.value)}
+                                    placeholder="Group Name (e.g. Miami Trip)"
+                                />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setNewGroupType('default')}
+                                    className={`py-3 px-4 rounded-xl text-sm font-bold border transition-all ${newGroupType === 'default' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' : 'bg-gray-50 border-gray-100 text-gray-500'}`}
+                                >
+                                    <div className="flex flex-col items-center gap-1">
+                                        <i className="pi pi-users"></i>
+                                        <span>Standard Split</span>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setNewGroupType('community')}
+                                    className={`py-3 px-4 rounded-xl text-sm font-bold border transition-all ${newGroupType === 'community' ? 'bg-orange-50 border-orange-500 text-orange-700 shadow-sm' : 'bg-gray-50 border-gray-100 text-gray-500'}`}
+                                >
+                                    <div className="flex flex-col items-center gap-1">
+                                        <i className="pi pi-sync"></i>
+                                        <span>Community Cycle</span>
+                                    </div>
+                                </button>
+                            </div>
+
+                            {newGroupType === 'community' && (
+                                <p className="text-[11px] text-orange-600 font-medium px-1 leading-tight">
+                                    <i className="pi pi-info-circle mr-1"></i>
+                                    In Community groups, you don't split bills. The app manages who pays next!
+                                </p>
+                            )}
+
+                            <div className="flex gap-2 pt-2">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsCreating(false)}
+                                    className="flex-1 py-3 px-4 rounded-2xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit"
+                                    className="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-md shadow-emerald-200 transition-all"
+                                >
+                                    Create Group
+                                </button>
+                            </div>
                         </div>
                     </form>
                 )}
 
-                {(() => {
-                    const filteredGroups = groups.filter(group => {
-                        if (filter === 'none') return true;
-                        const myBal = Number((group.balances || {})[user.id] || 0);
-                        if (filter === 'outstanding') return myBal !== 0;
-                        if (filter === 'owe') return myBal < 0;
-                        if (filter === 'owed') return myBal > 0;
-                        return true;
-                    });
-                    
-                    const activeGroups = filteredGroups.filter(g => Number((g.balances || {})[user.id] || 0) !== 0);
-                    const settledGroups = filteredGroups.filter(g => Number((g.balances || {})[user.id] || 0) === 0);
+                {/* Main Groups List Rendering */}
+                <div className="space-y-3 pb-20">
+                    {(() => {
+                        const baseList = activeGroups.filter(g => {
+                            if (activeTab === 'community') return g.groupType === 'community';
+                            return !g.groupType || g.groupType === 'default';
+                        });
 
-                    const renderGroup = (group) => {
-                        const myBal = Number((group.balances || {})[user.id] || 0);
+                        if (baseList.length === 0 && (activeTab === 'community' || settledGroups.length === 0)) {
+                            return (
+                                <div className="text-center py-12 px-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-100">
+                                    <div className={`w-16 h-16 ${activeTab === 'community' ? 'bg-orange-100 text-orange-500' : 'bg-emerald-100 text-emerald-500'} rounded-2xl flex items-center justify-center mx-auto mb-4`}>
+                                        <i className={`pi ${activeTab === 'community' ? 'pi-sync' : 'pi-users'} text-2xl`}></i>
+                                    </div>
+                                    <h3 className="text-gray-900 font-black text-lg">No {activeTab} groups</h3>
+                                    <p className="text-gray-500 text-sm mt-1 mb-6">Create your first {activeTab} group to start tracking.</p>
+                                    <button 
+                                        onClick={() => { setIsCreating(true); setNewGroupType(activeTab === 'community' ? 'community' : 'default'); }}
+                                        className={`px-6 py-3 ${activeTab === 'community' ? 'bg-orange-600 shadow-orange-100' : 'bg-emerald-600 shadow-emerald-100'} text-white font-bold rounded-2xl shadow-lg transition-transform active:scale-95`}
+                                    >
+                                        Create Group
+                                    </button>
+                                </div>
+                            );
+                        }
+
                         return (
-                            <Link
-                                to={`/group/${group._id}`}
-                                key={group._id}
-                                className="block bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100 transition-all group"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-emerald-900 group-hover:bg-slate-100 group-hover:scale-105 transition-all">
-                                        <i className="pi pi-th-large text-xl"></i>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-gray-800 text-lg truncate leading-tight">{group.name}</h3>
-                                        <p className="text-sm text-gray-500 mt-0.5">{group.members.length} member{group.members.length !== 1 && 's'}</p>
-                                    </div>
-                                    {myBal !== 0 ? (
-                                        <div className={`text-right flex-shrink-0 ml-2 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                            <p className={`text-[10px] font-black uppercase tracking-tight mb-0.5 ${myBal > 0 ? 'text-emerald-500/80' : 'text-rose-500/80'}`}>
-                                                {myBal > 0 ? 'you get back' : 'you owe'}
-                                            </p>
-                                            <p className={`text-[16px] font-black leading-none ${myBal > 0 ? 'text-emerald-500' : 'text-rose-600'}`}>
-                                                {formatCurrency(Math.abs(myBal), user?.defaultCurrency)}
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="text-right flex-shrink-0 ml-2">
-                                            <p className="text-[13px] font-bold text-gray-400 uppercase tracking-widest mt-1">settled</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </Link>
-                        );
-                    };
+                            <>
+                                {baseList.map((group) => {
+                                    const isCommunity = group.groupType === 'community';
+                                    const paidCount = group.paymentCycle?.filter(c => c.hasPaid).length || 0;
+                                    const totalMembers = group.members?.length || 0;
 
-                    return (
-                        <div className="space-y-4">
-                            {filteredGroups.length === 0 && !isCreating ? (
-                                <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-300">
-                                    <i className="pi pi-database text-gray-300 text-4xl mb-3 block"></i>
-                                    <p className="text-gray-500 font-medium">{filter === 'none' ? 'No groups yet.' : 'No groups match this filter.'}</p>
-                                    <p className="text-sm text-gray-400 mt-1">{filter === 'none' ? 'Create a group to start splitting bills!' : 'Try changing your filter settings.'}</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col gap-3">
-                                    {activeGroups.map(renderGroup)}
-                                    
-                                    {settledGroups.length > 0 && (
-                                        <div className="mt-5 pt-6 border-t border-gray-100/60">
-                                            <button
-                                                onClick={() => setShowSettled(!showSettled)}
-                                                className="w-full py-3.5 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 font-bold rounded-xl text-[14px] transition-colors flex items-center justify-center gap-2 shadow-sm"
-                                            >
-                                                {showSettled ? 'Hide settled up' : `Show settled up (${settledGroups.length})`}
-                                            </button>
-                                            
-                                            {showSettled && (
-                                                <div className="mt-3 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
-                                                    {settledGroups.map(renderGroup)}
+                                    return (
+                                        <Link 
+                                            key={group._id} 
+                                            to={`/group/${group._id}`}
+                                            className="flex items-center gap-4 p-4 bg-white rounded-3xl border border-gray-100 shadow-sm active:scale-[0.98] transition group"
+                                        >
+                                            <div className={`w-14 h-14 ${isCommunity ? 'bg-orange-50 text-orange-500' : 'bg-emerald-100/50 text-emerald-700'} rounded-2xl flex items-center justify-center flex-shrink-0 font-black text-xl shadow-inner`}>
+                                                {group.name?.charAt(0)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-black text-gray-900 group-hover:text-emerald-700 transition-colors truncate">{group.name}</h3>
+                                                <p className="text-[12px] text-gray-400 font-bold uppercase tracking-wider">{group.members?.length} members</p>
+                                            </div>
+
+                                            {isCommunity ? (
+                                                <div className="text-right flex flex-col items-end">
+                                                    <div className="bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                                                        <span className="text-[11px] font-black text-orange-600 uppercase tracking-tight">Cycle: {paidCount}/{totalMembers}</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest leading-none">Rotation Active</p>
+                                                </div>
+                                            ) : (
+                                                <div className="text-right">
+                                                    {group.myBalance > 0 ? (
+                                                        <>
+                                                            <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest leading-none">You get back</p>
+                                                            <p className="text-[17px] text-emerald-500 font-black tracking-tight">{formatCurrency(group.myBalance, group.currency || user?.defaultCurrency)}</p>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <p className="text-[10px] text-rose-500 font-black uppercase tracking-widest leading-none">You owe</p>
+                                                            <p className="text-[17px] text-rose-500 font-black tracking-tight">{formatCurrency(Math.abs(group.myBalance), group.currency || user?.defaultCurrency)}</p>
+                                                        </>
+                                                    )}
                                                 </div>
                                             )}
-                                        </div>
-                                    )}
-                                    
-                                    {activeGroups.length === 0 && settledGroups.length > 0 && !showSettled && (
-                                        <p className="text-gray-400 text-sm mt-6 text-center bg-gray-50 rounded-xl p-4 font-medium border border-gray-100">All your groups are currently settled up. You're all square!</p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })()}
+                                        </Link>
+                                    );
+                                })}
+
+                                {activeTab === 'standard' && settledGroups.length > 0 && (
+                                    <div className="pt-2">
+                                        <button
+                                            onClick={() => setShowSettled(!showSettled)}
+                                            className="w-full py-4 text-gray-400 font-bold text-[14px] hover:text-gray-600 transition flex items-center justify-center gap-2"
+                                        >
+                                            {showSettled ? 'Hide settled up' : `Show settled up (${settledGroups.length})`}
+                                            <i className={`pi ${showSettled ? 'pi-chevron-up' : 'pi-chevron-down'} text-xs`}></i>
+                                        </button>
+                                        {showSettled && settledGroups.map(group => (
+                                            <Link 
+                                                key={group._id} 
+                                                to={`/group/${group._id}`} 
+                                                className="flex items-center gap-4 p-4 bg-gray-50/50 rounded-3xl border border-transparent hover:border-gray-100 transition opacity-70 group"
+                                            >
+                                                <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center font-black text-gray-400 group-hover:bg-white shadow-sm transition-all">
+                                                    {group.name?.charAt(0)}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className="font-bold text-gray-500 group-hover:text-gray-700 transition-colors">{group.name}</h3>
+                                                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Settled</p>
+                                                </div>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        );
+                    })()}
+                </div>
             </main>
 
             <BottomNav />

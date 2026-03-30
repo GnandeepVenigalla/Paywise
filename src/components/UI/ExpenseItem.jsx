@@ -14,7 +14,8 @@ const ExpenseItem = ({
     groupName,
     isLoan = false,
     parentLoan,
-    billImage
+    billImage,
+    isCommunity = false
 }) => {
     const formattedDate = new Date(date).toLocaleDateString('en-US', {
         month: 'short',
@@ -45,6 +46,9 @@ const ExpenseItem = ({
                         <h4 className="font-bold text-gray-900 truncate leading-tight">
                             {description}
                         </h4>
+                        {isCommunity && (
+                            <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[9px] font-black uppercase tracking-widest leading-none">Turn</span>
+                        )}
                         {isLoan && (
                             <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-black uppercase tracking-widest">Loan</span>
                         )}
@@ -65,17 +69,26 @@ const ExpenseItem = ({
                 </div>
             </div>
 
-            <div className="text-right flex-shrink-0 ml-4">
-                <p className="text-[17px] font-black text-gray-900 leading-none mb-1">
-                    {formatCurrency(amount, targetCurrency, sourceCurrency)}
-                </p>
-                <p className={`text-[12px] font-bold uppercase tracking-tight ${userSplit > 0 ? 'text-emerald-500' : userSplit < 0 ? 'text-rose-500' : 'text-gray-400'}`}>
-                    {userSplit > 0 ? 'You are owed' : userSplit < 0 ? 'You owe' : 'Settled'}
-                    <span className="ml-1 font-black">
-                        {formatCurrency(Math.abs(userSplit), targetCurrency, sourceCurrency)}
-                    </span>
-                </p>
-            </div>
+            {isCommunity ? (
+                <div className="text-right flex-shrink-0 ml-4 flex flex-col items-end">
+                    <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100 shadow-sm">
+                        <i className="pi pi-check text-emerald-600 text-[10px]"></i>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mt-1.5">Done</span>
+                </div>
+            ) : (
+                <div className="text-right flex-shrink-0 ml-4">
+                    <p className="text-[17px] font-black text-gray-900 leading-none mb-1">
+                        {formatCurrency(amount, targetCurrency, sourceCurrency)}
+                    </p>
+                    <p className={`text-[12px] font-bold uppercase tracking-tight ${userSplit > 0 ? 'text-emerald-500' : userSplit < 0 ? 'text-rose-500' : 'text-gray-400'}`}>
+                        {userSplit > 0 ? 'You are owed' : userSplit < 0 ? 'You owe' : 'Settled'}
+                        <span className="ml-1 font-black">
+                            {formatCurrency(Math.abs(userSplit), targetCurrency, sourceCurrency)}
+                        </span>
+                    </p>
+                </div>
+            )}
         </div>
     );
 };
