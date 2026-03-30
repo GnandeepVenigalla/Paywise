@@ -217,10 +217,18 @@ export default function FriendDetails() {
     };
 
     const handleRejectLoan = async (loanId) => {
-        if (!window.confirm("Reject this loan request? It will remain as a regular split with no interest.")) return;
+        // Find the expense ID from the loan request map
+        const expId = Object.keys(loanRequests).find(eid => loanRequests[eid]._id === loanId);
+        
+        if (!window.confirm("Reject this loan invitation? If you decline, this whole expense will be deleted from your ledger for security and clarity.")) return;
+        
         setIsSubmittingLoan(true);
         try {
             await api.post(`/loans/${loanId}/reject`);
+            // Delete the expense as well
+            if (expId) {
+                await api.delete(`/expenses/${expId}`);
+            }
             fetchFriendDetails();
         } catch (err) {
             alert(err.response?.data?.msg || 'Failed to reject loan.');

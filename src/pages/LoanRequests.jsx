@@ -54,11 +54,18 @@ export default function LoanRequests() {
         }
     };
 
-    const handleReject = async (loanId) => {
-        if (!window.confirm('Reject this loan? No interest will be charged and the expense will remain as a regular split.')) return;
+    const handleReject = async (loan) => {
+        const loanId = loan._id;
+        const expId = loan.expense?._id || loan.expense;
+        
+        if (!window.confirm('Reject this loan invitation? If you decline, this whole expense will be deleted from your ledger for security and clarity.')) return;
+        
         setIsSubmitting(true);
         try {
             await api.post(`/loans/${loanId}/reject`, {});
+            if (expId) {
+                await api.delete(`/expenses/${expId}`);
+            }
             fetchPending();
         } catch (err) {
             alert(err.response?.data?.msg || 'Failed to reject loan.');
@@ -229,7 +236,7 @@ export default function LoanRequests() {
                                         {/* Action Buttons */}
                                         <div className="flex gap-3">
                                             <button
-                                                onClick={() => handleReject(loan._id)}
+                                                onClick={() => handleReject(loan)}
                                                 disabled={isSubmitting}
                                                 className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl border-2 border-rose-200 text-rose-600 font-bold text-[15px] hover:bg-rose-50 transition disabled:opacity-50"
                                             >

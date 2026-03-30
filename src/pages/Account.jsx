@@ -20,11 +20,6 @@ export default function Account() {
     const { isInstallable, promptInstall, isIosPromptVisible, hideIosPrompt } = useInstallApp();
     const fileInputRef = useRef(null);
     const [isUploading, setIsUploading] = useState(false);
-    const [pendingLoanCount, setPendingLoanCount] = useState(0);
-
-    useEffect(() => {
-        api.get('/loans/pending').then(res => setPendingLoanCount(res.data?.length || 0)).catch(() => {});
-    }, []);
 
     const handleProfilePicUpload = async (e) => {
         const file = e.target.files[0];
@@ -168,14 +163,6 @@ export default function Account() {
                     label: 'Default Currency',
                     sub: currencyDisplay,
                     to: '/account/currency',
-                },
-                {
-                    icon: <Banknote className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
-                    bg: 'bg-amber-50 dark:bg-amber-950/30',
-                    label: 'Loan Requests',
-                    sub: pendingLoanCount > 0 ? `${pendingLoanCount} pending acceptance` : 'Review incoming loan requests',
-                    to: '/loans',
-                    badge: pendingLoanCount > 0 ? pendingLoanCount : null,
                 },
             ],
         },
@@ -340,7 +327,7 @@ export default function Account() {
             <div className="text-center mt-8 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.4.3 /164 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.4.3 /174 · © 2026</p>
                 </div>
                 <div
                     onClick={spawnKitty}
