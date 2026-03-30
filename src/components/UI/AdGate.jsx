@@ -15,11 +15,19 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
 
     useEffect(() => {
         if (status === 'playing') {
+            // Attempt to push a Google Ad if the system is available
+            try {
+                if (window.adsbygoogle) {
+                    (window.adsbygoogle = window.adsbygoogle || []).push({});
+                }
+            } catch (adErr) {
+                console.error('Google Ad Request failed:', adErr);
+            }
+
             const timer = setInterval(() => {
                 setTimeLeft(prev => {
                     if (prev <= 1) {
                         clearInterval(timer);
-                        // Auto-finish when timer is done instead of showing another screen
                         onFinish(); 
                         return 0;
                     }
@@ -45,10 +53,22 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
     const startAd = () => {
         setStatus('loading');
         trackAdEvent('adRequests');
-        // Faster simulation for better UX
+        
+        // Check for Google AdSense presence as a sign of successful load
+        const isGoogleActive = window.adsbygoogle && window.adsbygoogle.loaded;
+
+        // Priotise Google, with a quick fallback trigger
         setTimeout(() => {
-            setStatus('playing');
-            trackAdEvent('adImpressions');
+            if (isGoogleActive) {
+                // If Google is detected, we still show our playing state but 
+                // Google might actually pop its own overlay on top of us.
+                setStatus('playing');
+                trackAdEvent('adImpressions_google');
+            } else {
+                // Fallback to our internal monetag/simulated system
+                setStatus('playing');
+                trackAdEvent('adImpressions_fallback');
+            }
         }, 800);
     };
 
@@ -102,21 +122,28 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                 );
             case 'playing':
                 return (
-                    <div className="flex flex-col items-center justify-center w-full h-full min-h-[450px] relative">
-                         {/* Seamless Ad Integration - Monetag Placeholder */}
-                         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50/50 dark:bg-black/20 p-8 text-center pt-24">
-                            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">Displaying Sponsor Content</h3>
-                            <div className="mb-6 flex items-center gap-2 bg-gray-200/50 dark:bg-slate-700/50 px-3 py-1 rounded-full border border-gray-300 dark:border-slate-600">
+                    <div className="flex flex-col items-center justify-center w-full h-full min-h-[450px] relative px-4">
+                         {/* Priority 1: Real Google AdSense Unit */}
+                         <div className="google-ad-container w-full h-[280px] bg-slate-50/30 dark:bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-100 dark:border-white/5 shadow-inner">
+                            <ins className="adsbygoogle"
+                                 style={{ display: 'block', width: '100%', height: '280px' }}
+                                 data-ad-client="ca-pub-7749956119820849"
+                                 data-ad-slot="auto"
+                                 data-full-width-responsive="true"></ins>
+                         </div>
+
+                         <div className="mt-6 flex flex-col items-center text-center">
+                            <div className="mb-4 flex items-center gap-2 bg-gray-200/50 dark:bg-slate-700/50 px-3 py-1 rounded-full border border-gray-300 dark:border-slate-600">
                                  <AlertTriangle className="w-3 h-3 text-gray-500" />
-                                 <span className="text-[9px] font-black tracking-widest text-gray-600 dark:text-gray-400 uppercase">Third-Party Content Notice</span>
+                                 <span className="text-[9px] font-black tracking-widest text-gray-600 dark:text-gray-400 uppercase">Secure Verification Stream</span>
                             </div>
                             <p className="text-gray-500 dark:text-gray-400 text-sm max-w-[240px] leading-relaxed">
-                                Please wait while we verify completion. We recommend not interaction with any suspicious pop-ups.
+                                Please wait while we verify your access. Do not refresh or exit.
                             </p>
                          </div>
 
-                         <div className="absolute top-8 right-8 z-30 bg-white dark:bg-slate-900 shadow-2xl px-6 py-2.5 rounded-full border border-indigo-500/30">
-                            <span className="text-slate-900 dark:text-white font-black text-sm tabular-nums">Unlocking in {timeLeft}s</span>
+                         <div className="absolute top-6 right-6 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-lg px-5 py-2.5 rounded-full border border-emerald-500">
+                            <span className="text-slate-900 dark:text-white font-black text-xs tabular-nums">Ready in {timeLeft}s</span>
                          </div>
                     </div>
                 );

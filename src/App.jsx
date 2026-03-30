@@ -16,13 +16,12 @@ import Activity from './pages/Activity';
 import Account from './pages/Account';
 import AccountSettings from './pages/AccountSettings';
 import Notifications from './pages/Notifications';
-import PrivacySecurity from './pages/PrivacySecurity';
-import CurrencySettings from './pages/CurrencySettings';
-import AppSettings from './pages/AppSettings';
-import JoinGroup from './pages/JoinGroup';
-import SplitwiseCallback from './pages/SplitwiseCallback';
 import AiAssistant from './pages/AiAssistant';
 import BetaHandler from './pages/BetaHandler';
+import HelpSupport from './pages/HelpSupport';
+import TermsOfService from './pages/TermsOfService';
+import PrivacySecurity from './pages/PrivacySecurity';
+import BetaLanding from './pages/BetaHandler';
 import HelpSupport from './pages/HelpSupport';
 import Katha from './pages/Katha';
 import KathaDetail from './pages/KathaDetail';
@@ -98,6 +97,8 @@ function App() {
                 <Route path="/ai" element={<PrivateRoute><AiAssistant /></PrivateRoute>} />
                 <Route path="/loans" element={<PrivateRoute><LoanRequests /></PrivateRoute>} />
                 <Route path="/beta" element={<BetaHandler />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/privacy" element={<PrivacySecurity />} />
                 <Route path="/" element={<Navigate to="/dashboard" />} />
               </Routes>
             </BiometricGate>
