@@ -56,8 +56,8 @@ export const convertAmount = (amount, from = 'USD', to = 'USD') => {
  * @returns {string} - Formatted currency string
  */
 export const formatCurrency = (amount, targetCurrency = 'USD', sourceCurrency = 'USD') => {
-    const t = targetCurrency.toUpperCase();
-    const s = sourceCurrency.toUpperCase();
+    const t = (targetCurrency || 'USD').toUpperCase();
+    const s = (sourceCurrency || 'USD').toUpperCase();
     const converted = convertAmount(amount, s, t);
     const symbol = CURRENCY_SYMBOLS[t] || t || '$';
     return `${symbol}${Math.abs(converted).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;

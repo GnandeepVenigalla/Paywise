@@ -12,7 +12,7 @@ import { useAppSettings } from '../hooks/useAppSettings';
 import { useMonthlySpending } from '../hooks/useMonthlySpending';
 import ExpenseItem from '../components/UI/ExpenseItem';
 import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS, convertAmount } from '../utils/formatters';
-import { X, HelpCircle, TrendingUp, PieChart, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { X, HelpCircle, TrendingUp, PieChart, ChevronLeft, ChevronRight, FileSpreadsheet, Building2, Banknote, CheckCircle2, DollarSign, FileText } from 'lucide-react';
 import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, toggleItemAssignment } from '../utils/expenseUtils';
 export default function GroupDetails() {
     const { id } = useParams();
@@ -279,12 +279,13 @@ export default function GroupDetails() {
     const handleSettleIndividualExpense = async (expense, amount) => {
         try {
             const payerId = user.id || user._id; 
-            const receiverId = expense.paidBy._id || expense.paidBy;
+            const receiverId = expense.paidBy?._id || expense.paidBy;
+            if (!receiverId || !payerId) throw new Error('Missing payer or receiver data.');
             
             await api.post('/expenses', {
                 group: id,
                 amount: amount,
-                description: `Partial cash payment (Settle: ${expense.description})`,
+                description: `Partial cash payment (Settle: ${expense.description || 'Expense'})`,
                 paidBy: payerId,
                 currency: expense.currency || displayCurrency || 'USD',
                 splits: [{ user: receiverId, amount: amount }]
