@@ -34,8 +34,12 @@ if ('serviceWorker' in navigator) {
 // Global Ad Transparency System
 // Monitors for dynamic 3rd-party ad injections (Monetag, etc.) and tags them
 const startAdObserver = () => {
-  const adKeywords = ['monetag', 'izcle', 'propush', 'vignette', 'onsite', 'ad-', 'ads-', 'google-ads', 'sponsored'];
-  const suspiciousText = ['vpn recommended', 'install and continue', 'tap to install', 'download now', 'system update', 'security warning'];
+  const adKeywords = ['monetag', 'izcle', 'propush', 'vignette', 'onsite', 'ad-', 'ads-', 'google-ads', 'sponsored', 'onclick', 'popcash', 'popads'];
+  const suspiciousText = [
+    'vpn recommended', 'install and continue', 'tap to install', 'download now', 'system update', 
+    'security warning', 'download is ready', 'tap to proceed', 'please wait...', 'recommended app',
+    'security scan', 'threats found', 'optimize your', 'free download', 'urgent action', 'cleaning system'
+  ];
   
   const tagAd = (node) => {
     if (node.nodeType !== 1 || node.dataset.adTagged) return;
@@ -57,8 +61,15 @@ const startAdObserver = () => {
     const hasSuspiciousText = suspiciousText.some(st => nodeText.includes(st));
     const isHighZOverlay = parseInt(style.zIndex) >= 1000 && (style.position === 'fixed' || style.position === 'absolute');
     
+    // Check if it's an iframe with an ad source
+    let hasAdSource = false;
+    if (node.tagName === 'IFRAME') {
+      const src = (node.src || '').toLowerCase();
+      hasAdSource = adKeywords.some(kw => src.includes(kw));
+    }
+    
     // If it's a high-z overlay outside root (or specifically branded), it's probably an ad
-    if ((hasAdKeyword || (isHighZOverlay && !isInternal) || hasSuspiciousText)) {
+    if ((hasAdKeyword || hasAdSource || (isHighZOverlay && !isInternal) || hasSuspiciousText)) {
       node.dataset.adTagged = 'true';
       
       const badge = document.createElement('div');
