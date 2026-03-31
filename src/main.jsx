@@ -34,81 +34,90 @@ if ('serviceWorker' in navigator) {
 // Global Ad Transparency System
 // Monitors for dynamic 3rd-party ad injections (Monetag, etc.) and tags them
 const startAdObserver = () => {
-  const adKeywords = ['monetag', 'izcle', 'propush', 'vignette', 'onsite', 'ad-', 'ads-', 'google-ads'];
+  const adKeywords = ['monetag', 'izcle', 'propush', 'vignette', 'onsite', 'ad-', 'ads-', 'google-ads', 'sponsored'];
+  const suspiciousText = ['vpn recommended', 'install and continue', 'tap to install', 'download now', 'system update', 'security warning'];
   
+  const tagAd = (node) => {
+    if (node.nodeType !== 1 || node.dataset.adTagged) return;
+    
+    const nodeId = (node.id || '').toLowerCase();
+    const nodeClass = (node.className?.toString() || '').toLowerCase();
+    const nodeText = (node.innerText || '').toLowerCase();
+    const root = document.getElementById('root');
+    const style = window.getComputedStyle(node);
+    
+    // Exclusion: Identify legitimate PrimeReact or App components
+    // PrimeReact components almost always have 'p-component' or follow a strict 'p-' prefix
+    const isPrimeReact = nodeClass.includes('p-component') || nodeClass.includes('p-toast') || nodeClass.includes('p-dialog');
+    const isAppRoot = root?.contains(node);
+    const isInternal = isPrimeReact || (isAppRoot && !nodeClass.includes('monetag'));
+
+    // Heuristics for Ads
+    const hasAdKeyword = adKeywords.some(kw => nodeId.includes(kw) || nodeClass.includes(kw));
+    const hasSuspiciousText = suspiciousText.some(st => nodeText.includes(st));
+    const isHighZOverlay = parseInt(style.zIndex) >= 1000 && (style.position === 'fixed' || style.position === 'absolute');
+    
+    // If it's a high-z overlay outside root (or specifically branded), it's probably an ad
+    if ((hasAdKeyword || (isHighZOverlay && !isInternal) || hasSuspiciousText)) {
+      node.dataset.adTagged = 'true';
+      
+      const badge = document.createElement('div');
+      badge.innerHTML = `
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:7px;height:7px;border-radius:50%;background:#ef4444;box-shadow:0 0 6px #ef4444;animation:pulse 2s infinite;"></div>
+          <span>ADS / SPONSORED CONTENT</span>
+        </div>
+        <style>@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }</style>
+      `;
+      
+      badge.style.cssText = `
+        position: fixed;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 2147483647 !important;
+        background: rgba(0, 0, 0, 0.9);
+        color: #ffffff;
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 10px;
+        font-weight: 900;
+        padding: 8px 20px;
+        border: 1px solid rgba(255,255,255,0.25);
+        border-radius: 999px;
+        pointer-events: none;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 15px rgba(239, 68, 68, 0.3);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        backdrop-filter: blur(12px);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        white-space: nowrap;
+      `;
+      
+      document.body.appendChild(badge);
+      
+      const checkInterval = setInterval(() => {
+        if (!document.body.contains(node) || style.display === 'none' || style.visibility === 'hidden') {
+          badge.style.opacity = '0';
+          badge.style.transform = 'translateX(-50%) translateY(-20px)';
+          setTimeout(() => { badge.remove(); clearInterval(checkInterval); }, 500);
+        }
+      }, 800);
+    }
+  };
+
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === 1) { // Is Element
-          const nodeId = (node.id || '').toLowerCase();
-          const nodeClass = (node.className?.toString() || '').toLowerCase();
-          const root = document.getElementById('root');
-          
-          // Exclusion list for legitimate application components (Portals, PrimeReact, etc.)
-          const appClasses = ['p-', 'pi-', 'toast', 'modal', 'headlessui', 'radix'];
-          const isAppElement = appClasses.some(ac => nodeId.includes(ac) || nodeClass.includes(ac));
-          
-          // Check if it's an ad container or a high-z-index overlay outside the React root
-          const isKeywordMatch = adKeywords.some(kw => nodeId.includes(kw) || nodeClass.includes(kw));
-          const isHighZOverlay = (window.getComputedStyle(node).zIndex >= 9999) && !root?.contains(node) && !isAppElement;
-          
-          const isAdContainer = isKeywordMatch || isHighZOverlay;
-
-          if (isAdContainer && !node.dataset.adTagged) {
-            node.dataset.adTagged = 'true';
-            
-            // Create a very prominent "ADS" badge
-            const badge = document.createElement('div');
-            badge.innerHTML = `
-              <div style="display:flex;align-items:center;gap:6px;">
-                <div style="width:6px;height:6px;border-radius:50%;background:#ef4444;box-shadow:0 0 4px #ef4444;"></div>
-                <span>ADS / SPONSORED CONTENT</span>
-              </div>
-            `;
-            
-            badge.style.cssText = `
-              position: fixed;
-              top: 10px;
-              left: 50%;
-              transform: translateX(-50%);
-              z-index: 2147483647 !important;
-              background: rgba(0, 0, 0, 0.95);
-              color: #ffffff;
-              font-family: system-ui, -apple-system, sans-serif;
-              font-size: 10px;
-              font-weight: 950;
-              padding: 6px 16px;
-              border: 1px solid rgba(255,255,255,0.3);
-              border-radius: 999px;
-              pointer-events: none;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 10px rgba(239, 68, 68, 0.4);
-              letter-spacing: 1.5px;
-              text-transform: uppercase;
-              backdrop-filter: blur(8px);
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              white-space: nowrap;
-            `;
-            
-            document.body.appendChild(badge);
-            
-            // Periodically check if the triggering node is still present or visible
-            const checkInterval = setInterval(() => {
-              if (!document.body.contains(node)) {
-                badge.style.opacity = '0';
-                badge.style.transform = 'translateX(-50%) translateY(-20px)';
-                setTimeout(() => {
-                  badge.remove();
-                  clearInterval(checkInterval);
-                }, 300);
-              }
-            }, 1000);
-          }
-        }
-      });
+      mutation.addedNodes.forEach(tagAd);
     });
   });
   
   observer.observe(document.body, { childList: true, subtree: true });
+
+  // Fallback: periodic scan for ads that change properties without being re-added
+  setInterval(() => {
+    const overlays = Array.from(document.querySelectorAll('body > div, body > iframe, [style*="z-index"]'));
+    overlays.forEach(tagAd);
+  }, 2000);
 };
 if (typeof window !== 'undefined') startAdObserver();
 
