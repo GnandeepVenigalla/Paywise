@@ -124,21 +124,22 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                 return (
                     <div className="flex flex-col items-center justify-center w-full h-full min-h-[450px] relative px-4">
                          {/* Priority 1: Real Google AdSense Unit */}
-                         <div className="google-ad-container w-full h-[280px] bg-slate-50/30 dark:bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-100 dark:border-white/5 shadow-inner">
-                            <ins className="adsbygoogle"
-                                 style={{ display: 'block', width: '100%', height: '280px' }}
-                                 data-ad-client="ca-pub-7749956119820849"
-                                 data-ad-slot="auto"
-                                 data-full-width-responsive="true"></ins>
+                         <div className="google-ad-container w-full h-[280px] bg-slate-50/30 dark:bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-100 dark:border-white/5 shadow-inner relative">
+                             <div className="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded text-[8px] font-black text-white/80 uppercase tracking-widest border border-white/10">ADS</div>
+                             <ins className="adsbygoogle"
+                                  style={{ display: 'block', width: '100%', height: '280px' }}
+                                  data-ad-client="ca-pub-7749956119820849"
+                                  data-ad-slot="auto"
+                                  data-full-width-responsive="true"></ins>
                          </div>
 
                          <div className="mt-6 flex flex-col items-center text-center">
                             <div className="mb-4 flex items-center gap-2 bg-gray-200/50 dark:bg-slate-700/50 px-3 py-1 rounded-full border border-gray-300 dark:border-slate-600">
                                  <AlertTriangle className="w-3 h-3 text-gray-500" />
-                                 <span className="text-[9px] font-black tracking-widest text-gray-600 dark:text-gray-400 uppercase">Secure Verification Stream</span>
+                                 <span className="text-[9px] font-black tracking-widest text-gray-600 dark:text-gray-400 uppercase">Verification Hub</span>
                             </div>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm max-w-[240px] leading-relaxed">
-                                Please wait while we verify your access. Do not refresh or exit.
+                            <p className="text-gray-500 dark:text-gray-400 text-xs px-4 max-w-[280px] leading-relaxed">
+                                Content from independent sponsors is being verified. <span className="font-bold text-red-500 underline">Ignore</span> any VPN, Antivirus or Download prompts to stay safe.
                             </p>
                          </div>
 
@@ -181,10 +182,16 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                 )}
                 <div className="w-full h-full overflow-y-auto custom-scrollbar relative">
                     {/* Security Disclaimer Header */}
-                    <div className="sticky top-0 left-0 right-0 h-12 bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-md flex items-center justify-between px-6 z-[60] border-b border-gray-100 dark:border-white/5">
-                        <div className="flex items-center gap-2">
-                             <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                             <span className="text-[10px] font-black tracking-[0.15em] text-gray-400 dark:text-slate-500 uppercase">Sponsored Advertisement</span>
+                    <div className="sticky top-0 left-0 right-0 h-14 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-md flex items-center justify-between px-6 z-[60] border-b border-gray-100 dark:border-white/10">
+                        <div className="flex items-center gap-3">
+                             <div className="flex items-center gap-2 bg-slate-900 dark:bg-black px-3 py-1.5 rounded-full shadow-lg border border-white/10">
+                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]" />
+                                <span className="text-[11px] font-black tracking-[0.15em] text-white uppercase">ADS</span>
+                             </div>
+                             <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase leading-none tracking-wider">Independent Provider</span>
+                                <span className="text-[9px] font-bold text-amber-500 uppercase leading-none mt-1">External Sponsored Media</span>
+                             </div>
                         </div>
                         {timeLeft < 4 && (
                             <button 

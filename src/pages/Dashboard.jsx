@@ -9,6 +9,7 @@ import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
 import SplitwiseMigrationBanner from '../components/SplitwiseMigrationBanner';
+import NotificationBell from '../components/NotificationBell';
 import { formatCurrency, convertAmount } from '../utils/formatters';
 
 export default function Dashboard() {
@@ -126,18 +127,44 @@ export default function Dashboard() {
 
     return (
         <div className="min-h-screen bg-gray-50 pb-24">
-            {/* Header */}
-            <header className="bg-white shadow-sm pt-8 pb-4 px-4 sticky top-0 z-10 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                    <img src={logoImg} alt="Paywise" className="w-8 h-8 object-contain" />
-                    <h1 className="text-xl font-bold text-gray-900">Paywise</h1>
+            <header className="bg-white dark:bg-slate-900 shadow-sm pt-8 pb-4 px-5 sticky top-0 z-30 flex justify-between items-center border-b border-slate-100 dark:border-slate-800 backdrop-blur-md bg-white/80 dark:bg-slate-900/80">
+                <div className="flex items-center gap-3">
+                    <img src={logoImg} alt="Paywise" className="w-9 h-9 object-contain drop-shadow-sm" />
+                    <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Paywise</h1>
                 </div>
-                <Link to="/ai" className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 group">
-                    <i className="pi pi-bolt group-hover:animate-pulse" style={{ fontSize: '1.2rem' }}></i>
-                </Link>
+                <div className="flex items-center gap-3">
+                    <NotificationBell />
+                    <Link to="/ai" className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all hover:scale-105 active:scale-95 group">
+                        <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform duration-300" />
+                    </Link>
+                </div>
             </header>
 
             <main className="px-4 pt-6 max-w-md mx-auto">
+                {/* ── Phone Missing Prompt (Especially for Google users) ── */}
+                {!user.phone && (
+                    <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-2xl animate-in slide-in-from-top duration-500 shadow-sm">
+                        <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                <Plus className="w-6 h-6 text-amber-600 rotate-45" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-black text-amber-900 text-sm uppercase tracking-wider mb-1">Action Required</h3>
+                                <p className="text-amber-800 text-[13px] leading-snug mb-3">
+                                    Your account is missing a phone number. Add it now to improve security and help friends find you.
+                                </p>
+                                <Link 
+                                    to="/account" 
+                                    className="inline-flex items-center gap-2 bg-amber-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-amber-700 transition active:scale-95 shadow-sm"
+                                >
+                                    Update Phone Number
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* ── Balance Summary Card ──────────────────────────── */}
                 <div className={`mb-6 bg-white rounded-2xl p-4 shadow-sm border border-gray-200 flex justify-between items-center transition-all ${hideBalance ? 'privacy-blur' : ''}`}>
                     <div className="flex items-center gap-1.5 text-[17px] font-semibold tracking-tight">

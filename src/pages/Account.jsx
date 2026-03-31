@@ -11,6 +11,7 @@ import Card from '../components/UI/Card';
 import Button from '../components/UI/Button';
 import { useInstallApp } from '../hooks/useInstallApp';
 import { useRef, useEffect } from 'react';
+import NotificationBell from '../components/NotificationBell';
 
 let memeCache = [];
 export default function Account() {
@@ -227,8 +228,9 @@ export default function Account() {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-24 font-sans text-gray-800 dark:text-gray-200 transition-colors">
-            <header className="bg-white dark:bg-slate-900 pt-10 pb-5 px-6 sticky top-0 z-10 border-b border-gray-100 dark:border-slate-800">
+            <header className="bg-white dark:bg-slate-900 pt-10 pb-5 px-6 sticky top-0 z-10 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
                 <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Account</h1>
+                <NotificationBell />
             </header>
 
             <main className="px-5 mt-6 max-w-lg mx-auto">
@@ -327,7 +329,7 @@ export default function Account() {
             <div className="text-center mt-8 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.4.4 /123 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.4.5 · © 2026</p>
                     <div className="mt-3 flex items-center justify-center gap-4 text-[10px] font-black uppercase tracking-widest text-[#19876e] dark:text-emerald-400">
                         <Link to="/terms" className="hover:underline">Terms</Link>
                         <span className="w-1 h-1 bg-gray-300 dark:bg-slate-700 rounded-full" />

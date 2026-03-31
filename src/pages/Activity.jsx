@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
+import NotificationBell from '../components/NotificationBell';
 import { formatCurrency } from '../utils/formatters';
 
 export default function Activity() {
@@ -34,8 +35,9 @@ export default function Activity() {
                     <h1 className="text-xl font-bold text-gray-900">Paywise</h1>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link to="/ai" className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-950 transition-all hover:scale-105 active:scale-95 group">
-                        <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+                    <NotificationBell />
+                    <Link to="/ai" className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shadow-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-all hover:scale-105 active:scale-95 group">
+                        <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform duration-300" />
                     </Link>
                 </div>
             </header>

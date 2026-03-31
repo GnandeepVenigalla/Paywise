@@ -344,10 +344,14 @@ export default function GroupDetails() {
             const payload = isEmail ? { email: emailToInvite } : { phone: emailToInvite };
             const res = await api.post(`/groups/${id}/members`, payload);
 
-            if (res.data.msg === 'Invitation email sent!' || res.data.msg === 'Invitation email sent to ghost user!') {
-                alert('User not registered yet, but we sent them a Paywise email invitation!');
+            if (res.data.user?.isGhostUser) {
+                if (res.data.user.email?.includes('ghost_phone_')) {
+                    alert(`Unregistered person added to "${group.name}"! Since they only have a phone number, we couldn't send an email invite. Please share the group invite link with them manually.`);
+                } else {
+                    alert(`New person invited to Paywise! They've been added to "${group.name}" via email invitation.`);
+                }
             } else {
-                alert('User successfully added to your group!');
+                alert('User added to the group! Since they are already on Paywise, they will see an invitation in their dashboard to join.');
             }
 
             setEmailToInvite('');
@@ -501,6 +505,43 @@ export default function GroupDetails() {
             </header>
 
             <main className="bg-white max-w-lg mx-auto">
+                {/* Pending Invitation Banner */}
+                {group.pendingMembers?.some(m => String(m._id || m) === String(user.id || user._id)) && (
+                    <div className="bg-amber-50 border-b border-amber-200 p-5 animate-in slide-in-from-top duration-500">
+                        <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                <HelpCircle className="w-6 h-6 text-amber-600" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-black text-amber-900 text-lg">Group Invitation</h3>
+                                <p className="text-amber-800 text-sm leading-snug mb-4">
+                                    You've been invited to join <strong>{group.name}</strong>. Accept to start sharing expenses and tracking balances.
+                                </p>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={async () => {
+                                            try {
+                                                await api.post(`/groups/${id}/accept`);
+                                                fetchGroup();
+                                            } catch (err) {
+                                                alert('Failed to accept invitation');
+                                            }
+                                        }}
+                                        className="bg-amber-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-amber-700 transition shadow-md active:scale-95"
+                                    >
+                                        Accept
+                                    </button>
+                                    <button 
+                                        onClick={handleLeaveGroup}
+                                        className="bg-white border border-amber-200 text-amber-600 px-4 py-2 rounded-xl font-bold hover:bg-amber-100 transition active:scale-95"
+                                    >
+                                        Decline
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {/* Invite Members form */}
                 {showInvite && (
                     <form onSubmit={inviteMember} className="bg-gray-50 p-5 shadow-inner border-b border-gray-200 animate-in fade-in zoom-in-95">
@@ -1092,7 +1133,15 @@ export default function GroupDetails() {
                                                 {member.username?.charAt(0)}
                                             </div>
                                             <div className="truncate flex-1">
-                                                <h4 className="text-[16px] text-gray-800 font-medium truncate leading-tight">{member.username}</h4>
+                                                <h4 className="text-[16px] text-gray-800 font-medium truncate leading-tight flex items-center gap-2">
+                                                    {member.username}
+                                                    {group.pendingMembers?.some(pm => String(pm._id || pm) === String(member._id)) && (
+                                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase font-black tracking-wider">Pending</span>
+                                                    )}
+                                                    {member.isGhostUser && (
+                                                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded uppercase font-black tracking-wider">Invited</span>
+                                                    )}
+                                                </h4>
                                                 <p className="text-[13px] text-gray-500 truncate mt-0.5">{member.email}</p>
                                             </div>
                                         </div>

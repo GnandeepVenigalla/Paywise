@@ -369,3 +369,67 @@ input[type=number] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* ── Global Ad Transparency Styling ─────────────────────── */
+.google-ad-container,
+ins.adsbygoogle {
+  position: relative;
+  display: block !important;
+  min-height: 50px;
+}
+
+.google-ad-container::before,
+ins.adsbygoogle::before,
+.ad-unit::before,
+[id^="google_ads_"]::before,
+[class*="monetag"]::before {
+  content: "ADS / SPONSORED";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 1001;
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  font-size: 8px;
+  font-weight: 950;
+  padding: 3px 8px;
+  letter-spacing: 1.2px;
+  border-radius: 4px;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Force labeling on ALL monetization layers that might pop up */
+body > div[style*="z-index: 2147483647"]::before,
+body > div[style*="z-index: 999999"]::before,
+.izcle-ad-layer::before,
+#vignette-overlay::before {
+  content: "ADS / SPONSORED CONTENT";
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  background: #000;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 950;
+  padding: 6px 16px;
+  border-radius: 999px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  letter-spacing: 1.5px;
+}
+
+/* Ensure AdGate header text is extra prominent */
+.ad-gate-sponsored-tag {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  font-weight: 950 !important;
+  font-size: 11px !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  letter-spacing: 1px;
+}

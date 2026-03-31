@@ -16,6 +16,7 @@ import Activity from './pages/Activity';
 import Account from './pages/Account';
 import AccountSettings from './pages/AccountSettings';
 import Notifications from './pages/Notifications';
+import NotificationSettings from './pages/NotificationSettings';
 import PrivacySecurity from './pages/PrivacySecurity';
 import CurrencySettings from './pages/CurrencySettings';
 import AppSettings from './pages/AppSettings';
@@ -87,7 +88,8 @@ function App() {
                 <Route path="/katha/:merchantId" element={<PrivateRoute><KathaDetail /></PrivateRoute>} />
                 <Route path="/account" element={<PrivateRoute><Account /></PrivateRoute>} />
                 <Route path="/account/settings" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
-                <Route path="/account/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
+                <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
+                <Route path="/account/notifications" element={<PrivateRoute><NotificationSettings /></PrivateRoute>} />
                 <Route path="/account/privacy" element={<PrivateRoute><PrivacySecurity /></PrivateRoute>} />
                 <Route path="/account/currency" element={<PrivateRoute><CurrencySettings /></PrivateRoute>} />
                 <Route path="/account/app-settings" element={<PrivateRoute><AppSettings /></PrivateRoute>} />

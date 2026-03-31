@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, HeartHandshake, Search, Plus, ArrowRight, ArrowLeft, Contact, Share2, Sparkles, SlidersHorizontal, Check } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
+import NotificationBell from '../components/NotificationBell';
 import { formatCurrency } from '../utils/formatters';
 
 export default function Friends() {
@@ -215,14 +216,15 @@ export default function Friends() {
                     <h1 className="text-xl font-bold text-gray-900">Paywise</h1>
                 </div>
                 <div className="flex items-center gap-3">
+                    <NotificationBell />
                     <button
                         onClick={() => { setIsAddingMode(!isAddingMode); setScannedResults(null); setSearchQuery(''); setSearchResults([]); }}
-                        className="p-2 rounded-full bg-slate-50 text-slate-900 hover:bg-slate-100 transition shadow-sm"
+                        className="p-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                     >
-                        {isAddingMode ? <HeartHandshake className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
+                        {isAddingMode ? <HeartHandshake className="w-6 h-6" /> : <UserPlus className="w-6 h-6" />}
                     </button>
-                    <Link to="/ai" className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-950 transition-all hover:scale-105 active:scale-95 group ml-1">
-                        <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+                    <Link to="/ai" className="w-11 h-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-950 transition-all hover:scale-105 active:scale-95 group ml-1">
+                        <Sparkles className="w-6 h-6 group-hover:animate-pulse" />
                     </Link>
                 </div>
             </header>
