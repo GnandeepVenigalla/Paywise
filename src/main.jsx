@@ -32,7 +32,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // Global Ad Transparency System
-// Monitors for dynamic 3rd-party ad injections (Monetag, etc.) and tags them
+// Monitors for dynamic 3rd-party ad injections and tags them for user safety
 const startAdObserver = () => {
   const adKeywords = ['monetag', 'izcle', 'propush', 'vignette', 'onsite', 'ad-', 'ads-', 'google-ads', 'sponsored', 'onclick', 'popcash', 'popads'];
   const suspiciousText = [

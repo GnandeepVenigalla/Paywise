@@ -65,7 +65,7 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                 setStatus('playing');
                 trackAdEvent('adImpressions_google');
             } else {
-                // Fallback to our internal monetag/simulated system
+                // Fallback to our internal simulated ad state
                 setStatus('playing');
                 trackAdEvent('adImpressions_fallback');
             }
@@ -92,19 +92,13 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                         <div className="mb-4 text-[10px] text-gray-400 font-bold uppercase tracking-widest text-center max-w-[250px] mx-auto opacity-70">
                             Paywise never promotes third-party downloads. Only proceed if you trust the content.
                         </div>
-                        <a 
-                            href="javascript:void(0)" 
+                        <button 
+                            type="button"
                             onClick={startAd}
-                            className="w-full block decoration-none"
-                            data-vignette-zone="10804063"
+                            className="w-full bg-slate-900 dark:bg-indigo-600 text-white h-16 rounded-[24px] font-black text-lg flex items-center justify-center gap-3 active:scale-95 transition-all shadow-2xl shadow-indigo-500/20"
                         >
-                            <button 
-                                type="button"
-                                className="w-full bg-slate-900 dark:bg-indigo-600 text-white h-16 rounded-[24px] font-black text-lg flex items-center justify-center gap-3 active:scale-95 transition-all shadow-2xl shadow-indigo-500/20"
-                            >
-                                <PlayCircle className="w-6 h-6" /> Start Ad
-                            </button>
-                        </a>
+                            <PlayCircle className="w-6 h-6" /> Start Ad
+                        </button>
                         <button onClick={onClose} className="mt-6 text-xs font-black text-gray-400 uppercase tracking-[0.2em] hover:text-gray-900 dark:hover:text-white transition-colors">Not Now</button>
                     </div>
                 );
