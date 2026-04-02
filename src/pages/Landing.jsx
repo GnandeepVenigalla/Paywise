@@ -8,6 +8,13 @@ import logoFull from '../assets/logo_full.png';
 export default function Landing() {
     const { user } = useContext(AuthContext);
     const navigate = useNavigate();
+    
+    const scrollToSection = (id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
 
     // If already logged in, show a way to go to dashboard or just redirect if the user wants
     // But for AdSense, we WANT the landing page to be the first thing bots see.
@@ -22,8 +29,8 @@ export default function Landing() {
                 </div>
                 
                 <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-600">
-                    <a href="#features" className="hover:text-slate-900 transition-colors">Features</a>
-                    <a href="#how-it-works" className="hover:text-slate-900 transition-colors">How it Works</a>
+                    <button onClick={() => scrollToSection('features')} className="hover:text-slate-900 transition-colors cursor-pointer bg-transparent border-none p-0 font-bold">Features</button>
+                    <button onClick={() => scrollToSection('how-it-works')} className="hover:text-slate-900 transition-colors cursor-pointer bg-transparent border-none p-0 font-bold">How it Works</button>
                     <Link to="/privacy" className="hover:text-slate-900 transition-colors">Security</Link>
                 </div>
 
@@ -64,9 +71,9 @@ export default function Landing() {
                             Get Started Free
                             <ChevronRight className="w-5 h-5" />
                         </Link>
-                        <a href="#features" className="w-full sm:w-auto px-8 py-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-lg text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center">
+                        <button onClick={() => scrollToSection('features')} className="w-full sm:w-auto px-8 py-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-lg text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center cursor-pointer">
                             Explore Features
-                        </a>
+                        </button>
                     </div>
 
                     {/* App Preview Mockup */}
@@ -87,15 +94,58 @@ export default function Landing() {
                 <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-50/40 blur-[100px] rounded-full -z-10" />
             </section>
 
+            {/* PWA / No App Store Section (Moved to Top) */}
+            <section className="py-20 px-6 bg-slate-900 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 blur-[120px] rounded-full translate-x-1/2 -translate-y-1/2"></div>
+                <div className="max-w-4xl mx-auto text-center relative z-10">
+                    <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-8 border border-emerald-500/20">
+                        <Smartphone className="w-4 h-4" />
+                        A Better App Experience
+                    </div>
+                    <h3 className="text-3xl md:text-5xl font-black mb-8 leading-tight">No App Store Required. <span className="text-emerald-400">No Downloads.</span></h3>
+                    <p className="text-lg md:text-xl text-slate-400 mb-12 leading-relaxed max-w-2xl mx-auto font-medium">
+                        Paywise is a next-generation Progressive Web App. Skip the search on Play Store or App Store. Simply <span className="text-white font-bold underline decoration-emerald-500 underline-offset-4">add this site to your home screen</span> for a seamless experience.
+                    </p>
+                    
+                    <div className="flex flex-row items-center justify-center gap-3 sm:gap-6 opacity-90">
+                        <div className="flex flex-col items-center gap-2">
+                             <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-xl sm:text-2xl group hover:border-emerald-500/50 transition-all">
+                                <i className="pi pi-google opacity-40 grayscale"></i>
+                             </div>
+                             <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500">Play Store</span>
+                        </div>
+                        
+                        <div className="w-4 sm:w-8 h-[1px] bg-slate-800"></div>
+                        
+                        <div className="flex flex-col items-center gap-2">
+                             <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-xl sm:text-2xl group hover:border-emerald-500/50 transition-all">
+                                <i className="pi pi-apple opacity-40 grayscale"></i>
+                             </div>
+                             <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500">App Store</span>
+                        </div>
+                        
+                        <div className="w-4 sm:w-8 h-[1px] bg-slate-800"></div>
+                        
+                        <div className="flex flex-col items-center gap-2">
+                             <div className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-500/20 border border-emerald-500/30 rounded-2xl flex items-center justify-center text-xl sm:text-2xl text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)] animate-pulse">
+                                <i className="pi pi-check"></i>
+                             </div>
+                             <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-emerald-400 font-bold">Direct Install</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
             {/* Trusted By Section (Social Proof) */}
-            <div className="py-12 border-y border-slate-50">
+            <div className="py-12 border-y border-slate-50 overflow-hidden">
                 <p className="text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] mb-8">Empowering smart splitters globally</p>
-                <div className="max-w-7xl mx-auto px-6 flex flex-wrap justify-center items-center gap-x-12 gap-y-8 opacity-40 grayscale">
-                    <span className="text-2xl font-bold italic tracking-tighter">Roommates</span>
-                    <span className="text-2xl font-bold tracking-tight uppercase">Travelers</span>
-                    <span className="text-2xl font-black">Couples</span>
-                    <span className="text-2xl font-black tracking-widest">Communities</span>
-                    <span className="text-2xl font-serif">Coworkers</span>
+                <div className="flex flex-nowrap items-center gap-12 overflow-x-auto px-6 pb-2 no-scrollbar md:justify-center opacity-40 grayscale">
+                    <span className="text-2xl font-bold italic tracking-tighter whitespace-nowrap">Roommates</span>
+                    <span className="text-2xl font-bold tracking-tight uppercase whitespace-nowrap">Travelers</span>
+                    <span className="text-2xl font-black whitespace-nowrap">Couples</span>
+                    <span className="text-2xl font-black tracking-widest whitespace-nowrap">Communities</span>
+                    <span className="text-2xl font-serif whitespace-nowrap">Coworkers</span>
                 </div>
             </div>
 
@@ -120,26 +170,25 @@ export default function Landing() {
                         </p>
                     </div>
 
-                    {/* Feature 2 */}
+                    {/* Feature 2: Peer-to-Peer Loans */}
                     <div className="bg-white p-8 rounded-[32px] border border-slate-100 hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-500/10 transition-all group">
                         <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <Users className="w-7 h-7 text-blue-600" />
+                            <Banknote className="w-7 h-7 text-blue-600" />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-3">Group Management</h3>
-                        <h3 className="text-xl font-bold text-slate-900 mb-3 invisible -mt-8">Group Management</h3>
+                        <h3 className="text-xl font-bold text-slate-900 mb-3">P2P Loans with Interest</h3>
                         <p className="text-slate-500 leading-relaxed text-[15px]">
-                            Organize your expenses by groups—home, trips, recurring buddies. Everyone gets real-time updates and balance summaries.
+                            Lend money to friends with automated interest tracking. Set a monthly rate and let Paywise handle the compounding math for you.
                         </p>
                     </div>
 
-                    {/* Feature 3 */}
-                    <div className="bg-white p-8 rounded-[32px] border border-slate-100 hover:border-rose-200 hover:shadow-2xl hover:shadow-rose-500/10 transition-all group">
-                        <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <Banknote className="w-7 h-7 text-rose-600" />
+                    {/* Feature 3: Community Groups */}
+                    <div className="bg-white p-8 rounded-[32px] border border-slate-100 hover:border-indigo-200 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all group">
+                        <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                            <Users className="w-7 h-7 text-indigo-600" />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-3">Instant Settlement</h3>
+                        <h3 className="text-xl font-bold text-slate-900 mb-3">Community Splits</h3>
                         <p className="text-slate-500 leading-relaxed text-[15px]">
-                            Record cash payments or simulate settlements with one click. We calculate the most efficient way to pay back the total.
+                            Perfect for shared commutes or recurring team lunches. Track turns and cycles to see who is next to pay in your community group.
                         </p>
                     </div>
 
@@ -168,13 +217,14 @@ export default function Landing() {
                     {/* Feature 6 */}
                     <div className="bg-white p-8 rounded-[32px] border border-slate-100 hover:border-emerald-200 hover:shadow-2xl hover:shadow-emerald-500/10 transition-all group">
                         <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <MessageSquare className="w-7 h-7 text-emerald-600" />
+                            <ShieldCheck className="w-7 h-7 text-emerald-600" />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-3">Smart Reminders</h3>
+                        <h3 className="text-xl font-bold text-slate-900 mb-3">Bank-Grade Security</h3>
                         <p className="text-slate-500 leading-relaxed text-[15px]">
-                            Friendly in-app and email notifications ensure everyone stays updated without the awkward "you owe me" conversations.
+                            Your financial data is protected by end-to-end encryption and biometric locks. We keep your splits private and your money secure.
                         </p>
                     </div>
+
                 </div>
             </section>
 
@@ -373,10 +423,10 @@ export default function Landing() {
                     <div>
                         <h5 className="font-bold text-slate-900 mb-6">Features</h5>
                         <ul className="space-y-4 text-sm text-slate-500 font-medium">
-                            <li><a href="#features" className="hover:text-slate-900 transition-colors">Itemized Split</a></li>
-                            <li><a href="#features" className="hover:text-slate-900 transition-colors">OCR Scan</a></li>
-                            <li><a href="#features" className="hover:text-slate-900 transition-colors">Group Tracking</a></li>
-                            <li><a href="#features" className="hover:text-slate-900 transition-colors">Monthly Insights</a></li>
+                            <li><button onClick={() => scrollToSection('features')} className="hover:text-slate-900 transition-colors bg-transparent border-none p-0 font-medium cursor-pointer">Itemized Split</button></li>
+                            <li><button onClick={() => scrollToSection('features')} className="hover:text-slate-900 transition-colors bg-transparent border-none p-0 font-medium cursor-pointer">OCR Scan</button></li>
+                            <li><button onClick={() => scrollToSection('features')} className="hover:text-slate-900 transition-colors bg-transparent border-none p-0 font-medium cursor-pointer">Group Tracking</button></li>
+                            <li><button onClick={() => scrollToSection('features')} className="hover:text-slate-900 transition-colors bg-transparent border-none p-0 font-medium cursor-pointer">Monthly Insights</button></li>
                         </ul>
                     </div>
 

@@ -433,3 +433,11 @@ body > div[style*="z-index: 999999"]::before,
   border-radius: 6px !important;
   letter-spacing: 1px;
 }
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
