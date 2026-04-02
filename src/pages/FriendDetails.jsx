@@ -19,6 +19,7 @@ import AdGate from '../components/UI/AdGate';
 export default function FriendDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { api, user } = useContext(AuthContext);
     const currSym = CURRENCY_SYMBOLS[user?.defaultCurrency || 'USD'] || '$';
     const { hideBalance } = useAppSettings();
@@ -35,7 +36,6 @@ export default function FriendDetails() {
     const [editLoanInterestRate, setEditLoanInterestRate] = useState(0);
     const [selectedMemberIdsForEdit, setSelectedMemberIdsForEdit] = useState([]);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
-    const location = useLocation();
     const [showSettings, setShowSettings] = useState(location.state?.openSettings || false);
     const [showFriendTotals, setShowFriendTotals] = useState(false);
     const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
@@ -187,6 +187,14 @@ export default function FriendDetails() {
                     } catch { /* no loan request for this expense */ }
                 }));
                 setLoanRequests(loanMap);
+            }
+
+            // Check for direct expense link from notification
+            const searchParams = new URLSearchParams(location.search);
+            const expParam = searchParams.get('expenseId');
+            if (expParam && res.data.expenses?.length > 0) {
+                const target = (res.data.expenses || []).find(e => e._id === expParam);
+                if (target) setSelectedExpense(target);
             }
         } catch (err) {
             console.error(err);
@@ -587,57 +595,43 @@ export default function FriendDetails() {
                         )}
 
                         {/* Breakdown */}
-                        {balance !== 0 && (
-                            <div className="space-y-1.5 pt-1">
-                                {(() => {
-                                    const breakdowns = {}; // { groupId/null: { name, balance } }
-                                    (expenses || []).forEach(exp => {
-                                        if (!exp) return;
-                                        const myId = user?.id || user?._id;
-                                        const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
-                                        const sourceCurr = exp.currency || 'USD';
-                                        let b = 0;
-                                        
-                                        if (isPaidByMe) {
-                                            const fSplit = (exp.splits || []).find(s => {
-                                                const sId = s?.user?._id || s?.user;
-                                                const friId = friend?._id || friend?.id || friend;
-                                                return sId === friId;
-                                            });
-                                            if (fSplit) {
-                                                // Convert to USD base for internal summing
-                                                b = convertAmount(fSplit.amount, sourceCurr, 'USD');
+                                <div className="space-y-3 pt-2">
+                                    {(() => {
+                                        const breakdowns = {};
+                                        (expenses || []).forEach(exp => {
+                                            if (!exp) return;
+                                            const myId = user?.id || user?._id;
+                                            const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
+                                            const sourceCurr = exp.currency || 'USD';
+                                            let b = 0;
+                                            
+                                            if (isPaidByMe) {
+                                                const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
+                                                if (fSplit) b = convertAmount(fSplit.amount, sourceCurr, 'USD');
+                                            } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
+                                                const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
+                                                if (mySplit) b = -convertAmount(mySplit.amount, sourceCurr, 'USD');
                                             }
-                                        } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
-                                            const mySplit = (exp.splits || []).find(s => {
-                                                const sId = s?.user?._id || s?.user;
-                                                const myId = user?.id || user?._id;
-                                                return sId === myId;
-                                            });
-                                            if (mySplit) {
-                                                // Convert to USD base for internal summing
-                                                b = -convertAmount(mySplit.amount, sourceCurr, 'USD');
+
+                                            if (b !== 0) {
+                                                const gid = (exp.group?._id || exp.group || 'none').toString();
+                                                if (!breakdowns[gid]) breakdowns[gid] = { name: exp.group?.name || (typeof exp.group === 'string' ? "Shared Group" : "non-group expenses"), balance: 0 };
+                                                breakdowns[gid].balance += b;
                                             }
-                                        }
+                                        });
 
-                                        if (b !== 0) {
-                                            const gid = (exp.group?._id || exp.group || 'none').toString();
-                                            if (!breakdowns[gid]) breakdowns[gid] = { name: exp.group?.name || (typeof exp.group === 'string' ? "Shared Group" : "non-group expenses"), balance: 0 };
-                                            breakdowns[gid].balance += b;
-                                        }
-                                    });
-
-                                    return Object.values(breakdowns).filter(item => Math.abs(item.balance) > 0.01).map((item, idx) => (
-                                        <p key={idx} className="text-[13.5px] text-gray-600 flex justify-between items-center">
-                                            <span>{(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes you' : 'you owe'} in {item.name === 'non-group expenses' ? item.name : `"${item.name}"`}</span>
-                                            <span className={`font-bold ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                {formatCurrency(Math.abs(item.balance), user?.defaultCurrency)}
-                                            </span>
-                                        </p>
-                                    ));
-                                })()}
-                            </div>
-                        )}
+                                        return Object.values(breakdowns).filter(item => Math.abs(item.balance) > 0.01).map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-[13.5px] bg-white/50 p-2 rounded-lg border border-gray-100">
+                                                <span className="text-gray-600 font-medium truncate pr-4">
+                                                    {(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes' : 'gets back'} in <span className="font-bold text-gray-800">{item.name === 'non-group expenses' ? 'Direct' : `"${item.name}"`}</span>
+                                                </span>
+                                                <span className={`font-black whitespace-nowrap ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    {formatCurrency(Math.abs(item.balance), user?.defaultCurrency)}
+                                                </span>
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
                     </div>
 
                     <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide items-center">
@@ -845,15 +839,38 @@ export default function FriendDetails() {
 
 
             <Dialog 
-                header={isEditingExpense ? 'Edit Expense' : 'Expense Details'} 
                 visible={!!selectedExpense} 
                 onHide={() => { setSelectedExpense(null); setIsEditingExpense(false); }}
-                className="w-full max-w-lg"
                 position="bottom"
                 draggable={false}
                 resizable={false}
-                contentClassName="p-0 bg-white dark:bg-slate-900"
-                headerClassName="bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100"
+                className="w-full max-w-lg rounded-t-[32px] overflow-hidden"
+                contentClassName="p-0 bg-white dark:bg-slate-900 border-0"
+                headerClassName="p-0 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 border-0 rounded-t-[32px]"
+                header={
+                    <div className="flex justify-between items-center w-full px-5 py-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 line-clamp-1">
+                            {isEditingExpense ? 'Edit Expense' : 'Expense Details'}
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            {!isEditingExpense && (selectedExpense?.addedBy ? (selectedExpense.addedBy._id === (user?.id || user?._id)) : (selectedExpense?.paidBy?._id === (user?.id || user?._id))) && (
+                                <button
+                                    onClick={() => setIsEditingExpense(true)}
+                                    className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition"
+                                >
+                                    <i className="pi pi-pencil text-[1rem]"></i>
+                                </button>
+                            )}
+                            <button
+                                onClick={() => { setSelectedExpense(null); setIsEditingExpense(false); }}
+                                className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition"
+                            >
+                                <i className="pi pi-times text-[1.2rem]"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+                closable={false}
             >
                 {selectedExpense && (
                 <div className="p-6">
@@ -870,19 +887,16 @@ export default function FriendDetails() {
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1">Total Amount</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
-                                    <InputNumber
-                                        value={Number(editAmount)}
-                                        onValueChange={(e) => setEditAmount(e.value?.toString() || '0')}
-                                        mode="decimal"
-                                        minFractionDigits={2}
-                                        maxFractionDigits={2}
-                                        className="w-full"
-                                        inputClassName="w-full py-3 pl-8 pr-4 rounded-xl border border-gray-300 outline-none font-bold"
-                                        required
-                                    />
-                                </div>
+                                <InputNumber
+                                    value={parseFloat(editAmount)}
+                                    onValueChange={(e) => setEditAmount(e.value?.toString())}
+                                    mode="currency"
+                                    currency={selectedExpense?.currency || 'USD'}
+                                    locale="en-US"
+                                    className="w-full"
+                                    inputClassName="w-full py-3 px-4 rounded-xl border border-gray-300 outline-none shadow-sm font-bold"
+                                    required
+                                />
                             </div>
                                         <p className="text-xs text-gray-500 font-medium leading-relaxed">Changing the total amount will instantly update and mathematically recalculate the splits.</p>
 
@@ -981,7 +995,7 @@ export default function FriendDetails() {
                                 ) : (
                                     <div>
                                         <div className="text-center mb-6">
-                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner overflow-hidden border-2 border-white`}>
+                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-emerald-50 text-emerald-600'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner overflow-hidden border-2 border-white`}>
                                                 {selectedExpense.billImage ? (
                                                     <a href={selectedExpense.billImage} target="_blank" rel="noopener noreferrer" className="w-full h-full"> 
                                                         <img src={selectedExpense.billImage} alt="Bill" className="w-full h-full object-cover" />
@@ -1018,8 +1032,12 @@ export default function FriendDetails() {
                                             {selectedExpense?.addedBy && (selectedExpense.addedBy._id || selectedExpense.addedBy) !== (selectedExpense.paidBy?._id || selectedExpense.paidBy) && (
                                                 <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {(selectedExpense.addedBy?._id || selectedExpense.addedBy) === (user?.id || user?._id) ? 'you' : (selectedExpense.addedBy?.username || 'someone')}</p>
                                             )}
-                                            {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
-                                            <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+                                            {selectedExpense?.group && typeof selectedExpense.group === 'object' && selectedExpense.group.name && (
+                                                <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>
+                                            )}
+                                            <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">
+                                                {selectedExpense?.date ? new Date(selectedExpense.date).toLocaleDateString() : ''}
+                                            </p>
 
                                             {selectedExpense.billImage && (
                                                 <div className="mt-4 flex justify-center">
@@ -1038,16 +1056,17 @@ export default function FriendDetails() {
                                                         <span className="font-semibold text-gray-700 text-sm">
                                                             {(split?.user?._id || split?.user) === (user?.id || user?._id) ? 'You' : (split?.user?.username || friend?.username || 'Guest')}
                                                         </span>
-                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split?.amount || 0, user?.defaultCurrency, selectedExpense?.currency)}</span>
+                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split?.amount || 0, user?.defaultCurrency || 'USD', selectedExpense?.currency || 'USD')}</span>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
 
                                         {(() => {
-                                            if (selectedExpense.description?.toLowerCase().includes('settle')) return null;
-                                            const isPaidByMe = (selectedExpense.paidBy?._id || selectedExpense.paidBy) === (user?.id || user?._id);
-                                            const mySplit = selectedExpense.splits?.find(s => (s.user?._id || s.user) === (user?.id || user?._id));
+                                            if (!selectedExpense) return null;
+                                            if (selectedExpense?.description?.toLowerCase().includes('settle')) return null;
+                                            const isPaidByMe = (selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === (user?.id || user?._id);
+                                            const mySplit = selectedExpense?.splits?.find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
                                             
                                             // Ensure there's a valid amount owed
                                             if (!isPaidByMe && mySplit && mySplit.amount > 0) {
@@ -1060,26 +1079,35 @@ export default function FriendDetails() {
                                                         className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
                                                     >
                                                         <i className="pi pi-check text-[14px]"></i>
-                                                        Settle my share ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense.currency)})
+                                                        Settle my share ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense?.currency)})
                                                     </button>
                                                 );
                                             }
                                             return null;
                                         })()}
 
-                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === (user?.id || user?._id)) : (selectedExpense.paidBy._id === (user?.id || user?._id))) && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    deleteExpense(selectedExpense._id, selectedExpense.description);
-                                                    setSelectedExpense(null);
-                                                }}
-                                                className="w-full mt-4 font-bold bg-rose-50 text-rose-600 rounded-xl py-3.5 border border-rose-100 hover:bg-rose-100 transition flex items-center justify-center gap-2"
-                                            >
-                                                <i className="pi pi-trash text-[14px]"></i>
-                                                Delete Entire Expense
-                                            </button>
-                                        )}
+                                        {(() => {
+                                            if (!selectedExpense) return null;
+                                            const hasEditPerm = selectedExpense?.addedBy 
+                                                ? ((selectedExpense.addedBy?._id || selectedExpense.addedBy) === (user?.id || user?._id)) 
+                                                : ((selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === (user?.id || user?._id));
+                                            
+                                            if (!hasEditPerm) return null;
+
+                                            return (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteExpense(selectedExpense?._id, selectedExpense?.description);
+                                                        setSelectedExpense(null);
+                                                    }}
+                                                    className="w-full mt-4 font-bold bg-rose-50 text-rose-600 rounded-xl py-3.5 border border-rose-100 hover:bg-rose-100 transition flex items-center justify-center gap-2"
+                                                >
+                                                    <i className="pi pi-trash text-[14px]"></i>
+                                                    Delete Entire Expense
+                                                </button>
+                                            );
+                                        })()}
                                     </div>
                                 )}
                             </div>

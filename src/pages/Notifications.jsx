@@ -72,7 +72,22 @@ export default function Notifications() {
     const handleAction = (notification) => {
         if (!notification.isRead) markAsRead(notification._id);
         if (notification.actionUrl) {
-            navigate(notification.actionUrl);
+            let url = notification.actionUrl;
+            
+            // Smart Legacy URL Resolution
+            // If the old notification has a generic URL but contains specific metadata, use it.
+            const meta = notification.metadata || {};
+            if (url === '/groups' && meta.groupId) {
+                url = `/group/${meta.groupId}`;
+                if (meta.expenseId) url += `?expenseId=${meta.expenseId}`;
+            } else if (url === '/friends' && (meta.actorId || meta.friendId)) {
+                url = `/friend/${meta.actorId || meta.friendId}`;
+                if (meta.expenseId) url += `?expenseId=${meta.expenseId}`;
+            } else if (url.startsWith('/friends/')) {
+                url = url.replace('/friends/', '/friend/');
+            }
+            
+            navigate(url);
         }
     };
 
@@ -81,6 +96,7 @@ export default function Notifications() {
             case 'expense': return '💰';
             case 'loan': return '🤝';
             case 'friend': return '👋';
+            case 'group': return '👥';
             default: return '🔔';
         }
     };

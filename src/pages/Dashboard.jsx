@@ -180,9 +180,9 @@ export default function Dashboard() {
                     </div>
                     <button 
                         onClick={() => setShowFilterModal(true)} 
-                        className="p-1 rounded-full hover:bg-slate-100 transition-colors text-slate-800 cursor-pointer"
+                        className="p-1.5 rounded-full hover:bg-slate-100 transition-colors text-slate-800 cursor-pointer"
                     >
-                        <i className="pi pi-sliders-h" style={{ fontSize: '1.4rem' }}></i>
+                        <SlidersHorizontal className="w-[22px] h-[22px]" />
                     </button>
                 </div>
 
@@ -395,34 +395,47 @@ export default function Dashboard() {
 
             <BottomNav />
 
-            <Dialog 
-                header="Set filter" 
-                visible={showFilterModal} 
-                onHide={() => setShowFilterModal(false)}
-                position="bottom" 
-                draggable={false} 
-                resizable={false}
-                className="w-full max-w-md prime-ios-dialog"
-                contentClassName="p-0 overflow-hidden rounded-t-3xl"
-            >
-                <div className="flex flex-col">
-                    {[
-                        { id: 'none', label: 'None' },
-                        { id: 'outstanding', label: 'Groups with outstanding balances' },
-                        { id: 'owe', label: 'Group balances you owe' },
-                        { id: 'owed', label: 'Group balances you are owed' }
-                    ].map((option, index, arr) => (
-                        <button
-                            key={option.id}
-                            onClick={() => { setFilter(option.id); setShowFilterModal(false); }}
-                            className={`p-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0`}
-                        >
-                            <span className={`text-[17px] ${filter === option.id ? 'font-bold text-emerald-900' : 'text-gray-600'}`}>{option.label}</span>
-                            {filter === option.id && <i className="pi pi-check text-emerald-500 font-bold text-lg"></i>}
-                        </button>
-                    ))}
+            {/* Filter iOS-style Modal */}
+            {showFilterModal && (
+                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowFilterModal(false)} />
+                    
+                    <div className="w-full px-3 pb-6 max-h-[85vh] flex flex-col relative z-[101] animate-in slide-in-from-bottom duration-300 gap-2">
+                        {/* Options Block */}
+                        <div className="bg-white rounded-[14px] flex flex-col overflow-hidden shadow-sm">
+                            <div className="p-3 text-center border-b border-gray-100">
+                                <h3 className="text-[13px] font-semibold text-gray-500 uppercase tracking-tight">Set filter</h3>
+                            </div>
+                            
+                            {[
+                                { id: 'none', label: 'None' },
+                                { id: 'outstanding', label: 'Groups with outstanding balances' },
+                                { id: 'owe', label: 'Group balances you owe' },
+                                { id: 'owed', label: 'Group balances you are owed' }
+                            ].map((option, index, arr) => (
+                                <button
+                                    key={option.id}
+                                    onClick={() => { setFilter(option.id); setShowFilterModal(false); }}
+                                    className={`p-[18px] text-[19px] text-[#007AFF] relative bg-white hover:bg-gray-50 transition-colors ${index !== arr.length - 1 ? 'border-b border-gray-100' : ''}`}
+                                >
+                                    <span className={`block text-center ${filter === option.id ? 'font-semibold tracking-tight' : 'tracking-tight font-normal'}`}>{option.label}</span>
+                                    {filter === option.id && <Check className="w-[22px] h-[22px] text-[#007AFF] font-bold absolute right-[18px] top-1/2 -translate-y-1/2" />}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Cancel Button */}
+                        <div className="bg-white rounded-[14px] mt-1 shadow-sm">
+                            <button
+                                onClick={() => setShowFilterModal(false)}
+                                className="w-full p-[18px] text-[19px] font-bold text-[#007AFF] hover:bg-gray-50 transition-colors rounded-[14px]"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </Dialog>
+            )}
         </div>
     );
 }

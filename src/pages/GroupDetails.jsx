@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext, useMemo, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
@@ -17,6 +17,7 @@ import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, t
 export default function GroupDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { api, user } = useContext(AuthContext);
     const { hideBalance } = useAppSettings();
     const [group, setGroup] = useState(null);
@@ -27,6 +28,10 @@ export default function GroupDetails() {
     const [emailToInvite, setEmailToInvite] = useState('');
     const [showInvite, setShowInvite] = useState(false);
     const [inviteError, setInviteError] = useState('');
+    const [searchingMember, setSearchingMember] = useState(false);
+    const [foundSearchUser, setFoundSearchUser] = useState(null);
+    const [searchAttempted, setSearchAttempted] = useState(false);
+
 
     const [selectedExpense, setSelectedExpense] = useState(null);
     const [isEditingExpense, setIsEditingExpense] = useState(false);
@@ -328,6 +333,15 @@ export default function GroupDetails() {
                 setSettleUpDate(res.data.group.settleUpDate.slice(0, 10));
                 setDraftSettleDate(res.data.group.settleUpDate.slice(0, 10));
             }
+
+            // Check for direct expense link from notification
+            // Use location.search (populated by HashRouter correctly)
+            const searchParams = new URLSearchParams(location.search);
+            const expParam = searchParams.get('expenseId');
+            if (expParam && res.data.expenses?.length > 0) {
+                const target = (res.data.expenses || []).find(e => e._id === expParam);
+                if (target) setSelectedExpense(target);
+            }
         } catch (err) {
             console.error(err);
         }
@@ -337,12 +351,46 @@ export default function GroupDetails() {
         fetchGroup();
     }, [id]);
 
-    const inviteMember = async (e) => {
-        e.preventDefault();
+    useEffect(() => {
+        setFoundSearchUser(null);
+        setSearchAttempted(false);
+    }, [emailToInvite]);
+
+    const handleSearchMember = async (e) => {
+        if (e) e.preventDefault();
+        if (!emailToInvite.trim()) return;
+        setInviteError('');
+        setSearchingMember(true);
+        try {
+            const res = await api.get(`/auth/users?q=${encodeURIComponent(emailToInvite.trim())}`);
+            const query = emailToInvite.trim().toLowerCase();
+            // Try to find an EXACT match by email or phone
+            const exactMatch = res.data.find(u => 
+                u.email?.toLowerCase() === query || 
+                u.phone?.replace(/\D/g, '') === query.replace(/\D/g, '')
+            );
+            
+            if (exactMatch) {
+                setFoundSearchUser(exactMatch);
+            } else {
+                setFoundSearchUser(null);
+            }
+            setSearchAttempted(true);
+        } catch (err) {
+            setInviteError('Error searching for user.');
+        } finally {
+            setSearchingMember(false);
+        }
+    };
+
+    const confirmAddMember = async (targetUser = null) => {
         setInviteError('');
         try {
             const isEmail = emailToInvite.includes('@');
-            const payload = isEmail ? { email: emailToInvite } : { phone: emailToInvite };
+            // Backend takes email or phone. If we found a user, we use their email/phone to add them.
+            const payload = targetUser 
+                ? (targetUser.email ? { email: targetUser.email } : { phone: targetUser.phone }) 
+                : (isEmail ? { email: emailToInvite } : { phone: emailToInvite });
             const res = await api.post(`/groups/${id}/members`, payload);
 
             if (res.data.user?.isGhostUser) {
@@ -352,16 +400,19 @@ export default function GroupDetails() {
                     alert(`New person invited to Paywise! They've been added to "${group.name}" via email invitation.`);
                 }
             } else {
-                alert('User added to the group! Since they are already on Paywise, they will see an invitation in their dashboard to join.');
+                alert('User added to the group!');
             }
 
             setEmailToInvite('');
             setShowInvite(false);
+            setFoundSearchUser(null);
+            setSearchAttempted(false);
             fetchGroup();
         } catch (err) {
-            setInviteError(err.response?.data?.msg || 'Error inviting member');
+            setInviteError(err.response?.data?.msg || 'Error adding member');
         }
     };
+
 
     const deleteExpense = async (expenseId, description) => {
         if (window.confirm(`Are you sure you want to delete "${description}"? This will recalculate everyone's balances.`)) {
@@ -545,24 +596,69 @@ export default function GroupDetails() {
                 )}
                 {/* Invite Members form */}
                 {showInvite && (
-                    <form onSubmit={inviteMember} className="bg-gray-50 p-5 shadow-inner border-b border-gray-200 animate-in fade-in zoom-in-95">
-                        <label className="block text-sm font-semibold text-gray-800 mb-2">Invite friend by email or phone</label>
-                        <div className="flex gap-2">
+                    <div className="bg-gray-50 p-5 shadow-inner border-b border-gray-200 animate-in fade-in zoom-in-95">
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">Add person to group</label>
+                        <form onSubmit={handleSearchMember} className="flex gap-2">
                             <input
                                 type="text"
-                                className="flex-1 py-2.5 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f172a] focus:border-transparent outline-none transition-all shadow-sm"
+                                className="flex-1 py-2.5 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent outline-none transition-all shadow-sm"
                                 value={emailToInvite}
                                 onChange={e => setEmailToInvite(e.target.value)}
-                                placeholder="email or phone number"
+                                placeholder="Email or phone number"
                                 required
                             />
-                            <button type="submit" className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-emerald-700 transition shadow-sm">
-                                Add
+                            <button 
+                                type="submit" 
+                                disabled={searchingMember}
+                                className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-emerald-700 transition shadow-sm disabled:opacity-50"
+                            >
+                                {searchingMember ? <i className="pi pi-spin pi-spinner"></i> : 'Check'}
                             </button>
-                        </div>
-                        {inviteError && <p className="text-red-500 text-xs mt-2 font-medium">{inviteError}</p>}
-                    </form>
+                        </form>
+
+                        {searchAttempted && (
+                            <div className="mt-4 p-4 bg-white rounded-xl border border-gray-100 shadow-sm animate-in slide-in-from-top-2">
+                                {foundSearchUser ? (
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold">
+                                                {foundSearchUser.username.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-900 leading-tight">{foundSearchUser.username}</p>
+                                                <p className="text-xs text-gray-500">{foundSearchUser.email || foundSearchUser.phone}</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => confirmAddMember(foundSearchUser)}
+                                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:translate-y-[-1px] transition"
+                                        >
+                                            Add to Group
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-3 text-center">
+                                        <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center">
+                                            <i className="pi pi-user-plus text-xl"></i>
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-900">User not found</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">They aren't on Paywise yet. Invite them to join?</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => confirmAddMember(null)}
+                                            className="w-full bg-slate-900 text-white py-2.5 rounded-lg text-sm font-bold shadow-sm transition hover:bg-slate-800"
+                                        >
+                                            Invite to Paywise & Add
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {inviteError && <p className="text-rose-500 text-xs mt-3 font-medium flex items-center gap-1"><i className="pi pi-exclamation-circle text-[10px]"></i> {inviteError}</p>}
+                    </div>
                 )}
+
 
                 <div className="px-5 py-4 border-b border-gray-100 mb-2">
                     {group.groupType === 'community' ? (
@@ -856,9 +952,9 @@ export default function GroupDetails() {
                 position="bottom"
                 draggable={false}
                 resizable={false}
-                className="w-full max-w-lg"
-                contentClassName="p-0 overflow-hidden rounded-t-[32px] bg-white dark:bg-slate-900 border-0"
-                headerClassName="p-0 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 border-0"
+                className="w-full max-w-lg rounded-t-[32px] overflow-hidden"
+                contentClassName="p-0 bg-white dark:bg-slate-900 border-0"
+                headerClassName="p-0 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 border-0 rounded-t-[32px]"
                 header={
                     <div className="flex justify-between items-center w-full px-5 py-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                         <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 line-clamp-1">

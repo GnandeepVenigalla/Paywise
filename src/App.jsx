@@ -30,6 +30,8 @@ import Katha from './pages/Katha';
 import KathaDetail from './pages/KathaDetail';
 import LoanRequests from './pages/LoanRequests';
 import BlockedUsers from './pages/BlockedUsers';
+import Landing from './pages/Landing';
+
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 import logoImg from './assets/logo.png';
@@ -104,7 +106,10 @@ function App() {
                 <Route path="/ai" element={<PrivateRoute><AiAssistant /></PrivateRoute>} />
                 <Route path="/loans" element={<PrivateRoute><LoanRequests /></PrivateRoute>} />
                 <Route path="/beta" element={<BetaHandler />} />
-                <Route path="/" element={<Navigate to="/dashboard" />} />
+                <Route path="/friends/:id" element={<PrivateRoute><FriendDetails /></PrivateRoute>} />
+                <Route path="/groups" element={<Navigate to="/dashboard" />} />
+                <Route path="/" element={<Landing />} />
+
               </Routes>
             </BiometricGate>
           </div>
