@@ -1,7 +1,7 @@
-import { useContext, useEffect } from 'react';
+import { useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { CheckCircle2, Receipt, Users, Smartphone, ShieldCheck, ChevronRight, PieChart, Banknote, HelpCircle, Zap, Globe, MessageSquare } from 'lucide-react';
+import { Receipt, Users, Smartphone, ShieldCheck, ChevronRight, PieChart, Banknote, Zap, Globe, MessageSquare, Mail, Lock } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import logoFull from '../assets/logo_full.png';
 
