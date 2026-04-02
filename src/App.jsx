@@ -48,16 +48,27 @@ function ThemeApplier() {
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-[#1e293b] flex flex-col items-center justify-center z-[100]">
-        <div className="w-[110px] h-[110px] animate-pulse">
-          <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <SplashScreen />;
   return user ? children : <Navigate to="/login" />;
+};
+
+const SplashScreen = () => (
+  <div className="fixed inset-0 bg-[#1e293b] flex flex-col items-center justify-center z-[100]">
+    <div className="w-[110px] h-[110px] animate-pulse">
+      <img src={logoImg} alt="Paywise Logo" className="w-full h-full object-contain drop-shadow-lg" />
+    </div>
+  </div>
+);
+
+const Home = () => {
+  const { user, loading } = useContext(AuthContext);
+  const token = localStorage.getItem('token');
+
+  // If loading and we likely have a session, show splash to prevent flicker
+  if (loading && token) return <SplashScreen />;
+  
+  // For everyone else (new users/bots), show landing
+  return <Landing />;
 };
 
 function App() {
@@ -70,7 +81,7 @@ function App() {
             <BiometricGate>
               <Routes>
                 {/* ── Public Marketing & Policy Routes (Gate-Free) ── */}
-                <Route path="/" element={<Landing />} />
+                <Route path="/" element={<Home />} />
                 <Route path="/terms" element={<TermsOfService />} />
                 <Route path="/privacy" element={<PrivacySecurity />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />

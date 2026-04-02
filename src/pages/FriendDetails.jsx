@@ -156,7 +156,7 @@ export default function FriendDetails() {
             if (exp.isLoan && exp.loanInterestRate > 0 && remainingBalance > 0.01 && isAccepted) {
                 const userSplit = user ? getUserExpenseSplit(exp, user, friend?._id || friend) : 0;
                 const sourceCurr = exp.currency || 'USD';
-                const splitInUSD = convertAmount(Math.abs(userSplit), sourceCurr, 'USD');
+                const splitInUSD = Math.round(convertAmount(Math.abs(userSplit), sourceCurr, 'USD') * 100) / 100;
                 
                 const interestBearingAmount = Math.min(splitInUSD, remainingBalance);
                 remainingBalance -= interestBearingAmount;
@@ -554,7 +554,7 @@ export default function FriendDetails() {
                                         {balance > 0 ? 'owes you' : 'you owe'}
                                     </span>
                                     <span className={`text-2xl font-black tracking-tight ${balance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                        {balance > 0 ? '+' : '-'}{formatCurrency(Math.abs(balance), user?.defaultCurrency)}
+                                        {formatCurrency(Math.abs(balance), user?.defaultCurrency)}
                                     </span>
                                 </div>
                             ) : (
@@ -577,7 +577,7 @@ export default function FriendDetails() {
                                     <div className="text-right">
                                         <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70 mb-1">Projected Bill</p>
                                         <p className="text-[20px] font-black text-emerald-950 leading-none">
-                                            {balance > 0 ? '+' : '-'}{formatCurrency(Math.abs(balance) + interestStats.projectedMonthly, user?.defaultCurrency)}
+                                            {formatCurrency(Math.abs(balance) + interestStats.projectedMonthly, user?.defaultCurrency)}
                                         </p>
                                     </div>
                                 </div>
@@ -607,10 +607,10 @@ export default function FriendDetails() {
                                             
                                             if (isPaidByMe) {
                                                 const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
-                                                if (fSplit) b = convertAmount(fSplit.amount, sourceCurr, 'USD');
+                                                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, 'USD') * 100) / 100;
                                             } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
                                                 const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
-                                                if (mySplit) b = -convertAmount(mySplit.amount, sourceCurr, 'USD');
+                                                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, 'USD') * 100) / 100;
                                             }
 
                                             if (b !== 0) {

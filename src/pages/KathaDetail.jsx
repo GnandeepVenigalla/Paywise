@@ -30,6 +30,13 @@ export default function KathaDetail() {
     const [showSettleModal, setShowSettleModal] = useState(false);
 
     useEffect(() => {
+        const host = window.location.hostname;
+        const isLocalOrBeta = host === 'localhost' || host === '127.0.0.1' || host === 'beta.paywiseapp.com';
+        if (!isLocalOrBeta) {
+            navigate('/dashboard', { replace: true });
+            return;
+        }
+
         const load = async () => {
             setLoading(true);
             setError('');
@@ -207,7 +214,7 @@ export default function KathaDetail() {
                                     </div>
                                     <div className="text-right flex-shrink-0 ml-2">
                                         <div className={`text-[17px] font-black leading-none ${entry.entryType === 'UDHAR' ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                            {entry.entryType === 'UDHAR' ? '+' : '-'}{fmt(entry.amount)}
+                                            {fmt(entry.amount)}
                                         </div>
                                     </div>
                                     {expanded === entry._id ? <ChevronUp className="w-4 h-4 text-gray-300 mt-0.5 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-300 mt-0.5 flex-shrink-0" />}

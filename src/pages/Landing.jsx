@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { Receipt, Users, Smartphone, ShieldCheck, ChevronRight, PieChart, Banknote, Zap, Globe, MessageSquare, Mail, Lock } from 'lucide-react';
@@ -6,9 +6,10 @@ import logoImg from '../assets/logo.png';
 import logoFull from '../assets/logo_full.png';
 
 export default function Landing() {
-    const { user } = useContext(AuthContext);
+    const { user, loading } = useContext(AuthContext);
     const navigate = useNavigate();
-    
+
+    // Auto-redirect to dashboard if already logged in
     const scrollToSection = (id) => {
         const el = document.getElementById(id);
         if (el) {
@@ -16,8 +17,11 @@ export default function Landing() {
         }
     };
 
-    // If already logged in, show a way to go to dashboard or just redirect if the user wants
-    // But for AdSense, we WANT the landing page to be the first thing bots see.
+    useEffect(() => {
+        if (!loading && user) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [user, loading, navigate]);
 
     return (
         <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-emerald-100 selection:text-emerald-900">

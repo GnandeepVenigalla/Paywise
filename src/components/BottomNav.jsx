@@ -17,9 +17,9 @@ export default function BottomNav() {
     const isLocalOrBeta = host === 'localhost' || host === '127.0.0.1' || host === 'beta.paywiseapp.com';
     const isIndia = user?.defaultCurrency === 'INR' || String(user?.phone).startsWith('91') || String(user?.phone).startsWith('+91');
 
-    // Always show in local/beta environments for testing. 
-    // In production (www.paywiseapp.com), only show to users with Indian context.
-    if (isLocalOrBeta || isIndia) {
+    // Restricted for now: Only show in local/beta environments for development. 
+    // It remains hidden on production (www.paywiseapp.com) until fully developed.
+    if (isLocalOrBeta) {
         tabs.push({ path: '/katha', label: 'Katha', icon: BookOpen, accent: true });
     }
 

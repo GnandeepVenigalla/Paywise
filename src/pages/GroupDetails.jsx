@@ -134,7 +134,7 @@ export default function GroupDetails() {
             exp.splits.forEach(split => {
                 const debtorId = String(split.user?._id || split.user);
                 if (debtorId !== creditorId && pairwise[debtorId] && pairwise[debtorId][creditorId] !== undefined) {
-                    const convertedAmount = convertAmount(split.amount, sourceCurr, targetCurr);
+                    const convertedAmount = Math.round(convertAmount(split.amount, sourceCurr, targetCurr) * 100) / 100;
                     pairwise[debtorId][creditorId] += convertedAmount;
                 }
             });
@@ -1874,8 +1874,8 @@ export default function GroupDetails() {
                                 
                                 // 1. Calculate Largest Expense by comparing CONVERTED amounts
                                 const maxExp = curMonthExpenses.reduce((max, e) => {
-                                    const currentConverted = convertAmount(e.amount, e.currency || 'USD', displayCurrency);
-                                    const maxConverted = convertAmount(max.amount, max.currency || 'USD', displayCurrency);
+                                    const currentConverted = Math.round(convertAmount(e.amount, e.currency || 'USD', displayCurrency) * 100) / 100;
+                                    const maxConverted = Math.round(convertAmount(max.amount, max.currency || 'USD', displayCurrency) * 100) / 100;
                                     return currentConverted > maxConverted ? e : max;
                                 }, curMonthExpenses[0]);
 
@@ -1884,7 +1884,7 @@ export default function GroupDetails() {
                                 const targetCurr = displayCurrency || 'USD';
                                 curMonthExpenses.forEach(e => {
                                     const pid = (e.paidBy?._id || e.paidBy || 'unknown').toString();
-                                    const convertedAmt = convertAmount(e.amount, e.currency || 'USD', targetCurr);
+                                    const convertedAmt = Math.round(convertAmount(e.amount, e.currency || 'USD', targetCurr) * 100) / 100;
                                     spenderMap[pid] = (spenderMap[pid] || 0) + convertedAmt;
                                 });
 
@@ -2358,7 +2358,7 @@ export default function GroupDetails() {
                                     <div>
                                         <h3 className="text-[18px] font-bold text-gray-900">Send a Reminder</h3>
                                         <p className="text-[13px] text-gray-400 mt-0.5">
-                                            {m.username} owes you {currSym}{absAmt} in {group.name}
+                                            {m.username} owes you {formattedAmt} in {group.name}
                                         </p>
                                     </div>
                                     <button onClick={() => setShowReminderModal(false)} className="ml-auto p-2 text-gray-400 hover:bg-gray-100 rounded-full transition">

@@ -469,7 +469,7 @@ export default function AppSettings() {
                             <p className="text-[12px] text-gray-400" style={{ fontSize: `${12 * (ct.fontScale || 1)}px` }}>You are owed</p>
                         </div>
                         <div>
-                            <p className="text-[16px] font-black" style={{ color: previewAccent, fontSize: `${16 * (ct.fontScale || 1)}px` }}>+$24.50</p>
+                            <p className="text-[16px] font-black" style={{ color: previewAccent, fontSize: `${16 * (ct.fontScale || 1)}px` }}>$24.50</p>
                         </div>
                     </div>
                 </div>

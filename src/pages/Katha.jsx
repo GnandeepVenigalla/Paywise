@@ -44,7 +44,15 @@ export default function Katha() {
         }
     };
 
-    useEffect(() => { fetchStores(); }, []);
+    useEffect(() => { 
+        const host = window.location.hostname;
+        const isLocalOrBeta = host === 'localhost' || host === '127.0.0.1' || host === 'beta.paywiseapp.com';
+        if (!isLocalOrBeta) {
+            navigate('/dashboard', { replace: true });
+            return;
+        }
+        fetchStores(); 
+    }, []);
 
     const totalOwed = stores.filter(s => s.balance > 0).reduce((sum, s) => sum + s.balance, 0);
     const totalAdvance = stores.filter(s => s.balance < 0).reduce((sum, s) => sum + Math.abs(s.balance), 0);
@@ -158,7 +166,7 @@ export default function Katha() {
                                     {/* Balance */}
                                     <div className="text-right flex-shrink-0">
                                         <div className={`text-[16px] font-black leading-none ${owes ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                            {owes ? '+' : '-'}{fmt(store.balance)}
+                                            {fmt(store.balance)}
                                         </div>
                                         <div className={`text-[10px] font-black uppercase tracking-tight mt-0.5 ${owes ? 'text-rose-400' : 'text-emerald-400'}`}>
                                             {owes ? 'you owe' : 'advance'}
