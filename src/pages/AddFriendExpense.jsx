@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { InputNumber } from 'primereact/inputnumber';
@@ -17,6 +17,7 @@ export default function AddFriendExpense() {
     const { defaultSplitMethod } = useAppSettings();
 
     const [showAd, setShowAd] = useState(false);
+    const hasSubmittedRef = useRef(false);
 
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
@@ -54,8 +55,12 @@ export default function AddFriendExpense() {
 
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
+        
+        // Prevent double submissions resulting in duplicated expenses
+        if (hasSubmittedRef.current) return;
         if (!description || !amount || Number(amount) <= 0) return;
 
+        hasSubmittedRef.current = true;
         setIsLoading(true);
 
         try {
@@ -100,6 +105,7 @@ export default function AddFriendExpense() {
         } catch (err) {
             console.error(err);
             alert('Error adding expense');
+            hasSubmittedRef.current = false;
             setIsLoading(false);
         }
     };

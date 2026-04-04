@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { applyCustomTheme } from '../hooks/useAppSettings';
 
 export const AuthContext = createContext();
 
@@ -27,6 +28,10 @@ export const AuthProvider = ({ children }) => {
                 const res = await api.get('/auth/me');
                 const loggedInUser = res.data;
                 setUser(loggedInUser);
+                // Apply saved custom theme immediately when user data arrives
+                if (loggedInUser?.appSettings?.customTheme) {
+                    applyCustomTheme(loggedInUser.appSettings.customTheme);
+                }
 
                 // Sync timezone automatically if it's not set or has changed
                 const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;

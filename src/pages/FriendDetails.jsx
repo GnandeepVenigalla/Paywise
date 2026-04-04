@@ -155,13 +155,21 @@ export default function FriendDetails() {
 
             if (exp.isLoan && exp.loanInterestRate > 0 && remainingBalance > 0.01 && isAccepted) {
                 const userSplit = user ? getUserExpenseSplit(exp, user, friend?._id || friend) : 0;
-                const sourceCurr = exp.currency || 'USD';
-                const splitInUSD = Math.round(convertAmount(Math.abs(userSplit), sourceCurr, 'USD') * 100) / 100;
                 
-                const interestBearingAmount = Math.min(splitInUSD, remainingBalance);
-                remainingBalance -= interestBearingAmount;
+                // Determine if this loan is active based on the overall balance direction
+                // If balance > 0 (Friend owes User), only loans where userSplit > 0 (User lent to Friend) accrue interest.
+                // If balance < 0 (User owes Friend), only loans where userSplit < 0 (Friend lent to User) accrue interest.
+                const isLoanActive = (balance > 0 && userSplit > 0) || (balance < 0 && userSplit < 0);
                 
-                return acc + (interestBearingAmount * ((exp.loanInterestRate / 100) / 12));
+                if (isLoanActive) {
+                    const sourceCurr = exp.currency || 'USD';
+                    const splitInUSD = Math.round(convertAmount(Math.abs(userSplit), sourceCurr, 'USD') * 100) / 100;
+                    
+                    const interestBearingAmount = Math.min(splitInUSD, remainingBalance);
+                    remainingBalance -= interestBearingAmount;
+                    
+                    return acc + (interestBearingAmount * ((exp.loanInterestRate / 100) / 12));
+                }
             }
             return acc;
         }, 0);
@@ -314,7 +322,7 @@ export default function FriendDetails() {
                 description: `Cash settle up`,
                 paidBy: payerId,
                 currency: expense.currency || user?.defaultCurrency || 'USD',
-                splits: [{ user: receiverId, amount: amount }]
+                splits: [{ user: receiverId, amount: roundedAmount }]  // ← was `amount` (unrounded)
             });
             
             setSelectedExpense(null);
@@ -359,7 +367,7 @@ export default function FriendDetails() {
     };
 
     const openSettleUp = () => {
-        if (balance === 0) {
+        if (Math.abs(balance) < 0.01) {
             alert("You and " + (friend?.username || 'your friend') + " are already settled up!");
             return;
         }
@@ -458,19 +466,22 @@ export default function FriendDetails() {
             
             if (isPaidByMe) {
                 const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
-                if (fSplit) b = convertAmount(fSplit.amount, sourceCurr, 'USD');
+                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, 'USD') * 100) / 100;
             } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
                 const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === myId);
-                if (mySplit) b = -convertAmount(mySplit.amount, sourceCurr, 'USD');
+                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, 'USD') * 100) / 100;
             }
             // Add to the USD-based total but we will display it in default currency
             summary.amount += b;
+            summary.amount = Math.round(summary.amount * 100) / 100;
         } else {
             resultItems.push({ ...exp, isGroupSummary: false });
         }
     });
 
-    const displayItems = resultItems.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const displayItems = resultItems
+        .filter(item => !item.isGroupSummary || Math.abs(item.amount) >= 0.01)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // Calculate group balances safely for the settings page
     const groupBalances = {};
@@ -548,7 +559,7 @@ export default function FriendDetails() {
                     <div className="mb-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                         <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-3">
                             <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Current Standing</span>
-                            {balance !== 0 ? (
+                            {Math.abs(balance) >= 0.01 ? (
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-gray-500">
                                         {balance > 0 ? 'owes you' : 'you owe'}

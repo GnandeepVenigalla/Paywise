@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ArrowLeft, Check, Users, Receipt, DollarSign, X } from 'lucide-react';
@@ -204,6 +204,8 @@ export default function SplitItems() {
         }));
     };
 
+    const hasSubmittedRef = useRef(false);
+
     const saveExpense = async () => {
         // Validate
         const totalAssigned = items.reduce((acc, item) => item.assignedTo.length > 0 ? acc + item.price : acc, 0);
@@ -212,6 +214,8 @@ export default function SplitItems() {
             return;
         }
 
+        if (hasSubmittedRef.current) return;
+        hasSubmittedRef.current = true;
         setIsLoading(true);
 
         // Calculate splits
@@ -270,6 +274,7 @@ export default function SplitItems() {
         } catch (err) {
             console.error(err);
             alert('Failed to save expense');
+            hasSubmittedRef.current = false;
             setIsLoading(false);
         }
     };

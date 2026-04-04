@@ -85,20 +85,20 @@ export default function Dashboard() {
             // Groups contribution
             groupsRes.data.forEach(g => {
                 const myBal = (g.balances || {})[user.id] || 0;
-                const converted = convertAmount(myBal, 'USD', displayCurr);
-                if (converted > 0) owedToMe += converted;
-                else if (converted < 0) iOwe += Math.abs(converted);
+                const converted = Math.round(convertAmount(myBal, 'USD', displayCurr) * 100) / 100;
+                if (converted >= 0.01) owedToMe += converted;
+                else if (converted <= -0.01) iOwe += Math.abs(converted);
             });
 
             // Friends contribution
             friendsRes.data.forEach(f => {
-                const converted = convertAmount(f.balance || 0, 'USD', displayCurr);
-                if (converted > 0) owedToMe += converted;
-                else if (converted < 0) iOwe += Math.abs(converted);
+                const converted = Math.round(convertAmount(f.balance || 0, 'USD', displayCurr) * 100) / 100;
+                if (converted >= 0.01) owedToMe += converted;
+                else if (converted <= -0.01) iOwe += Math.abs(converted);
             });
 
-            setTotalOwedToMe(owedToMe);
-            setTotalIOwe(iOwe);
+            setTotalOwedToMe(Math.round(owedToMe * 100) / 100);
+            setTotalIOwe(Math.round(iOwe * 100) / 100);
         } catch (err) {
             console.error(err);
         }
@@ -170,9 +170,9 @@ export default function Dashboard() {
                     <div className="flex items-center gap-1.5 text-[17px] font-semibold tracking-tight">
                         <span className="text-slate-800">Overall,</span>
                         <span className="text-slate-800">
-                            {netBalance > 0 ? "you are owed" : netBalance < 0 ? "you owe" : "you are settled up"}
+                            {netBalance >= 0.01 ? "you are owed" : netBalance <= -0.01 ? "you owe" : "you are settled up"}
                         </span>
-                        {netBalance !== 0 && (
+                        {Math.abs(netBalance) >= 0.01 && (
                             <span className={`font-bold ml-0.5 ${netBalance > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                 {formatCurrency(Math.abs(netBalance), displayCurr)}
                             </span>

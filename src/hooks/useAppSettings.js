@@ -12,12 +12,9 @@ export function applyCustomTheme(ct) {
             ? (ct.customAccentHex.startsWith('#') ? ct.customAccentHex : `#${ct.customAccentHex}`)
             : (ct.accentColor || '#059669');
 
-        // Build a semi-transparent version of the accent for light backgrounds
-        // using a simple hex→rgba approach
         root.style.setProperty('--pw-accent', accent);
         root.style.setProperty('--pw-accent-light', hexToRgba(accent, 0.12));
         root.style.setProperty('--pw-accent-text', accent);
-        // This class triggers all the CSS overrides in index.css
         root.classList.add('pw-custom-accent');
     } else {
         root.style.removeProperty('--pw-accent');
@@ -26,17 +23,54 @@ export function applyCustomTheme(ct) {
         root.classList.remove('pw-custom-accent');
     }
 
-    // ── Border radius ─────────────────────────────────────────────────────────
+    // ── Border radius — injected via <style> tag to beat all specificity ──────
     root.classList.remove('pw-radius-sharp', 'pw-radius-soft', 'pw-radius-round', 'pw-radius-pill');
-    root.classList.add(`pw-radius-${ct.borderRadius || 'round'}`);
+    const radiusKey = ct.borderRadius || 'round';
+    root.classList.add(`pw-radius-${radiusKey}`);
 
-    // ── Font scale (via JS inline style — CSS zoom picks this up) ─────────────
-    root.style.setProperty('--pw-font-scale', ct.fontScale || 1.0);
+    const RADIUS_MAP = {
+        sharp:  { sm: '2px',   md: '4px',   lg: '4px',   xl: '4px',   '2xl': '4px',   '3xl': '4px',   full: '4px',   arb: '4px'   },
+        soft:   { sm: '4px',   md: '6px',   lg: '8px',   xl: '10px',  '2xl': '14px',  '3xl': '18px',  full: '9999px', arb: '18px'  },
+        round:  { sm: '4px',   md: '8px',   lg: '12px',  xl: '16px',  '2xl': '20px',  '3xl': '28px',  full: '9999px', arb: '32px'  },
+        pill:   { sm: '12px',  md: '18px',  lg: '24px',  xl: '32px',  '2xl': '48px',  '3xl': '64px',  full: '9999px', arb: '9999px' },
+    };
+    const r = RADIUS_MAP[radiusKey] || RADIUS_MAP.round;
 
-    // ── Surface style class ───────────────────────────────────────────────────
+    // Remove old injected style if present
+    const existing = document.getElementById('pw-radius-style');
+    if (existing) existing.remove();
+
+    const styleTag = document.createElement('style');
+    styleTag.id = 'pw-radius-style';
+    styleTag.textContent = `
+        .rounded-sm  { border-radius: ${r.sm}  !important; }
+        .rounded     { border-radius: ${r.sm}  !important; }
+        .rounded-md  { border-radius: ${r.md}  !important; }
+        .rounded-lg  { border-radius: ${r.lg}  !important; }
+        .rounded-xl  { border-radius: ${r.xl}  !important; }
+        .rounded-2xl { border-radius: ${r['2xl']} !important; }
+        .rounded-3xl { border-radius: ${r['3xl']} !important; }
+        .rounded-full { border-radius: ${r.full} !important; }
+        [class*="rounded-["] { border-radius: ${r.arb} !important; }
+        button, input, select, textarea { border-radius: ${r.md} !important; }
+    `;
+    document.head.appendChild(styleTag);
+
+    // ── Font scale ────────────────────────────────────────────────────────────
+    const scale = ct.fontScale || 1.0;
+    root.style.setProperty('--pw-font-scale', scale);
+    // Also set on #root zoom AND html font-size for maximum browser compatibility
+    const appRoot = document.getElementById('root');
+    if (appRoot) appRoot.style.zoom = scale;
+
+    // ── Surface style — use data attribute for reliable targeting ─────────────
+    root.removeAttribute('data-pw-surface');
+    root.setAttribute('data-pw-surface', ct.surfaceStyle || 'default');
+    // Also keep class for CSS fallback
     root.classList.remove('pw-surface-default', 'pw-surface-glass', 'pw-surface-flat', 'pw-surface-bordered');
     root.classList.add(`pw-surface-${ct.surfaceStyle || 'default'}`);
 }
+
 
 /** Convert a hex color + alpha to rgba() string */
 function hexToRgba(hex, alpha) {
