@@ -165,18 +165,19 @@ export default function Friends() {
         return true;
     });
 
-    const activeFriends = filteredFriends.filter(f => Number(f.balance || 0) !== 0);
-    const settledFriends = filteredFriends.filter(f => Number(f.balance || 0) === 0);
+    const activeFriends = filteredFriends.filter(f => Math.abs(Number(f.balance || 0)) >= 0.01);
+    const settledFriends = filteredFriends.filter(f => Math.abs(Number(f.balance || 0)) < 0.01);
 
     const renderFriend = (friend) => {
-        const isSettled = Number(friend.balance || 0) === 0;
+        const bal = Number(friend.balance || 0);
+        const isSettled = Math.abs(bal) < 0.01;
         return (
             <Link
                 to={`/friend/${friend.id}`}
                 key={friend.id}
                 className={`block p-4 rounded-2xl transition-all group ${
-                    isSettled 
-                    ? 'bg-gray-50/50 opacity-70 border border-transparent hover:border-gray-100 shadow-none' 
+                    isSettled
+                    ? 'bg-gray-50/50 opacity-70 border border-transparent hover:border-gray-100 shadow-none'
                     : 'bg-white shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100'
                 }`}
             >
@@ -193,18 +194,18 @@ export default function Friends() {
                         </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                        {Number(friend.balance || 0) > 0 ? (
+                        {bal > 0.01 ? (
                             <div className="flex flex-col items-end">
                                 <span className="text-[11px] font-black uppercase tracking-tight text-emerald-500/80 mb-0.5">owes you</span>
                                 <span className="text-[16px] font-black text-emerald-500 leading-none">
-                                    {formatCurrency(Math.abs(Number(friend.balance || 0)), user.defaultCurrency)}
+                                    {formatCurrency(Math.abs(bal), user.defaultCurrency)}
                                 </span>
                             </div>
-                        ) : Number(friend.balance || 0) < 0 ? (
+                        ) : bal < -0.01 ? (
                             <div className="flex flex-col items-end">
                                 <span className="text-[11px] font-black uppercase tracking-tight text-rose-500/80 mb-0.5">you owe</span>
                                 <span className="text-[16px] font-black text-rose-600 leading-none">
-                                    {formatCurrency(Math.abs(Number(friend.balance || 0)), user.defaultCurrency)}
+                                    {formatCurrency(Math.abs(bal), user.defaultCurrency)}
                                 </span>
                             </div>
                         ) : (

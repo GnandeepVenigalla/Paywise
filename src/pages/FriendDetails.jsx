@@ -26,6 +26,7 @@ export default function FriendDetails() {
     const [friend, setFriend] = useState(null);
     const [expenses, setExpenses] = useState([]);
     const [balance, setBalance] = useState(0);
+    const [balanceCurrency, setBalanceCurrency] = useState(displayCurrency); // currency the balance is already in
 
     const [selectedExpense, setSelectedExpense] = useState(null);
     const [isEditingExpense, setIsEditingExpense] = useState(false);
@@ -183,6 +184,9 @@ export default function FriendDetails() {
             setFriend(res.data.friend);
             setExpenses(res.data.expenses);
             setBalance(res.data.balance);
+            // balanceCurrency tells us what currency the balance is already expressed in.
+            // If backend is old and doesn't return it, fall back to displayCurrency.
+            setBalanceCurrency(res.data.balanceCurrency || displayCurrency);
 
             // Fetch loan request status for all loan expenses
             const loanExps = (res.data.expenses || []).filter(e => e.isLoan && e.loanInterestRate > 0);
@@ -286,6 +290,18 @@ export default function FriendDetails() {
         api.get(`/auth/friend-note/${id}`).then(res => setFriendNote(res.data.note || '')).catch(() => { });
     }, [id]);
 
+    // Auto-open settle-up if ?settle=1 is in the URL (navigated from Friends list)
+    const hasMountedSettle = useEffect._settleTriggered;
+    useEffect(() => {
+        if (!friend || balance === 0) return; // wait for data to load
+        const params = new URLSearchParams(location.search);
+        if (params.get('settle') === '1') {
+            // Clean the URL without re-fetching
+            window.history.replaceState({}, '', window.location.pathname);
+            openSettleUp();
+        }
+    }, [friend, balance]); // runs whenever friend/balance loads
+
     const handleUpdateExpense = async (e) => {
         e.preventDefault();
         setIsSavingEdit(true);
@@ -311,27 +327,16 @@ export default function FriendDetails() {
         }
     };
 
-    const handleSettleIndividualExpense = async (expense, amount) => {
+    const handleSettleIndividualExpense = async (expense) => {
         try {
-            const payerId = user?.id || user?._id; 
-            const receiverId = expense.paidBy._id || expense.paidBy;
-            // Convert split amount from expense's currency to displayCurrency for correct posting
-            const convertedAmt = Math.round(convertAmount(amount, expense.currency || 'USD', displayCurrency) * 100) / 100;
-            
-            await api.post('/expenses', {
-                // Embed [sid:ID] so we can detect this expense was individually settled
-                description: `Settle my share [sid:${expense._id}]`,
-                amount: convertedAmt,
-                paidBy: payerId,
-                currency: displayCurrency,
-                splits: [{ user: receiverId, amount: convertedAmt }]
-            });
-            
+            // Call the dedicated settle-and-delete route.
+            // Backend: verifies split membership, deletes the expense, emails + notifies the payer.
+            await api.post(`/expenses/${expense._id}/settle-my-share`);
             setSelectedExpense(null);
             fetchFriendDetails();
         } catch (err) {
             console.error(err);
-            alert('Failed to settle expense.');
+            alert(err.response?.data?.msg || 'Failed to settle expense.');
         }
     };
 
@@ -380,9 +385,9 @@ export default function FriendDetails() {
     };
 
     const handleCashSettle = async (isPartial) => {
-        // balance is in USD (backend normalizes to USD). Convert to displayCurrency for posting.
-        const balanceInDisplay = Math.round(convertAmount(Math.abs(balance), 'USD', displayCurrency) * 100) / 100;
-        const maxBalanceInDisplay = Math.round(convertAmount(Math.abs(balance) + 0.005, 'USD', displayCurrency) * 100) / 100;
+        // balance is already in balanceCurrency (native currency — no conversion needed)
+        const balanceInDisplay = Math.round(Math.abs(balance) * 100) / 100;
+        const maxBalanceInDisplay = Math.round((Math.abs(balance) + 0.005) * 100) / 100;
         const amt = Math.round((isPartial ? parseFloat(partialAmount) : balanceInDisplay) * 100) / 100;
         if (isNaN(amt) || amt <= 0) {
             alert('Please enter a valid amount.');
@@ -398,10 +403,11 @@ export default function FriendDetails() {
                 ? `Partial cash payment of ${formatCurrency(amt, displayCurrency)}`
                 : 'Cash settle up';
             const fullDesc = settleNote?.trim() ? `${baseDesc} — ${settleNote.trim()}` : baseDesc;
-            await api.post('/expenses', {
+            // POST the settle expense and capture its _id
+            const settleRes = await api.post('/expenses', {
                 description: fullDesc,
                 amount: amt,
-                currency: displayCurrency,
+                currency: balanceCurrency,   // use exact balance currency, not displayCurrency
                 group: null,
                 paidBy: balance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
                 splits: [{
@@ -409,18 +415,20 @@ export default function FriendDetails() {
                     amount: amt
                 }]
             });
+            const settleExpId = settleRes.data?._id;
 
             setShowSettleUp(false);
             setSettleNote('');
 
             if (!isPartial) {
-                // Full settle — clear entire history and notify friend via email + in-app
+                // Full settle — clear the history but KEEP the settle expense so balance stays at $0
                 try {
-                    await api.delete(`/expenses/friends/${friend?._id || friend}/all`);
+                    const keepParam = settleExpId ? `?keepId=${settleExpId}` : '';
+                    await api.delete(`/expenses/friends/${friend?._id || friend}/all${keepParam}`);
                 } catch (clearErr) {
                     console.warn('[SettleClear] History clear failed (non-fatal):', clearErr.message);
                 }
-                // Navigate back since there's nothing left to show
+                // Navigate back — only the settle banner will remain, balance = $0
                 navigate(-1);
             } else {
                 fetchFriendDetails();
@@ -467,7 +475,8 @@ export default function FriendDetails() {
                     isGroupSummary: true,
                     group: exp.group,
                     paidBy: null, // Multiple
-                    currency: exp.currency || user?.defaultCurrency || 'USD'
+                    // Store the currency as displayCurrency so ExpenseItem doesn't double-convert
+                    currency: displayCurrency
                 });
                 resultItems.push(groupedMap.get(gidStr));
             }
@@ -476,7 +485,7 @@ export default function FriendDetails() {
             // Use the most recent date
             if (new Date(exp.date) > new Date(summary.date)) summary.date = exp.date;
             
-            // Calculate the specific balance contribution of this expense to the friend relationship
+            // Calculate the specific balance contribution in displayCurrency (NOT USD) to avoid double-conversion
             const myId = user?.id || user?._id;
             const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
             const sourceCurr = exp.currency || 'USD';
@@ -484,12 +493,12 @@ export default function FriendDetails() {
             
             if (isPaidByMe) {
                 const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
-                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, 'USD') * 100) / 100;
+                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, displayCurrency) * 100) / 100;
             } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
                 const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === myId);
-                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, 'USD') * 100) / 100;
+                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, displayCurrency) * 100) / 100;
             }
-            // Add to the USD-based total but we will display it in default currency
+            // Accumulate in displayCurrency — ExpenseItem will use sourceCurrency=displayCurrency so no second conversion
             summary.amount += b;
             summary.amount = Math.round(summary.amount * 100) / 100;
         } else {
@@ -498,7 +507,18 @@ export default function FriendDetails() {
     });
 
     const displayItems = resultItems
-        .filter(item => item.amount !== undefined && Math.abs(item.amount) >= 0.005 && (!item.isGroupSummary || Math.abs(item.amount) >= 0.01))
+        .filter(item => {
+            // Always show settle-up type items (they are rendered as banners, not expense cards)
+            const isSettle = !item.isGroupSummary && (
+                item.description?.toLowerCase().includes('settle') ||
+                item.description?.includes('[sid:')
+            );
+            if (isSettle) return true;
+            // For group summaries: show if net balance > 1 cent
+            if (item.isGroupSummary) return Math.abs(item.amount) >= 0.01;
+            // For regular expenses: always show (balance is calculated server-side)
+            return true;
+        })
         .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // Calculate group balances safely for the settings page
@@ -583,7 +603,7 @@ export default function FriendDetails() {
                                         {balance > 0 ? 'owes you' : 'you owe'}
                                     </span>
                                     <span className={`text-2xl font-black tracking-tight ${balance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                        {formatCurrency(Math.abs(balance), user?.defaultCurrency)}
+                                        {formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency)}
                                     </span>
                                 </div>
                             ) : (
@@ -606,7 +626,7 @@ export default function FriendDetails() {
                                     <div className="text-right">
                                         <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70 mb-1">Projected Bill</p>
                                         <p className="text-[20px] font-black text-emerald-950 leading-none">
-                                            {formatCurrency(Math.abs(balance) + interestStats.projectedMonthly, user?.defaultCurrency)}
+                                            {formatCurrency(Math.abs(balance) + interestStats.projectedMonthly, balanceCurrency, balanceCurrency)}
                                         </p>
                                     </div>
                                 </div>
@@ -631,21 +651,23 @@ export default function FriendDetails() {
                                             if (!exp) return;
                                             const myId = user?.id || user?._id;
                                             const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
+                                            // Accumulate directly in displayCurrency to avoid double-conversion
                                             const sourceCurr = exp.currency || 'USD';
                                             let b = 0;
                                             
                                             if (isPaidByMe) {
                                                 const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
-                                                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, 'USD') * 100) / 100;
+                                                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, displayCurrency) * 100) / 100;
                                             } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
                                                 const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
-                                                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, 'USD') * 100) / 100;
+                                                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, displayCurrency) * 100) / 100;
                                             }
 
                                             if (b !== 0) {
                                                 const gid = (exp.group?._id || exp.group || 'none').toString();
-                                                if (!breakdowns[gid]) breakdowns[gid] = { name: exp.group?.name || (typeof exp.group === 'string' ? "Shared Group" : "non-group expenses"), balance: 0 };
+                                                if (!breakdowns[gid]) breakdowns[gid] = { name: exp.group?.name || (typeof exp.group === 'string' ? 'Shared Group' : 'non-group expenses'), balance: 0 };
                                                 breakdowns[gid].balance += b;
+                                                breakdowns[gid].balance = Math.round(breakdowns[gid].balance * 100) / 100;
                                             }
                                         });
 
@@ -655,7 +677,8 @@ export default function FriendDetails() {
                                                     {(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes' : 'gets back'} in <span className="font-bold text-gray-800">{item.name === 'non-group expenses' ? 'Direct' : `"${item.name}"`}</span>
                                                 </span>
                                                 <span className={`font-black whitespace-nowrap ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                    {formatCurrency(Math.abs(item.balance), user?.defaultCurrency)}
+                                                    {/* Amount is already in displayCurrency — pass it as source to avoid re-conversion */}
+                                                    {formatCurrency(Math.abs(item.balance), displayCurrency, displayCurrency)}
                                                 </span>
                                             </div>
                                         ));
@@ -664,14 +687,16 @@ export default function FriendDetails() {
                     </div>
 
                     <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide items-center">
+                        {Math.abs(balance) >= 0.01 && (
                         <button onClick={openSettleUp} className="bg-[#e11d48] text-white px-5 py-2 rounded-lg hover:bg-[#be123c] font-bold shadow-sm whitespace-nowrap transition">
                             Settle up
                         </button>
+                        )}
                         <button
                             onClick={() => {
                                 if (!friend) return;
                                 // Build a professional pre-filled email draft
-                                const absAmtFormatted = formatCurrency(Math.abs(balance), user?.defaultCurrency);
+                                const absAmtFormatted = formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency);
                                 const draft = balance > 0
                                     ? `Hi ${friend.username},\n\nI hope you're doing well! I just wanted to send a quick, friendly reminder that you have an outstanding balance of ${absAmtFormatted} on Paywise.\n\nWhenever you get a chance, please settle up — you can do it directly in the app.\n\nThanks so much! 😊\n\n${user.username}`
                                     : `Hi ${friend.username},\n\nJust a heads-up — I have a balance of ${absAmtFormatted} that I owe you on Paywise. I'll take care of it soon!\n\nThanks,\n${user.username}`;
@@ -1109,31 +1134,24 @@ export default function FriendDetails() {
                                         {(() => {
                                             if (!selectedExpense) return null;
                                             if (selectedExpense?.description?.toLowerCase().includes('settle')) return null;
-                                            if (selectedExpense?.description?.includes('[sid:')) return null; // it IS a settle expense
                                             const isPaidByMe = (selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === (user?.id || user?._id);
                                             const mySplit = selectedExpense?.splits?.find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
                                             if (!mySplit || mySplit.amount <= 0 || isPaidByMe) return null;
-
-                                            // Check 1: Was this specific expense already individually settled?
-                                            const expId = selectedExpense._id;
-                                            const alreadySettled = expenses.some(e =>
-                                                e.description?.includes(`[sid:${expId}]`)
-                                            );
-                                            if (alreadySettled) return null;
-
-                                            // Check 2: Is the overall balance between this pair already 0?
+                                            // Hide if balance is already zero between the two
                                             if (Math.abs(balance) < 0.01) return null;
 
                                             return (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleSettleIndividualExpense(selectedExpense, mySplit.amount);
+                                                        if (window.confirm(`Settle and delete "${selectedExpense.description}"? This will remove it from the list and notify ${selectedExpense.paidBy?.username || 'the payer'}.`)) {
+                                                            handleSettleIndividualExpense(selectedExpense);
+                                                        }
                                                     }}
                                                     className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
                                                 >
                                                     <i className="pi pi-check text-[14px]"></i>
-                                                    Settle my share ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense?.currency)})
+                                                    Settle & delete ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense?.currency)})
                                                 </button>
                                             );
                                         })()}
@@ -1559,7 +1577,7 @@ export default function FriendDetails() {
             {/* REMINDERS MODAL                            */}
             {/* ---------------------------------------- */}
             {showReminderModal && (() => {
-                const formattedAmt = formatCurrency(Math.abs(balance), user?.defaultCurrency);
+                const formattedAmt = formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency);
                 const shareText = balance > 0
                     ? `Hi ${friend?.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${formattedAmt} on Paywise.\n\nPlease settle up when you get a chance. You can pay directly in the Paywise app. 🙏\n\nThank you!`
                     : `Hi ${friend?.username}! 👋\n\nJust letting you know — I owe you ${formattedAmt} on Paywise and will take care of it soon!\n\nThanks for your patience,\n${user.username}`;
@@ -1601,8 +1619,8 @@ export default function FriendDetails() {
                                     <h3 className="text-[18px] font-bold text-gray-900">Send a Reminder</h3>
                                     <p className="text-[13px] text-gray-400 mt-0.5">
                                         {balance > 0
-                                            ? `${friend?.username} owes you ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}`
-                                            : `You owe ${friend?.username} ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}`}
+                                            ? `${friend?.username} owes you ${formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency)}`
+                                            : `You owe ${friend?.username} ${formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency)}`}
                                     </p>
                                 </div>
                                 <button onClick={() => setShowReminderModal(false)} className="ml-auto p-2 text-gray-400 hover:bg-gray-100 rounded-full transition">
@@ -1704,10 +1722,10 @@ export default function FriendDetails() {
                                 <div>
                                     <p className="text-[13px] text-gray-500 font-medium">Amount to settle</p>
                                     {(() => {
-                                        const balInDisplay = Math.round(convertAmount(Math.abs(balance), 'USD', displayCurrency) * 100) / 100;
+                                        const balInDisplay = Math.round(Math.abs(balance) * 100) / 100;
                                         return (
                                             <>
-                                                <p className="text-[22px] font-bold text-gray-900">{formatCurrency(balInDisplay, displayCurrency, displayCurrency)}</p>
+                                                <p className="text-[22px] font-bold text-gray-900">{formatCurrency(balInDisplay, balanceCurrency, balanceCurrency)}</p>
                                                 <p className="text-[13px] text-gray-500 mt-0.5">
                                                     {balance < 0
                                                         ? `You owe ${friend.username}`
@@ -1780,9 +1798,9 @@ export default function FriendDetails() {
                                     </div>
                                 </div>
                                 {(() => {
-                                    const balInDisplay = Math.round(convertAmount(Math.abs(balance), 'USD', displayCurrency) * 100) / 100;
+                                    const balInDisplay = Math.round(Math.abs(balance) * 100) / 100;
                                     return (
-                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balInDisplay, displayCurrency, displayCurrency)}</span>
+                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balInDisplay, balanceCurrency, balanceCurrency)}</span>
                                     );
                                 })()}
                             </button>
@@ -1813,7 +1831,7 @@ export default function FriendDetails() {
                             {/* Partial input */}
                             <div className="mt-4">
                                 {(() => {
-                                    const balanceInDisplay = Math.round(convertAmount(Math.abs(balance), 'USD', displayCurrency) * 100) / 100;
+                                    const balanceInDisplay = Math.round(Math.abs(balance) * 100) / 100;
                                     const remaining = Math.max(0, balanceInDisplay - (parseFloat(partialAmount) || 0));
                                     return (
                                         <>

@@ -285,28 +285,16 @@ export default function GroupDetails() {
         }
     };
 
-    const handleSettleIndividualExpense = async (expense, amount) => {
+    const handleSettleIndividualExpense = async (expense) => {
         try {
-            const payerId = user.id || user._id; 
-            const receiverId = expense.paidBy?._id || expense.paidBy;
-            if (!receiverId || !payerId) throw new Error('Missing payer or receiver data.');
-            // Convert split amount from expense's currency to displayCurrency for correct posting
-            const convertedAmt = Math.round(convertAmount(amount, expense.currency || 'USD', displayCurrency) * 100) / 100;
-            await api.post('/expenses', {
-                group: id,
-                amount: convertedAmt,
-                // Embed [sid:ID] so we can detect this expense was individually settled
-                description: `Settle my share [sid:${expense._id}]`,
-                paidBy: payerId,
-                currency: displayCurrency,
-                splits: [{ user: receiverId, amount: convertedAmt }]
-            });
-            
+            // Call the dedicated settle-and-delete route.
+            // Backend: verifies split membership, deletes the expense, emails + notifies the payer.
+            await api.post(`/expenses/${expense._id}/settle-my-share`);
             setSelectedExpense(null);
             fetchGroup();
         } catch (err) {
             console.error(err);
-            alert('Failed to settle expense.');
+            alert(err.response?.data?.msg || 'Failed to settle expense.');
         }
     };
     // handleUpdateExpense is above ^
@@ -1162,14 +1150,7 @@ export default function GroupDetails() {
                                 const mySplit = selectedExpense.splits?.find(s => (s.user?._id || s.user) === (user?.id || user?._id));
                                 if (!mySplit || mySplit.amount <= 0 || isPaidByMe) return null;
 
-                                // Check 1: Was this specific expense already individually settled?
-                                const expId = selectedExpense._id;
-                                const alreadySettled = expenses.some(e =>
-                                    e.description?.includes(`[sid:${expId}]`)
-                                );
-                                if (alreadySettled) return null;
-
-                                // Check 2: Is the overall pairwise balance already 0?
+                                // Hide if pairwise balance is already zero
                                 const myId = user?.id || user?._id;
                                 const otherMemberId = selectedExpense.paidBy?._id || selectedExpense.paidBy;
                                 const iOwe = pairwiseBalances[myId]?.[otherMemberId] || 0;
@@ -1181,12 +1162,14 @@ export default function GroupDetails() {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleSettleIndividualExpense(selectedExpense, mySplit.amount);
+                                            if (window.confirm(`Settle and delete "${selectedExpense.description}"? This will remove it and notify ${selectedExpense.paidBy?.username || 'the payer'}.`)) {
+                                                handleSettleIndividualExpense(selectedExpense);
+                                            }
                                         }}
                                         className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
                                     >
                                         <i className="pi pi-check text-[1rem]"></i>
-                                        Settle my share ({formatCurrency(mySplit.amount, displayCurrency, selectedExpense.currency)})
+                                        Settle &amp; delete ({formatCurrency(mySplit.amount, displayCurrency, selectedExpense.currency)})
                                     </button>
                                 );
                             })()}
