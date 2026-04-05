@@ -26,7 +26,7 @@ export default function FriendDetails() {
     const [friend, setFriend] = useState(null);
     const [expenses, setExpenses] = useState([]);
     const [balance, setBalance] = useState(0);
-    const [balanceCurrency, setBalanceCurrency] = useState(displayCurrency); // currency the balance is already in
+    const [balanceCurrency, setBalanceCurrency] = useState(user?.defaultCurrency || 'USD'); // currency the balance is already in
 
     const [selectedExpense, setSelectedExpense] = useState(null);
     const [isEditingExpense, setIsEditingExpense] = useState(false);
