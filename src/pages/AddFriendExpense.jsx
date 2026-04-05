@@ -173,7 +173,7 @@ export default function AddFriendExpense() {
                 </h1>
                 <button
                     onClick={(e) => {
-                        if (expenseCount >= 4) {
+                        if (expenseCount >= 3) {
                             setShowAd(true);
                         } else {
                             handleSubmit(e);

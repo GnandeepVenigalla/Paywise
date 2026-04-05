@@ -315,7 +315,7 @@ export default function AddExpense() {
                 <button
                     onClick={(e) => {
                         if (isLoading || hasSubmittedRef.current) return;
-                        if (expenseCount >= 4) {
+                        if (expenseCount >= 3) {
                             setIsLoading(true); // Lock the UI
                             setShowAd(true);
                         } else {

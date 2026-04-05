@@ -142,12 +142,26 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
-    const [expenseCount, setExpenseCount] = useState(parseInt(localStorage.getItem('expense_count') || '0'));
+    const getDailyExpenseCount = () => {
+        const storedDate = localStorage.getItem('expense_count_date');
+        const today = new Date().toDateString();
+        
+        if (storedDate !== today) {
+            localStorage.setItem('expense_count_date', today);
+            localStorage.setItem('expense_count', '0');
+            return 0;
+        }
+        return parseInt(localStorage.getItem('expense_count') || '0');
+    };
+
+    const [expenseCount, setExpenseCount] = useState(getDailyExpenseCount());
 
     const incrementExpenseCount = () => {
+        const today = new Date().toDateString();
         const newCount = expenseCount + 1;
         setExpenseCount(newCount);
         localStorage.setItem('expense_count', newCount.toString());
+        localStorage.setItem('expense_count_date', today);
     };
 
     return (

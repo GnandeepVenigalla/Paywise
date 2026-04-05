@@ -10,6 +10,13 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
         if (!isOpen) {
             setStatus('ready');
             setTimeLeft(5);
+        } else {
+            // Auto-bypass ads on beta and dev environments
+            const isProd = window.location.hostname === 'www.paywiseapp.com' || window.location.hostname === 'paywiseapp.com';
+            if (!isProd) {
+                // Instantly finish if not in prod
+                setStatus('finished');
+            }
         }
     }, [isOpen]);
 
@@ -117,11 +124,20 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
             case 'playing':
                 return (
                     <div className="flex flex-col items-center justify-center w-full h-full min-h-[450px] relative px-4">
-                         {/* Priority 1: Real Google AdSense Unit */}
-                         <div className="google-ad-container w-full h-[280px] bg-slate-50/30 dark:bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-100 dark:border-white/5 shadow-inner relative">
+                         {/* Priority 1: Real Google AdSense Unit or Internal Image */}
+                         <div className="google-ad-container w-full h-[320px] bg-slate-50/10 dark:bg-slate-800/10 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-100 dark:border-white/10 shadow-inner relative">
                              <div className="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded text-[8px] font-black text-white/80 uppercase tracking-widest border border-white/10">ADS</div>
-                             <ins className="adsbygoogle"
-                                  style={{ display: 'block', width: '100%', height: '280px' }}
+                             
+                             {/* Internal Internal Ad Image (Always visible while Google loads) */}
+                             <img 
+                                src="/ads.png" 
+                                alt="Sponsored Content" 
+                                className="absolute inset-0 w-full h-full object-cover opacity-60 animate-in fade-in duration-1000"
+                             />
+
+                             {/* The actual Google Ad slot */}
+                             <ins className="adsbygoogle relative z-10"
+                                  style={{ display: 'block', width: '100%', height: '320px' }}
                                   data-ad-client="ca-pub-7749956119820849"
                                   data-ad-slot="auto"
                                   data-full-width-responsive="true"></ins>
