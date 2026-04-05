@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useRef, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -10,13 +10,16 @@ import Avatar from '../components/UI/Avatar';
 import Card from '../components/UI/Card';
 import Button from '../components/UI/Button';
 import { useInstallApp } from '../hooks/useInstallApp';
-import { useRef, useEffect } from 'react';
+
 import NotificationBell from '../components/NotificationBell';
+import { useAppSettings } from '../hooks/useAppSettings';
 
 let memeCache = [];
 export default function Account() {
     const { user, logout, setUser, api } = useContext(AuthContext);
     const navigate = useNavigate();
+    // Apply theme whenever the Account tab is mounted
+    useAppSettings();
     const [kitties, setKitties] = useState([]);
     const { isInstallable, promptInstall, isIosPromptVisible, hideIosPrompt } = useInstallApp();
     const fileInputRef = useRef(null);
@@ -279,7 +282,7 @@ export default function Account() {
                         <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] px-1 mb-3">
                             {group.label}
                         </p>
-                        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                             {group.items.map((item, idx) => {
                                 const isLast = idx === group.items.length - 1;
                                 const content = (
@@ -329,7 +332,7 @@ export default function Account() {
             <div className="text-center mt-8 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.4.7 /149 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise V1.4.8 · © 2026</p>
                     <div className="mt-3 flex items-center justify-center gap-4 text-[10px] font-black uppercase tracking-widest text-[#19876e] dark:text-emerald-400">
                         <Link to="/terms" className="hover:underline">Terms</Link>
                         <span className="w-1 h-1 bg-gray-300 dark:bg-slate-700 rounded-full" />

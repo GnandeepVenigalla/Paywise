@@ -128,6 +128,7 @@ export default function GroupDetails() {
         });
 
         expenses.forEach(exp => {
+            if (exp.amount < 0.005) return;
             const creditorId = String(exp.paidBy?._id || exp.paidBy);
             const sourceCurr = exp.currency || 'USD';
             const targetCurr = 'USD';
@@ -136,6 +137,7 @@ export default function GroupDetails() {
                 if (debtorId !== creditorId && pairwise[debtorId] && pairwise[debtorId][creditorId] !== undefined) {
                     const convertedAmount = Math.round(convertAmount(split.amount, sourceCurr, targetCurr) * 100) / 100;
                     pairwise[debtorId][creditorId] += convertedAmount;
+                    pairwise[debtorId][creditorId] = Math.round(pairwise[debtorId][creditorId] * 100) / 100;
                 }
             });
         });
@@ -152,6 +154,8 @@ export default function GroupDetails() {
                     if (a !== b) {
                         netBalances[a] -= pairwise[a][b];
                         netBalances[b] += pairwise[a][b];
+                        netBalances[a] = Math.round(netBalances[a] * 100) / 100;
+                        netBalances[b] = Math.round(netBalances[b] * 100) / 100;
                     }
                 });
             });
@@ -198,10 +202,10 @@ export default function GroupDetails() {
                     const aOwesB = pairwise[a][b] || 0;
                     const bOwesA = pairwise[b][a] || 0;
                     if (aOwesB > bOwesA) {
-                        pairwise[a][b] = aOwesB - bOwesA;
+                        pairwise[a][b] = Math.round((aOwesB - bOwesA) * 100) / 100;
                         pairwise[b][a] = 0;
                     } else {
-                        pairwise[b][a] = bOwesA - aOwesB;
+                        pairwise[b][a] = Math.round((bOwesA - aOwesB) * 100) / 100;
                         pairwise[a][b] = 0;
                     }
                 }
@@ -286,14 +290,16 @@ export default function GroupDetails() {
             const payerId = user.id || user._id; 
             const receiverId = expense.paidBy?._id || expense.paidBy;
             if (!receiverId || !payerId) throw new Error('Missing payer or receiver data.');
-            
+            // Convert split amount from expense's currency to displayCurrency for correct posting
+            const convertedAmt = Math.round(convertAmount(amount, expense.currency || 'USD', displayCurrency) * 100) / 100;
             await api.post('/expenses', {
                 group: id,
-                amount: amount,
-                description: `Partial cash payment (Settle: ${expense.description || 'Expense'})`,
+                amount: convertedAmt,
+                // Embed [sid:ID] so we can detect this expense was individually settled
+                description: `Settle my share [sid:${expense._id}]`,
                 paidBy: payerId,
-                currency: expense.currency || displayCurrency || 'USD',
-                splits: [{ user: receiverId, amount: amount }]
+                currency: displayCurrency,
+                splits: [{ user: receiverId, amount: convertedAmt }]
             });
             
             setSelectedExpense(null);
@@ -457,6 +463,7 @@ export default function GroupDetails() {
             const otherOwesMe = pairwiseBalances[otherId]?.[mId] || 0;
             const iOweOther = pairwiseBalances[mId]?.[otherId] || 0;
             net += otherOwesMe - iOweOther;
+            net = Math.round(net * 100) / 100;
         });
         return net;
     };
@@ -471,7 +478,8 @@ export default function GroupDetails() {
         .filter(item =>
             !item.parentLoan &&
             !item.isLoan &&
-            !(item.description?.toLowerCase().includes('interest') || item.description?.toLowerCase().includes('intrest'))
+            !(item.description?.toLowerCase().includes('interest') || item.description?.toLowerCase().includes('intrest')) &&
+            item.amount >= 0.005
         )
         .sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -825,7 +833,9 @@ export default function GroupDetails() {
                                     const isSettleUp =
                                         item.description?.toLowerCase() === 'settle up' ||
                                         item.description?.toLowerCase() === 'cash settle up' ||
-                                        item.description?.toLowerCase().startsWith('partial cash payment');
+                                        item.description?.toLowerCase().startsWith('partial cash payment') ||
+                                        item.description?.toLowerCase().startsWith('settle my share') ||
+                                        item.description?.includes('[sid:');
                                     const isPaidByMe = (item.paidBy?._id || item.paidBy) === (user?.id || user?._id);
 
                                     // Render settle-up as a clean banner row, not an expense card
@@ -886,6 +896,19 @@ export default function GroupDetails() {
                                                     <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">{monthYear}</span>
                                                 </div>
                                             )}
+                                            {/* "Individually Settled" badge */}
+                                            {(() => {
+                                                const isIndivSettled = expenses.some(e => e.description?.includes(`[sid:${item._id}]`));
+                                                if (!isIndivSettled) return null;
+                                                return (
+                                                    <div className="flex items-center gap-1.5 mx-5 mt-2 mb-0 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                                        <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                                                        </svg>
+                                                        <span className="text-[11.5px] font-bold text-emerald-700 uppercase tracking-wide">Individually Settled</span>
+                                                    </div>
+                                                );
+                                            })()}
                                             <ExpenseItem
                                                 description={item.description}
                                                 amount={item.amount}
@@ -1137,23 +1160,35 @@ export default function GroupDetails() {
                                 if (selectedExpense.description?.toLowerCase().includes('settle')) return null;
                                 const isPaidByMe = (selectedExpense.paidBy?._id || selectedExpense.paidBy) === (user?.id || user?._id);
                                 const mySplit = selectedExpense.splits?.find(s => (s.user?._id || s.user) === (user?.id || user?._id));
-                                
-                                // Ensure there's a valid amount owed (not fully settled via a negative split)
-                                if (!isPaidByMe && mySplit && mySplit.amount > 0) {
-                                    return (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleSettleIndividualExpense(selectedExpense, mySplit.amount);
-                                            }}
-                                            className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
-                                        >
-                                            <i className="pi pi-check text-[1rem]"></i>
-                                            Settle my share ({formatCurrency(mySplit.amount, displayCurrency, selectedExpense.currency)})
-                                        </button>
-                                    );
-                                }
-                                return null;
+                                if (!mySplit || mySplit.amount <= 0 || isPaidByMe) return null;
+
+                                // Check 1: Was this specific expense already individually settled?
+                                const expId = selectedExpense._id;
+                                const alreadySettled = expenses.some(e =>
+                                    e.description?.includes(`[sid:${expId}]`)
+                                );
+                                if (alreadySettled) return null;
+
+                                // Check 2: Is the overall pairwise balance already 0?
+                                const myId = user?.id || user?._id;
+                                const otherMemberId = selectedExpense.paidBy?._id || selectedExpense.paidBy;
+                                const iOwe = pairwiseBalances[myId]?.[otherMemberId] || 0;
+                                const theyOwe = pairwiseBalances[otherMemberId]?.[myId] || 0;
+                                const netUSD = Math.abs(theyOwe - iOwe);
+                                if (netUSD < 0.01) return null;
+
+                                return (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSettleIndividualExpense(selectedExpense, mySplit.amount);
+                                        }}
+                                        className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                                    >
+                                        <i className="pi pi-check text-[1rem]"></i>
+                                        Settle my share ({formatCurrency(mySplit.amount, displayCurrency, selectedExpense.currency)})
+                                    </button>
+                                );
                             })()}
 
                             {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy?._id === user.id)) && (
@@ -2099,19 +2134,26 @@ export default function GroupDetails() {
                     const settleList = allMembers
                         .filter(m => m._id !== myId)
                         .map(m => {
-                            const iOwe = (pairwiseBalances[myId]?.[m._id] || 0);
-                            const theyOwe = (pairwiseBalances[m._id]?.[myId] || 0);
-                            const net = theyOwe - iOwe;
-                            return { member: m, amount: Math.abs(net), iOwe: net < 0 };
+                            const iOwe = (pairwiseBalances[myId]?.[m._id] || 0);   // USD
+                            const theyOwe = (pairwiseBalances[m._id]?.[myId] || 0); // USD
+                            const netUSD = theyOwe - iOwe;
+                            // Convert the USD net to the display currency so full settle
+                            // posts the correct amount in the correct currency
+                            const netInDisplay = Math.round(
+                                convertAmount(Math.abs(netUSD), 'USD', displayCurrency) * 100
+                            ) / 100;
+                            return { member: m, amount: netInDisplay, iOwe: netUSD < 0 };
                         })
                         .filter(r => r.amount > 0.005);
 
                     const handleGroupCashSettle = async (isPartial) => {
                         if (!settleUpTarget) return;
-                        const amt = isPartial ? parseFloat(groupPartialAmount) : settleUpTarget.amount;
+                        // settleUpTarget.amount is already in displayCurrency
+                        const rawAmt = isPartial ? parseFloat(groupPartialAmount) : settleUpTarget.amount;
+                        const amt = Math.round(rawAmt * 100) / 100;
                         if (isNaN(amt) || amt <= 0) { alert('Please enter a valid amount.'); return; }
-                        if (amt > settleUpTarget.amount) {
-                            const maxFmt = formatCurrency(settleUpTarget.amount, displayCurrency);
+                        if (amt > settleUpTarget.amount + 0.005) {
+                            const maxFmt = formatCurrency(settleUpTarget.amount, displayCurrency, displayCurrency);
                             alert(`Amount cannot exceed ${maxFmt}.`);
                             return;
                         }
@@ -2121,6 +2163,7 @@ export default function GroupDetails() {
                             const receiverId = settleUpTarget.iOwe ? settleUpTarget.member._id : myId;
                             await api.post('/expenses', {
                                 description: isPartial ? `Partial cash payment of ${formatCurrency(amt, displayCurrency)}` : 'Cash settle up',
+                                // Post in displayCurrency so backend stores the correct amount
                                 amount: amt,
                                 currency: displayCurrency,
                                 group: id,
@@ -2190,7 +2233,7 @@ export default function GroupDetails() {
                                                     {row.iOwe ? 'you owe' : 'owes you'}
                                                 </p>
                                                 <p className={`text-[20px] font-bold leading-tight ${row.iOwe ? 'text-rose-600' : 'text-emerald-500'}`}>
-                                                    {formatCurrency(row.amount, displayCurrency)}
+                                                    {formatCurrency(row.amount, displayCurrency, displayCurrency)}
                                                 </p>
                                             </div>
                                         </button>
@@ -2207,7 +2250,7 @@ export default function GroupDetails() {
                                         </div>
                                         <div>
                                             <p className="text-[13px] text-gray-500 font-medium">Amount to settle</p>
-                                            <p className="text-[22px] font-bold text-gray-900">{formatCurrency(settleUpTarget.amount, displayCurrency)}</p>
+                                            <p className="text-[22px] font-bold text-gray-900">{formatCurrency(settleUpTarget.amount, displayCurrency, displayCurrency)}</p>
                                             <p className="text-[13px] text-gray-500 mt-0.5">
                                                 {settleUpTarget.iOwe
                                                     ? `You owe ${settleUpTarget.member.username}`
@@ -2271,7 +2314,7 @@ export default function GroupDetails() {
                                                 <p className="text-[13px] text-gray-500">Pay the entire balance</p>
                                             </div>
                                         </div>
-                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(settleUpTarget.amount, displayCurrency)}</span>
+                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(settleUpTarget.amount, displayCurrency, displayCurrency)}</span>
                                     </button>
 
                                     {/* Divider */}
@@ -2283,21 +2326,21 @@ export default function GroupDetails() {
 
                                     {/* Partial input */}
                                     <div className="mt-4">
-                                        <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay</label>
+                                        <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay ({displayCurrency})</label>
                                         <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-emerald-600 rounded-xl px-4 py-3 transition bg-white">
-                                            <DollarSign className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                                            <span className="text-gray-500 font-bold text-[16px] flex-shrink-0">{currSym}</span>
                                             <input
                                                 type="number"
                                                 min="0.01"
                                                 step="0.01"
                                                 max={settleUpTarget.amount}
-                                                placeholder={`Max ${formatCurrency(settleUpTarget.amount, displayCurrency)}`}
+                                                placeholder={`Max ${formatCurrency(settleUpTarget.amount, displayCurrency, displayCurrency)}`}
                                                 value={groupPartialAmount}
                                                 onChange={e => setGroupPartialAmount(e.target.value)}
                                                 className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
                                             />
                                         </div>
-                                        <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(Math.abs(settleUpTarget.amount - (parseFloat(groupPartialAmount) || 0)), displayCurrency)}</p>
+                                        <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(Math.max(0, settleUpTarget.amount - (parseFloat(groupPartialAmount) || 0)), displayCurrency, displayCurrency)}</p>
                                     </div>
 
                                     <button

@@ -23,11 +23,25 @@ body {
   --pw-accent-light: rgba(5, 150, 105, 0.12);
   --pw-accent-text: #059669;
   --pw-font-scale: 1;
+  /* Radius variables — updated dynamically by applyCustomTheme() */
+  --pw-radius-arb: 32px;
+  --pw-radius-sm: 4px;
+  --pw-radius-md: 8px;
+  --pw-radius-lg: 12px;
+  --pw-radius-xl: 16px;
+  --pw-radius-2xl: 20px;
+  --pw-radius-3xl: 28px;
+  --pw-radius-full: 9999px;
 }
 
 /* ── Font Scale: zoom the entire #root so px-based Tailwind text scales too ── */
 #root {
   zoom: var(--pw-font-scale, 1);
+}
+
+/* Firefox/Safari fallback — font-size on html scales rem-based units  */
+html {
+  font-size: calc(1rem * var(--pw-font-scale, 1));
 }
 
 /* ── Accent Color: when pw-custom-accent is on <html>, remap the Tailwind v4  ──

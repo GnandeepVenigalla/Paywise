@@ -36,6 +36,16 @@ export function applyCustomTheme(ct) {
     };
     const r = RADIUS_MAP[radiusKey] || RADIUS_MAP.round;
 
+    // Set CSS variable so arbitrary radius classes can consume it
+    root.style.setProperty('--pw-radius-arb', r.arb);
+    root.style.setProperty('--pw-radius-sm', r.sm);
+    root.style.setProperty('--pw-radius-md', r.md);
+    root.style.setProperty('--pw-radius-lg', r.lg);
+    root.style.setProperty('--pw-radius-xl', r.xl);
+    root.style.setProperty('--pw-radius-2xl', r['2xl']);
+    root.style.setProperty('--pw-radius-3xl', r['3xl']);
+    root.style.setProperty('--pw-radius-full', r.full);
+
     // Remove old injected style if present
     const existing = document.getElementById('pw-radius-style');
     if (existing) existing.remove();
@@ -51,17 +61,29 @@ export function applyCustomTheme(ct) {
         .rounded-2xl { border-radius: ${r['2xl']} !important; }
         .rounded-3xl { border-radius: ${r['3xl']} !important; }
         .rounded-full { border-radius: ${r.full} !important; }
-        [class*="rounded-["] { border-radius: ${r.arb} !important; }
         button, input, select, textarea { border-radius: ${r.md} !important; }
+
+        /* ── Arbitrary radius classes: use attribute begins-with selector ─── */
+        [class~="rounded-[2rem]"],
+        [class~="rounded-[1.5rem]"],
+        [class~="rounded-[1rem]"],
+        [class~="rounded-[3rem]"],
+        [class~="rounded-[4rem]"] { border-radius: ${r.arb} !important; }
+
+        /* ── Also catch any element that has an inline border-radius set via Tailwind arb ─── */
+        :where([class]), :where([class*="rounded-"]) [class*="rounded-"] { }
     `;
     document.head.appendChild(styleTag);
 
     // ── Font scale ────────────────────────────────────────────────────────────
     const scale = ct.fontScale || 1.0;
     root.style.setProperty('--pw-font-scale', scale);
-    // Also set on #root zoom AND html font-size for maximum browser compatibility
+    // Set zoom on #root (Chromium) AND font-size on <html> (Firefox/Safari)
+    // Both are needed for cross-browser support of px-based Tailwind text sizes
     const appRoot = document.getElementById('root');
     if (appRoot) appRoot.style.zoom = scale;
+    // html font-size approach — scales rem units universally
+    root.style.fontSize = `${scale * 100}%`;
 
     // ── Surface style — use data attribute for reliable targeting ─────────────
     root.removeAttribute('data-pw-surface');

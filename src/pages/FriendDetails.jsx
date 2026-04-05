@@ -315,14 +315,16 @@ export default function FriendDetails() {
         try {
             const payerId = user?.id || user?._id; 
             const receiverId = expense.paidBy._id || expense.paidBy;
-            const roundedAmount = Math.round(amount * 100) / 100;
+            // Convert split amount from expense's currency to displayCurrency for correct posting
+            const convertedAmt = Math.round(convertAmount(amount, expense.currency || 'USD', displayCurrency) * 100) / 100;
             
             await api.post('/expenses', {
-                amount: roundedAmount,
-                description: `Cash settle up`,
+                // Embed [sid:ID] so we can detect this expense was individually settled
+                description: `Settle my share [sid:${expense._id}]`,
+                amount: convertedAmt,
                 paidBy: payerId,
-                currency: expense.currency || user?.defaultCurrency || 'USD',
-                splits: [{ user: receiverId, amount: roundedAmount }]  // ← was `amount` (unrounded)
+                currency: displayCurrency,
+                splits: [{ user: receiverId, amount: convertedAmt }]
             });
             
             setSelectedExpense(null);
@@ -378,25 +380,28 @@ export default function FriendDetails() {
     };
 
     const handleCashSettle = async (isPartial) => {
-        const amt = Math.round((isPartial ? parseFloat(partialAmount) : Math.abs(balance)) * 100) / 100;
+        // balance is in USD (backend normalizes to USD). Convert to displayCurrency for posting.
+        const balanceInDisplay = Math.round(convertAmount(Math.abs(balance), 'USD', displayCurrency) * 100) / 100;
+        const maxBalanceInDisplay = Math.round(convertAmount(Math.abs(balance) + 0.005, 'USD', displayCurrency) * 100) / 100;
+        const amt = Math.round((isPartial ? parseFloat(partialAmount) : balanceInDisplay) * 100) / 100;
         if (isNaN(amt) || amt <= 0) {
             alert('Please enter a valid amount.');
             return;
         }
-        if (amt > Math.abs(balance)) {
-            alert(`Amount cannot exceed ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}.`);
+        if (amt > maxBalanceInDisplay) {
+            alert(`Amount cannot exceed ${formatCurrency(balanceInDisplay, displayCurrency)}.`);
             return;
         }
         setIsSettling(true);
         try {
             const baseDesc = isPartial
-                ? `Partial cash payment of ${formatCurrency(amt, user?.defaultCurrency)}`
+                ? `Partial cash payment of ${formatCurrency(amt, displayCurrency)}`
                 : 'Cash settle up';
             const fullDesc = settleNote?.trim() ? `${baseDesc} — ${settleNote.trim()}` : baseDesc;
             await api.post('/expenses', {
                 description: fullDesc,
                 amount: amt,
-                currency: user?.defaultCurrency || 'USD',
+                currency: displayCurrency,
                 group: null,
                 paidBy: balance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
                 splits: [{
@@ -404,9 +409,22 @@ export default function FriendDetails() {
                     amount: amt
                 }]
             });
+
             setShowSettleUp(false);
             setSettleNote('');
-            fetchFriendDetails();
+
+            if (!isPartial) {
+                // Full settle — clear entire history and notify friend via email + in-app
+                try {
+                    await api.delete(`/expenses/friends/${friend?._id || friend}/all`);
+                } catch (clearErr) {
+                    console.warn('[SettleClear] History clear failed (non-fatal):', clearErr.message);
+                }
+                // Navigate back since there's nothing left to show
+                navigate(-1);
+            } else {
+                fetchFriendDetails();
+            }
         } catch (err) {
             alert('Failed to record settlement.');
         } finally {
@@ -480,7 +498,7 @@ export default function FriendDetails() {
     });
 
     const displayItems = resultItems
-        .filter(item => !item.isGroupSummary || Math.abs(item.amount) >= 0.01)
+        .filter(item => item.amount !== undefined && Math.abs(item.amount) >= 0.005 && (!item.isGroupSummary || Math.abs(item.amount) >= 0.01))
         .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // Calculate group balances safely for the settings page
@@ -697,7 +715,9 @@ export default function FriendDetails() {
                                     const isSettleUp = !item.isGroupSummary && (
                                         item.description?.toLowerCase() === 'settle up' ||
                                         item.description?.toLowerCase() === 'cash settle up' ||
-                                        item.description?.toLowerCase().startsWith('partial cash payment')
+                                        item.description?.toLowerCase().startsWith('partial cash payment') ||
+                                        item.description?.toLowerCase().startsWith('settle my share') ||
+                                        item.description?.includes('[sid:')
                                     );
 
                                     // Render settle-up as a clean banner, not a regular expense card
@@ -806,6 +826,19 @@ export default function FriendDetails() {
                                                                 </button>
                                                             </div>
                                                         )}
+                                                    </div>
+                                                );
+                                            })()}
+                                            {/* "Settled" badge — shown when a [sid:] settle expense references this expense */}
+                                            {!item.isGroupSummary && (() => {
+                                                const isIndivSettled = expenses.some(e => e.description?.includes(`[sid:${item._id}]`));
+                                                if (!isIndivSettled) return null;
+                                                return (
+                                                    <div className="flex items-center gap-1.5 mx-5 mt-2 mb-0 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                                        <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                                                        </svg>
+                                                        <span className="text-[11.5px] font-bold text-emerald-700 uppercase tracking-wide">Individually Settled</span>
                                                     </div>
                                                 );
                                             })()}
@@ -1076,25 +1109,33 @@ export default function FriendDetails() {
                                         {(() => {
                                             if (!selectedExpense) return null;
                                             if (selectedExpense?.description?.toLowerCase().includes('settle')) return null;
+                                            if (selectedExpense?.description?.includes('[sid:')) return null; // it IS a settle expense
                                             const isPaidByMe = (selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === (user?.id || user?._id);
                                             const mySplit = selectedExpense?.splits?.find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
-                                            
-                                            // Ensure there's a valid amount owed
-                                            if (!isPaidByMe && mySplit && mySplit.amount > 0) {
-                                                return (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleSettleIndividualExpense(selectedExpense, mySplit.amount);
-                                                        }}
-                                                        className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
-                                                    >
-                                                        <i className="pi pi-check text-[14px]"></i>
-                                                        Settle my share ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense?.currency)})
-                                                    </button>
-                                                );
-                                            }
-                                            return null;
+                                            if (!mySplit || mySplit.amount <= 0 || isPaidByMe) return null;
+
+                                            // Check 1: Was this specific expense already individually settled?
+                                            const expId = selectedExpense._id;
+                                            const alreadySettled = expenses.some(e =>
+                                                e.description?.includes(`[sid:${expId}]`)
+                                            );
+                                            if (alreadySettled) return null;
+
+                                            // Check 2: Is the overall balance between this pair already 0?
+                                            if (Math.abs(balance) < 0.01) return null;
+
+                                            return (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleSettleIndividualExpense(selectedExpense, mySplit.amount);
+                                                    }}
+                                                    className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                                                >
+                                                    <i className="pi pi-check text-[14px]"></i>
+                                                    Settle my share ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense?.currency)})
+                                                </button>
+                                            );
                                         })()}
 
                                         {(() => {
@@ -1662,12 +1703,19 @@ export default function FriendDetails() {
                                 </div>
                                 <div>
                                     <p className="text-[13px] text-gray-500 font-medium">Amount to settle</p>
-                                    <p className="text-[22px] font-bold text-gray-900">{formatCurrency(balance, user?.defaultCurrency)}</p>
-                                    <p className="text-[13px] text-gray-500 mt-0.5">
-                                        {balance < 0
-                                            ? `You owe ${friend.username}`
-                                            : `${friend.username} owes you`}
-                                    </p>
+                                    {(() => {
+                                        const balInDisplay = Math.round(convertAmount(Math.abs(balance), 'USD', displayCurrency) * 100) / 100;
+                                        return (
+                                            <>
+                                                <p className="text-[22px] font-bold text-gray-900">{formatCurrency(balInDisplay, displayCurrency, displayCurrency)}</p>
+                                                <p className="text-[13px] text-gray-500 mt-0.5">
+                                                    {balance < 0
+                                                        ? `You owe ${friend.username}`
+                                                        : `${friend.username} owes you`}
+                                                </p>
+                                            </>
+                                        );
+                                    })()}
                                 </div>
                             </div>
 
@@ -1731,7 +1779,12 @@ export default function FriendDetails() {
                                         <p className="text-[13px] text-gray-500">Pay the entire balance</p>
                                     </div>
                                 </div>
-                                <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balance, user?.defaultCurrency)}</span>
+                                {(() => {
+                                    const balInDisplay = Math.round(convertAmount(Math.abs(balance), 'USD', displayCurrency) * 100) / 100;
+                                    return (
+                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balInDisplay, displayCurrency, displayCurrency)}</span>
+                                    );
+                                })()}
                             </button>
 
                             {/* Optional note — applies to both full and partial */}
@@ -1759,21 +1812,29 @@ export default function FriendDetails() {
 
                             {/* Partial input */}
                             <div className="mt-4">
-                                <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay</label>
-                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-emerald-600 rounded-xl px-4 py-3 transition bg-white">
-                                    <DollarSign className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                                    <input
-                                        type="number"
-                                        min="0.01"
-                                        step="0.01"
-                                        max={Math.abs(balance)}
-                                        placeholder={`Max ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}`}
-                                        value={partialAmount}
-                                        onChange={e => setPartialAmount(e.target.value)}
-                                        className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
-                                    />
-                                </div>
-                                <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(Math.abs(balance - (parseFloat(partialAmount) || 0)), user?.defaultCurrency)}</p>
+                                {(() => {
+                                    const balanceInDisplay = Math.round(convertAmount(Math.abs(balance), 'USD', displayCurrency) * 100) / 100;
+                                    const remaining = Math.max(0, balanceInDisplay - (parseFloat(partialAmount) || 0));
+                                    return (
+                                        <>
+                                            <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay ({displayCurrency})</label>
+                                            <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-emerald-600 rounded-xl px-4 py-3 transition bg-white">
+                                                <span className="text-gray-500 font-bold text-[16px] flex-shrink-0">{CURRENCY_SYMBOLS[displayCurrency] || '$'}</span>
+                                                <input
+                                                    type="number"
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    max={balanceInDisplay}
+                                                    placeholder={`Max ${formatCurrency(balanceInDisplay, displayCurrency)}`}
+                                                    value={partialAmount}
+                                                    onChange={e => setPartialAmount(e.target.value)}
+                                                    className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
+                                                />
+                                            </div>
+                                            <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(remaining, displayCurrency)}</p>
+                                        </>
+                                    );
+                                })()}
                             </div>
 
 
