@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, User, Wallet } from 'lucide-react';
@@ -14,8 +14,15 @@ export default function Register() {
     const [success, setSuccess] = useState('');
     const [isOtpMode, setIsOtpMode] = useState(false);
     const [otp, setOtp] = useState('');
-    const { register, verifyOtp, api } = useContext(AuthContext);
+    const { register, verifyOtp, api, user, loading } = useContext(AuthContext);
     const navigate = useNavigate();
+
+    // Auto-redirect if already logged in
+    useEffect(() => {
+        if (!loading && user) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [user, loading, navigate]);
 
     const handleRegister = async (e) => {
         e.preventDefault();

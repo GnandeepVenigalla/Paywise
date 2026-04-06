@@ -1,24 +1,32 @@
 import { useState, useEffect, useContext, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { ArrowLeft, Edit2, Trash2, X, Receipt, Camera, Settings, ChevronLeft, ChevronRight, HelpCircle, TrendingUp, PieChart, Download, FileText, FileSpreadsheet, Banknote, Building2, DollarSign, CheckCircle2, Folder, Percent, Sparkles, Check } from 'lucide-react';
+import { Dialog } from 'primereact/dialog';
+import { InputText } from 'primereact/inputtext';
+import { InputNumber } from 'primereact/inputnumber';
+import { Button } from 'primereact/button';
+import Toggle from '../components/UI/Toggle';
 import { exportExpenses } from '../utils/exportUtils';
 import logoImg from '../assets/logo.png';
 import { useAppSettings } from '../hooks/useAppSettings';
 import ExpenseItem from '../components/UI/ExpenseItem';
 import { useMonthlySpending } from '../hooks/useMonthlySpending';
 import { formatMonthYear, formatDay, formatShortMonth, formatCurrency, CURRENCY_SYMBOLS, convertAmount } from '../utils/formatters';
+import { X, HelpCircle, TrendingUp, PieChart, ChevronLeft, ChevronRight, FileSpreadsheet, Percent, Receipt, FileText, Building2, Banknote, CheckCircle2, DollarSign, Eye, EyeOff, Lock, ShieldCheck, ShieldX } from 'lucide-react';
 import { calculateSplitsFromItems, normalizeItemsForSave, getUserExpenseSplit, toggleItemAssignment } from '../utils/expenseUtils';
+import AdGate from '../components/UI/AdGate';
 
 export default function FriendDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { api, user } = useContext(AuthContext);
     const currSym = CURRENCY_SYMBOLS[user?.defaultCurrency || 'USD'] || '$';
     const { hideBalance } = useAppSettings();
     const [friend, setFriend] = useState(null);
     const [expenses, setExpenses] = useState([]);
     const [balance, setBalance] = useState(0);
+    const [balanceCurrency, setBalanceCurrency] = useState(user?.defaultCurrency || 'USD'); // currency the balance is already in
 
     const [selectedExpense, setSelectedExpense] = useState(null);
     const [isEditingExpense, setIsEditingExpense] = useState(false);
@@ -29,7 +37,6 @@ export default function FriendDetails() {
     const [editLoanInterestRate, setEditLoanInterestRate] = useState(0);
     const [selectedMemberIdsForEdit, setSelectedMemberIdsForEdit] = useState([]);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
-    const location = useLocation();
     const [showSettings, setShowSettings] = useState(location.state?.openSettings || false);
     const [showFriendTotals, setShowFriendTotals] = useState(false);
     const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
@@ -51,11 +58,84 @@ export default function FriendDetails() {
     const [isReporting, setIsReporting] = useState(false);
     const [isBlocking, setIsBlocking] = useState(false);
     const [targetExportCurrency, setTargetExportCurrency] = useState(user?.defaultCurrency || 'USD');
+    const [loanRequests, setLoanRequests] = useState({}); // { expenseId: loanRequest }
 
-    // Extract monthly spending aggregation logic to custom hook
-    // Pass user.defaultCurrency so chart amounts are consistently converted
+    const [showAdGate, setShowAdGate] = useState(false);
+    const [adPendingRoute, setAdPendingRoute] = useState(null);
+    const [adType, setAdType] = useState('camera'); // 'camera' or 'ai'
+
+    // Loan Handling State
+    const [handlingLoan, setHandlingLoan] = useState(null);
+    const [loanPassword, setLoanPassword] = useState('');
+    const [showLoanPasswordModal, setShowLoanPasswordModal] = useState(false);
+    const [isSubmittingLoan, setIsSubmittingLoan] = useState(false);
+    const [showLoanPass, setShowLoanPass] = useState(false);
+
+    const handleAddExpenseClick = (e) => {
+        e.preventDefault();
+        const today = new Date().toDateString();
+        const key = `daily_add_expense_count_${user?.id || user?._id}`;
+        let data;
+        try {
+            data = JSON.parse(localStorage.getItem(key) || '{"date":"","count":0}');
+        } catch (err) {
+            data = { date: '', count: 0 };
+        }
+        
+        if (data.date !== today) {
+            data = { date: today, count: 0 };
+        }
+
+        if (data.count >= 4) {
+            setAdType('ai');
+            setAdPendingRoute(`/friend/${id}/add`);
+            setShowAdGate(true);
+        } else {
+            data.count += 1;
+            localStorage.setItem(key, JSON.stringify(data));
+            navigate(`/friend/${id}/add`);
+        }
+    };
+
+    const handleScanBillClick = (e) => {
+        e.preventDefault();
+        setAdType('camera');
+        setAdPendingRoute(`/friend/${id}/scan`);
+        setShowAdGate(true);
+    };
+
+    const handleAdFinish = () => {
+        setShowAdGate(false);
+        if (adPendingRoute === `/friend/${id}/add`) {
+            const today = new Date().toDateString();
+            const key = `daily_add_expense_count_${user?.id || user?._id}`;
+            let data = { date: today, count: 0 };
+            try {
+                data = JSON.parse(localStorage.getItem(key) || '{"date":"","count":0}');
+            } catch(e) {}
+            if (data.date !== today) data = { date: today, count: 0 };
+            data.count += 1;
+            localStorage.setItem(key, JSON.stringify(data));
+        }
+        if (adPendingRoute) {
+            navigate(adPendingRoute);
+            setAdPendingRoute(null);
+        }
+    };
+
     const displayCurrency = user?.defaultCurrency || 'USD';
     const monthlySpending = useMonthlySpending(expenses, user, displayCurrency);
+
+    // Balance in the viewer's own currency.
+    // For same-currency pairs (INR↔INR, USD↔USD) this is identical to the raw balance — no conversion.
+    // For cross-currency pairs (INR↔USD) the backend returns USD; we convert to the viewer's currency here.
+    const viewerBalanceCurrency = (balanceCurrency && balanceCurrency !== displayCurrency)
+        ? displayCurrency
+        : (balanceCurrency || displayCurrency);
+    const viewerBalance = useMemo(() => {
+        if (!balance || !balanceCurrency || balanceCurrency === displayCurrency) return balance;
+        return Math.round(convertAmount(balance, balanceCurrency, displayCurrency) * 100) / 100;
+    }, [balance, balanceCurrency, displayCurrency]);
 
     useEffect(() => {
         if (monthlySpending.length > 0) {
@@ -63,27 +143,49 @@ export default function FriendDetails() {
         }
     }, [monthlySpending]);
 
-    const projectedInterest = useMemo(() => {
-        if (!expenses || !friend) return 0;
-        // If fully settled, no interest will be charged by the scheduler either
-        const balanceInUSD = Math.abs(balance); // balance from server is in USD
-        if (balanceInUSD < 0.01) return 0;
+    // Calculate projected monthly interest — only for ACCEPTED loans
+    const interestStats = useMemo(() => {
+        if (!expenses || !friend || !user) return { projectedMonthly: 0, totalAccrued: 0 };
+        
+        const balanceInUSD = Math.abs(balance);
+        let remainingBalance = balanceInUSD;
+        let totalAccrued = 0;
 
-        let remainingBalance = balanceInUSD; // track how much of the balance is still loan-covered
+        const projectedMonthly = expenses.reduce((acc, exp) => {
+            if (!exp) return acc;
+            // Calculate total interest added so far (accruals from the scheduler)
+            if (exp.parentLoan || exp.description?.toLowerCase().includes('interest accrual')) {
+                const userDelta = user ? getUserExpenseSplit(exp, user, friend?._id || friend) : 0;
+                totalAccrued += Math.abs(userDelta);
+            }
 
-        return expenses.reduce((acc, exp) => {
-            if (exp.isLoan && exp.loanInterestRate > 0) {
-                const userSplit = getUserExpenseSplit(exp, user, friend._id || friend);
-                const sourceCurr = exp.currency || 'USD';
-                const splitInUSD = convertAmount(Math.abs(userSplit), sourceCurr, 'USD');
-                // Mirror the scheduler's logic: cap interest-bearing amount by the net balance
-                const interestBearingAmount = Math.min(splitInUSD, remainingBalance);
-                remainingBalance -= interestBearingAmount; // reduce remaining balance for next loan
-                return acc + (interestBearingAmount * (exp.loanInterestRate / 100));
+            // Only project interest for ACCEPTED loans (not pending)
+            const loanReq = loanRequests[exp._id];
+            const isAccepted = !loanReq || loanReq.status === 'accepted';
+
+            if (exp.isLoan && exp.loanInterestRate > 0 && remainingBalance > 0.01 && isAccepted) {
+                const userSplit = user ? getUserExpenseSplit(exp, user, friend?._id || friend) : 0;
+                
+                // Determine if this loan is active based on the overall balance direction
+                // If balance > 0 (Friend owes User), only loans where userSplit > 0 (User lent to Friend) accrue interest.
+                // If balance < 0 (User owes Friend), only loans where userSplit < 0 (Friend lent to User) accrue interest.
+                const isLoanActive = (balance > 0 && userSplit > 0) || (balance < 0 && userSplit < 0);
+                
+                if (isLoanActive) {
+                    const sourceCurr = exp.currency || 'USD';
+                    const splitInUSD = Math.round(convertAmount(Math.abs(userSplit), sourceCurr, 'USD') * 100) / 100;
+                    
+                    const interestBearingAmount = Math.min(splitInUSD, remainingBalance);
+                    remainingBalance -= interestBearingAmount;
+                    
+                    return acc + (interestBearingAmount * ((exp.loanInterestRate / 100) / 12));
+                }
             }
             return acc;
         }, 0);
-    }, [expenses, friend, user.id, balance]);
+
+        return { projectedMonthly, totalAccrued };
+    }, [expenses, friend, user?._id, user?.id, balance, loanRequests]);
 
     const fetchFriendDetails = async () => {
         try {
@@ -91,8 +193,76 @@ export default function FriendDetails() {
             setFriend(res.data.friend);
             setExpenses(res.data.expenses);
             setBalance(res.data.balance);
+            // balanceCurrency tells us what currency the balance is already expressed in.
+            // If backend is old and doesn't return it, fall back to displayCurrency.
+            setBalanceCurrency(res.data.balanceCurrency || displayCurrency);
+
+            // Fetch loan request status for all loan expenses
+            const loanExps = (res.data.expenses || []).filter(e => e.isLoan && e.loanInterestRate > 0);
+            if (loanExps.length > 0) {
+                const loanMap = {};
+                await Promise.all(loanExps.map(async (exp) => {
+                    try {
+                        const lr = await api.get(`/loans/expense/${exp._id}`);
+                        if (lr.data) loanMap[exp._id] = lr.data;
+                    } catch { /* no loan request for this expense */ }
+                }));
+                setLoanRequests(loanMap);
+            }
+
+            // Check for direct expense link from notification
+            const searchParams = new URLSearchParams(location.search);
+            const expParam = searchParams.get('expenseId');
+            if (expParam && res.data.expenses?.length > 0) {
+                const target = (res.data.expenses || []).find(e => e._id === expParam);
+                if (target) setSelectedExpense(target);
+            }
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleAcceptLoan = async (loan) => {
+        if (!loan) return;
+        // If it requires password and we don't have it yet, show modal
+        if (loan.requiresPasswordConfirmation && !loanPassword) {
+            setHandlingLoan(loan);
+            setShowLoanPasswordModal(true);
+            return;
+        }
+
+        setIsSubmittingLoan(true);
+        try {
+            await api.post(`/loans/${loan._id}/accept`, { password: loanPassword });
+            setLoanPassword('');
+            setShowLoanPasswordModal(false);
+            setHandlingLoan(null);
+            fetchFriendDetails(); // Refresh to update status
+        } catch (err) {
+            alert(err.response?.data?.msg || 'Failed to accept loan.');
+        } finally {
+            setIsSubmittingLoan(false);
+        }
+    };
+
+    const handleRejectLoan = async (loanId) => {
+        // Find the expense ID from the loan request map
+        const expId = Object.keys(loanRequests).find(eid => loanRequests[eid]._id === loanId);
+        
+        if (!window.confirm("Reject this loan invitation? If you decline, this whole expense will be deleted from your ledger for security and clarity.")) return;
+        
+        setIsSubmittingLoan(true);
+        try {
+            await api.post(`/loans/${loanId}/reject`);
+            // Delete the expense as well
+            if (expId) {
+                await api.delete(`/expenses/${expId}`);
+            }
+            fetchFriendDetails();
+        } catch (err) {
+            alert(err.response?.data?.msg || 'Failed to reject loan.');
+        } finally {
+            setIsSubmittingLoan(false);
         }
     };
 
@@ -129,6 +299,18 @@ export default function FriendDetails() {
         api.get(`/auth/friend-note/${id}`).then(res => setFriendNote(res.data.note || '')).catch(() => { });
     }, [id]);
 
+    // Auto-open settle-up if ?settle=1 is in the URL (navigated from Friends list)
+    const hasMountedSettle = useEffect._settleTriggered;
+    useEffect(() => {
+        if (!friend || balance === 0) return; // wait for data to load
+        const params = new URLSearchParams(location.search);
+        if (params.get('settle') === '1') {
+            // Clean the URL without re-fetching
+            window.history.replaceState({}, '', window.location.pathname);
+            openSettleUp();
+        }
+    }, [friend, balance]); // runs whenever friend/balance loads
+
     const handleUpdateExpense = async (e) => {
         e.preventDefault();
         setIsSavingEdit(true);
@@ -154,24 +336,16 @@ export default function FriendDetails() {
         }
     };
 
-    const handleSettleIndividualExpense = async (expense, amount) => {
+    const handleSettleIndividualExpense = async (expense) => {
         try {
-            const payerId = user.id || user._id; 
-            const receiverId = expense.paidBy._id || expense.paidBy;
-            
-            await api.post('/expenses', {
-                amount: amount,
-                description: `Partial cash payment (Settle: ${expense.description})`,
-                paidBy: payerId,
-                currency: expense.currency || user?.defaultCurrency || 'USD',
-                splits: [{ user: receiverId, amount: amount }]
-            });
-            
+            // Call the dedicated settle-and-delete route.
+            // Backend: verifies split membership, deletes the expense, emails + notifies the payer.
+            await api.post(`/expenses/${expense._id}/settle-my-share`);
             setSelectedExpense(null);
             fetchFriendDetails();
         } catch (err) {
             console.error(err);
-            alert('Failed to settle expense.');
+            alert(err.response?.data?.msg || 'Failed to settle expense.');
         }
     };
 
@@ -182,8 +356,8 @@ export default function FriendDetails() {
         }
 
         const members = [
-            { _id: user.id || user._id, username: 'You' },
-            { _id: friend._id, username: friend.username }
+            { _id: user?.id || user?._id, username: 'You' },
+            { _id: friend?._id, username: friend?.username || 'Friend' }
         ];
 
         setEditItems(prev => toggleItemAssignment(prev, itemId, selectedMemberIdsForEdit, members));
@@ -209,8 +383,8 @@ export default function FriendDetails() {
     };
 
     const openSettleUp = () => {
-        if (balance === 0) {
-            alert("You and " + friend.username + " are already settled up!");
+        if (Math.abs(balance) < 0.01) {
+            alert("You and " + (friend?.username || 'your friend') + " are already settled up!");
             return;
         }
         setSettleMode(null);
@@ -220,35 +394,61 @@ export default function FriendDetails() {
     };
 
     const handleCashSettle = async (isPartial) => {
-        const amt = isPartial ? parseFloat(partialAmount) : Math.abs(balance);
+        // Use viewerBalance (already in viewer's own currency) for all settle logic.
+        // For pure INR-INR or USD-USD: viewerBalance === balance, viewerBalanceCurrency === balanceCurrency.
+        // For mixed pairs (Case 3): viewerBalance is converted to viewer's own currency.
+        const balanceInDisplay = Math.round(Math.abs(viewerBalance) * 100) / 100;
+        const maxBalanceInDisplay = Math.round((Math.abs(viewerBalance) + 0.005) * 100) / 100;
+        const amt = Math.round((isPartial ? parseFloat(partialAmount) : balanceInDisplay) * 100) / 100;
         if (isNaN(amt) || amt <= 0) {
             alert('Please enter a valid amount.');
             return;
         }
-        if (amt > Math.abs(balance)) {
-            alert(`Amount cannot exceed ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}.`);
+        if (amt > maxBalanceInDisplay) {
+            alert(`Amount cannot exceed ${formatCurrency(balanceInDisplay, viewerBalanceCurrency, viewerBalanceCurrency)}.`);
             return;
         }
         setIsSettling(true);
         try {
             const baseDesc = isPartial
-                ? `Partial cash payment of ${formatCurrency(amt, user?.defaultCurrency)}`
+                ? `Partial cash payment of ${formatCurrency(amt, viewerBalanceCurrency, viewerBalanceCurrency)}`
                 : 'Cash settle up';
             const fullDesc = settleNote?.trim() ? `${baseDesc} — ${settleNote.trim()}` : baseDesc;
-            await api.post('/expenses', {
-                description: fullDesc,
-                amount: amt,
-                currency: user?.defaultCurrency || 'USD',
-                group: null,
-                paidBy: balance > 0 ? friend._id : (user.id || user._id),
-                splits: [{
-                    user: balance > 0 ? (user.id || user._id) : friend._id,
-                    amount: amt
-                }]
-            });
+
             setShowSettleUp(false);
             setSettleNote('');
-            fetchFriendDetails();
+
+            if (!isPartial) {
+                // Full settle — post in viewer's currency, then delete all history
+                await api.post('/expenses', {
+                    description: fullDesc,
+                    amount: amt,
+                    currency: viewerBalanceCurrency,
+                    group: null,
+                    paidBy: viewerBalance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
+                    splits: [{
+                        user: viewerBalance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
+                        amount: amt
+                    }]
+                });
+
+                await api.delete(`/expenses/friends/${friend?._id || friend}/all`);
+                navigate('/friends');
+            } else {
+                // Partial settle — record in viewer's currency and refresh
+                await api.post('/expenses', {
+                    description: fullDesc,
+                    amount: amt,
+                    currency: viewerBalanceCurrency,
+                    group: null,
+                    paidBy: viewerBalance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
+                    splits: [{
+                        user: viewerBalance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
+                        amount: amt
+                    }]
+                });
+                fetchFriendDetails();
+            }
         } catch (err) {
             alert('Failed to record settlement.');
         } finally {
@@ -268,11 +468,74 @@ export default function FriendDetails() {
         );
     }
 
-    const displayItems = [...expenses].map(exp => ({
-        ...exp,
-        isGroupSummary: false
-    }));
-    displayItems.sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (!friend) return null;
+
+    // ────────────────────────────────────────────────────────
+    // GROUPING LOGIC: Collapse expenses from the same group
+    // ────────────────────────────────────────────────────────
+    const groupedMap = new Map();
+    const resultItems = [];
+
+    expenses.forEach(exp => {
+        if (!exp) return;
+        const gid = exp.group?._id || exp.group?.id || exp.group;
+        
+        if (gid) {
+            const gidStr = gid.toString();
+            if (!groupedMap.has(gidStr)) {
+                groupedMap.set(gidStr, {
+                    _id: `group-summary-${gidStr}`,
+                    description: exp.group?.name || "Group Expenses",
+                    date: exp.date,
+                    amount: 0,
+                    isGroupSummary: true,
+                    group: exp.group,
+                    paidBy: null, // Multiple
+                    // Store the currency as displayCurrency so ExpenseItem doesn't double-convert
+                    currency: displayCurrency
+                });
+                resultItems.push(groupedMap.get(gidStr));
+            }
+            
+            const summary = groupedMap.get(gidStr);
+            // Use the most recent date
+            if (new Date(exp.date) > new Date(summary.date)) summary.date = exp.date;
+            
+            // Calculate the specific balance contribution in displayCurrency (NOT USD) to avoid double-conversion
+            const myId = user?.id || user?._id;
+            const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
+            const sourceCurr = exp.currency || 'USD';
+            let b = 0;
+            
+            if (isPaidByMe) {
+                const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
+                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, displayCurrency) * 100) / 100;
+            } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
+                const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === myId);
+                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, displayCurrency) * 100) / 100;
+            }
+            // Accumulate in displayCurrency — ExpenseItem will use sourceCurrency=displayCurrency so no second conversion
+            summary.amount += b;
+            summary.amount = Math.round(summary.amount * 100) / 100;
+        } else {
+            resultItems.push({ ...exp, isGroupSummary: false });
+        }
+    });
+
+    const displayItems = resultItems
+        .filter(item => {
+            // Always show settle-up type items (they are rendered as banners, not expense cards)
+            const isSettle = !item.isGroupSummary && (
+                item.description?.toLowerCase().includes('settle') ||
+                item.description?.includes('[sid:')
+            );
+            if (isSettle) return true;
+            // For group summaries: show if net balance > 1 cent
+            if (item.isGroupSummary) return Math.abs(item.amount) >= 0.01;
+            // For regular expenses: always show (balance is calculated server-side)
+            return true;
+        })
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // Calculate group balances safely for the settings page
     const groupBalances = {};
@@ -287,7 +550,7 @@ export default function FriendDetails() {
                         balance: 0
                     };
                 }
-                const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
+                const isPaidByMe = exp.paidBy?._id === (user?.id || user?._id) || exp.paidBy === (user?.id || user?._id);
                 const sourceCurr = exp.currency || 'USD';
                 
                 if (isPaidByMe) {
@@ -297,7 +560,7 @@ export default function FriendDetails() {
                         groupBalances[gid].balance += convertAmount(fSplit.amount, sourceCurr, 'USD');
                     }
                 } else if (exp.paidBy?._id === friend?._id || exp.paidBy?._id === friend?.id || exp.paidBy === friend?._id || exp.paidBy === friend?.id) {
-                    const mySplit = (exp.splits || []).find(s => s?.user?._id === user.id || s?.user?._id === user._id || s?.user === user.id || s?.user === user._id);
+                    const mySplit = (exp.splits || []).find(s => s?.user?._id === (user?.id || user?._id) || s?.user === (user?.id || user?._id));
                     if (mySplit) {
                         // Convert to USD base for internal summing
                         groupBalances[gid].balance -= convertAmount(mySplit.amount, sourceCurr, 'USD');
@@ -307,22 +570,25 @@ export default function FriendDetails() {
         });
     }
 
+    const favsHidden = showSettings || showFriendTotals || showExportOptions || showSettleUp || showNoteModal || showReminderModal || showReportModal || !!selectedExpense || showAdGate;
+
     return (
+        <>
         <div className="min-h-screen bg-white font-sans pb-24">
             {/* Header - Splitwise Style Top Dark Header */}
-            <header className="bg-slate-950 text-white pt-6 pb-6 px-4 sticky top-0 z-10">
+            <header className="bg-emerald-700 text-white pt-6 pb-6 px-4 sticky top-0 z-10">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <button onClick={() => navigate('/friends')} className="p-2 -ml-2 rounded-full bg-white/20 hover:bg-white/30 transition shadow-sm">
-                            <ArrowLeft className="w-5 h-5 text-white" />
+                            <i className="pi pi-arrow-left text-white text-[18px]"></i>
                         </button>
                     </div>
                     <div className="flex gap-3 items-center">
                         <Link to="/ai" className="w-9 h-9 rounded-full bg-white/20 border-2 border-white/40 text-white flex items-center justify-center shadow-sm cursor-pointer hover:bg-white/30 transition group">
-                            <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+                            <i className="pi pi-bolt group-hover:animate-pulse"></i>
                         </Link>
                         <button onClick={() => setShowSettings(true)} className="w-9 h-9 rounded-full bg-white/20 border-2 border-white/40 text-white flex items-center justify-center font-bold text-lg uppercase shadow-sm cursor-pointer hover:bg-white/30 transition">
-                            <Settings className="w-5 h-5" />
+                            <i className="pi pi-cog"></i>
                         </button>
                     </div>
                 </div>
@@ -335,7 +601,7 @@ export default function FriendDetails() {
                             onClick={() => { setDraftNote(friendNote); setShowNoteModal(true); }}
                             className="bg-black/20 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 border border-white/20 shadow-sm hover:bg-black/30 max-w-[200px] truncate"
                         >
-                            <Edit2 className="w-3 h-3 flex-shrink-0" />
+                            <i className="pi pi-pencil text-[10px] flex-shrink-0" />
                             <span className="truncate">{friendNote ? friendNote : 'Add friend notes...'}</span>
                         </button>
                     </div>
@@ -346,14 +612,14 @@ export default function FriendDetails() {
                 <div className="px-4 py-5 shadow-[0_4px_10px_rgb(0,0,0,0.03)] border-b border-gray-100 mb-2">
                     <div className="mb-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                         <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-3">
-                            <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Current Standing</span>
-                            {balance !== 0 ? (
+                            <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Direct Balance</span>
+                            {Math.abs(viewerBalance) >= 0.50 ? (
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-gray-500">
-                                        {balance > 0 ? 'owes you' : 'you owe'}
+                                        {viewerBalance > 0 ? 'owes you' : 'you owe'}
                                     </span>
-                                    <span className={`text-2xl font-black tracking-tight ${balance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                        {balance > 0 ? '+' : '-'}{formatCurrency(Math.abs(balance), user?.defaultCurrency)}
+                                    <span className={`text-2xl font-black tracking-tight ${viewerBalance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
+                                        {formatCurrency(Math.abs(viewerBalance), viewerBalanceCurrency, viewerBalanceCurrency)}
                                     </span>
                                 </div>
                             ) : (
@@ -361,82 +627,111 @@ export default function FriendDetails() {
                             )}
                         </div>
 
-                        {projectedInterest > 0 && (
-                            <div className="mb-4 bg-emerald-50/80 rounded-2xl p-4 border border-emerald-100 flex items-center justify-between shadow-sm">
-                                <div>
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                        <Percent className="w-3.5 h-3.5 text-emerald-600" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70">Next Month Interest</p>
-                                    </div>
-                                    <p className="text-[15px] font-black text-emerald-900 leading-none">
-                                        Estimated Interest <span className="mx-1 text-emerald-300 font-light">|</span> 
-                                        {formatCurrency(projectedInterest, user?.defaultCurrency)}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70 mb-1">Projected Bill</p>
-                                    <p className="text-[18px] font-black text-emerald-950 leading-none">
-                                        {balance > 0 ? '+' : '-'}{formatCurrency(Math.abs(balance) + projectedInterest, user?.defaultCurrency)}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Breakdown */}
-                        {balance !== 0 && (
-                            <div className="space-y-1.5 pt-1">
-                                {(() => {
-                                    const breakdowns = {}; // { groupId/null: { name, balance } }
-                                    (expenses || []).forEach(exp => {
-                                        if (!exp) return;
-                                        const isPaidByMe = exp.paidBy?._id === user.id || exp.paidBy?._id === user._id || exp.paidBy === user.id;
-                                        const sourceCurr = exp.currency || 'USD';
-                                        let b = 0;
-                                        
-                                        if (isPaidByMe) {
-                                            const fSplit = (exp.splits || []).find(s => s?.user?._id === friend?._id || s?.user?._id === friend?.id || s?.user === friend?._id || s?.user === friend?.id);
-                                            if (fSplit) {
-                                                // Convert to USD base for internal summing
-                                                b = convertAmount(fSplit.amount, sourceCurr, 'USD');
-                                            }
-                                        } else if (exp.paidBy?._id === friend?._id || exp.paidBy?._id === friend?.id || exp.paidBy === friend?._id || exp.paidBy === friend?.id) {
-                                            const mySplit = (exp.splits || []).find(s => s?.user?._id === user.id || s?.user?._id === user._id || s?.user === user.id || s?.user === user._id);
-                                            if (mySplit) {
-                                                // Convert to USD base for internal summing
-                                                b = -convertAmount(mySplit.amount, sourceCurr, 'USD');
-                                            }
-                                        }
-
-                                        if (b !== 0) {
-                                            const gid = (exp.group?._id || exp.group || 'none').toString();
-                                            if (!breakdowns[gid]) breakdowns[gid] = { name: exp.group?.name || (typeof exp.group === 'string' ? "Shared Group" : "non-group expenses"), balance: 0 };
-                                            breakdowns[gid].balance += b;
-                                        }
-                                    });
-
-                                    return Object.values(breakdowns).filter(item => Math.abs(item.balance) > 0.01).map((item, idx) => (
-                                        <p key={idx} className="text-[13.5px] text-gray-600 flex justify-between items-center">
-                                            <span>{(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes you' : 'you owe'} in {item.name === 'non-group expenses' ? item.name : `"${item.name}"`}</span>
-                                            <span className={`font-bold ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                {formatCurrency(Math.abs(item.balance), user?.defaultCurrency)}
-                                            </span>
+                        {(interestStats.projectedMonthly > 0 || interestStats.totalAccrued > 0) && (
+                            <div className="mb-4 bg-emerald-50/80 rounded-2xl p-4 border border-emerald-100 shadow-sm">
+                                <div className="flex items-center justify-between mb-3 border-b border-emerald-100 pb-3">
+                                    <div>
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <Percent className="w-3.5 h-3.5 text-emerald-600" />
+                                            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70">Next Month Interest</p>
+                                        </div>
+                                        <p className="text-[18px] font-black text-emerald-900 leading-none">
+                                            {formatCurrency(interestStats.projectedMonthly, viewerBalanceCurrency)}
                                         </p>
-                                    ));
-                                })()}
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70 mb-1">Projected Bill</p>
+                                        <p className="text-[20px] font-black text-emerald-950 leading-none">
+                                            {formatCurrency(Math.abs(viewerBalance) + interestStats.projectedMonthly, viewerBalanceCurrency, viewerBalanceCurrency)}
+                                        </p>
+                                    </div>
+                                </div>
+                                {interestStats.totalAccrued > 0 && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[12px] font-bold text-emerald-700 flex items-center gap-1">
+                                            <i className="pi pi-sparkles text-[10px]"></i> Total Interest Added
+                                        </span>
+                                        <span className="text-[13px] font-black text-emerald-800">
+                                            {formatCurrency(interestStats.totalAccrued, viewerBalanceCurrency)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         )}
+
+                        {/* Breakdown — Direct rows are settleable here; group rows must be settled inside the group */}
+                                <div className="space-y-3 pt-2">
+                                    {(() => {
+                                        const breakdowns = {};
+                                        (expenses || []).forEach(exp => {
+                                            if (!exp) return;
+                                            const myId = user?.id || user?._id;
+                                            const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
+                                            // Always convert to viewerBalanceCurrency so breakdown matches the header
+                                            const sourceCurr = exp.currency || viewerBalanceCurrency;
+                                            const targetCurr = viewerBalanceCurrency;
+                                            let b = 0;
+                                            
+                                            if (isPaidByMe) {
+                                                const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
+                                                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, targetCurr) * 100) / 100;
+                                            } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
+                                                const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
+                                                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, targetCurr) * 100) / 100;
+                                            }
+
+                                            if (b !== 0) {
+                                                const gid = (exp.group?._id || exp.group || 'none').toString();
+                                                const isGroup = !!(exp.group?._id || exp.group);
+                                                if (!breakdowns[gid]) breakdowns[gid] = {
+                                                    name: exp.group?.name || (typeof exp.group === 'string' ? 'Shared Group' : 'Direct'),
+                                                    balance: 0,
+                                                    isGroup
+                                                };
+                                                breakdowns[gid].balance += b;
+                                                breakdowns[gid].balance = Math.round(breakdowns[gid].balance * 100) / 100;
+                                            }
+                                        });
+
+                                        // Snap tiny residuals & filter — same 0.50 guard as the header
+                                        return Object.values(breakdowns).filter(item => Math.abs(item.balance) >= 0.50).map((item, idx) => (
+                                            <div key={idx} className={`flex justify-between items-center text-[13.5px] p-2 rounded-lg border ${
+                                                item.isGroup
+                                                    ? 'bg-amber-50/60 border-amber-100'
+                                                    : 'bg-white/50 border-gray-100'
+                                            }`}>
+                                                <div className="flex flex-col min-w-0 pr-3">
+                                                    <span className="text-gray-600 font-medium truncate">
+                                                        {(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes' : 'gets back'} in{' '}
+                                                        <span className="font-bold text-gray-800">{item.isGroup ? `"${item.name}"` : 'Direct'}</span>
+                                                    </span>
+                                                    {item.isGroup && (
+                                                        <span className="text-[10.5px] text-amber-600 font-semibold mt-0.5">
+                                                            🏷 Settle inside the group
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className={`font-black whitespace-nowrap flex-shrink-0 ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    {formatCurrency(Math.abs(item.balance), viewerBalanceCurrency, viewerBalanceCurrency)}
+                                                </span>
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
                     </div>
 
                     <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide items-center">
+                        {Math.abs(viewerBalance) >= 0.50 && (
                         <button onClick={openSettleUp} className="bg-[#e11d48] text-white px-5 py-2 rounded-lg hover:bg-[#be123c] font-bold shadow-sm whitespace-nowrap transition">
                             Settle up
                         </button>
+                        )}
                         <button
                             onClick={() => {
                                 if (!friend) return;
                                 // Build a professional pre-filled email draft
-                                const absAmtFormatted = formatCurrency(Math.abs(balance), user?.defaultCurrency);
-                                const draft = balance > 0
+                                const absAmtFormatted = formatCurrency(Math.abs(viewerBalance), viewerBalanceCurrency, viewerBalanceCurrency);
+                                const draft = viewerBalance > 0
                                     ? `Hi ${friend.username},\n\nI hope you're doing well! I just wanted to send a quick, friendly reminder that you have an outstanding balance of ${absAmtFormatted} on Paywise.\n\nWhenever you get a chance, please settle up — you can do it directly in the app.\n\nThanks so much! 😊\n\n${user.username}`
                                     : `Hi ${friend.username},\n\nJust a heads-up — I have a balance of ${absAmtFormatted} that I owe you on Paywise. I'll take care of it soon!\n\nThanks,\n${user.username}`;
                                 setReminderEmailBody(draft);
@@ -470,66 +765,66 @@ export default function FriendDetails() {
                                     const showHeader = monthYear !== lastMonth;
                                     lastMonth = monthYear;
 
-                                    const isPaidByMe = item.paidBy?._id === user.id || item.paidBy?._id === user._id || item.paidBy === user.id;
-                                    const userSplit = getUserExpenseSplit(item, user, friend?._id || friend);
+                                    const myId = user?.id || user?._id;
+                                    const isPaidByMe = !item.isGroupSummary && (item.paidBy?._id === myId || item.paidBy === myId);
+                                    
+                                    // Summarized userSplit should be the calculated net amount from grouping logic
+                                    const userSplit = item.isGroupSummary ? item.amount : (user ? getUserExpenseSplit(item, user, friend?._id || friend) : 0);
 
-                                    const isSettleUp =
+                                    const isSettleUp = !item.isGroupSummary && (
                                         item.description?.toLowerCase() === 'settle up' ||
                                         item.description?.toLowerCase() === 'cash settle up' ||
-                                        item.description?.toLowerCase().startsWith('partial cash payment');
+                                        item.description?.toLowerCase().startsWith('partial cash payment') ||
+                                        item.description?.toLowerCase().startsWith('settle my share') ||
+                                        item.description?.includes('[sid:')
+                                    );
 
                                     // Render settle-up as a clean banner, not a regular expense card
                                     if (isSettleUp) {
                                         const payerName = isPaidByMe ? 'You' : (item.paidBy?.username || friend?.username || 'Someone');
-                                        const receiverSplit = item.splits?.[0];
-                                        const receiverId = receiverSplit?.user?._id || receiverSplit?.user;
+                                        const receiverId = item.splits?.[0]?.user?._id || item.splits?.[0]?.user;
                                         const myId = user?.id || user?._id;
-                                        const receiverName = receiverId === myId ? 'you' : (receiverSplit?.user?.username || friend?.username || 'someone');
+                                        const receiverName = receiverId === myId ? 'you' : (item.splits?.[0]?.user?.username || friend?.username || 'someone');
                                         const isPartial = item.description?.toLowerCase().startsWith('partial');
-                                        // Extract note — anything after " — " in the stored description
                                         const notePart = item.description?.includes(' — ') ? item.description.split(' — ').slice(1).join(' — ') : null;
-                                        // Determine payment method from description
                                         const isBankPayment = item.description?.toLowerCase().includes('bank') || item.description?.toLowerCase().includes('transfer');
                                         return (
                                             <div key={item._id || Math.random()}>
                                                 {showHeader && (
-                                                    <div className="px-5 py-3 bg-gray-50/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
+                                                    <div className="px-5 py-3 bg-gray-50/50 dark:bg-emerald-600/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
                                                         <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-[0.2em]">{monthYear}</span>
                                                     </div>
                                                 )}
                                                 <div className="flex items-center gap-3 px-5 py-4 border-b border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/60 dark:bg-emerald-950/20">
-                                                    {/* Icon */}
                                                     <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center flex-shrink-0">
                                                         <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                                                     </div>
-                                                    {/* Text */}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             <p className="text-[13.5px] font-semibold text-emerald-800 dark:text-emerald-300 leading-snug">
                                                                 <span className="font-black">{payerName}</span> paid <span className="font-black">{receiverName}</span>
                                                             </p>
-                                                            {/* Method badge */}
                                                             <span className="text-[10px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-500 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                                                                 {isBankPayment ? '🏦 Bank' : '💵 Cash'}
                                                             </span>
-                                                            {isPartial && (
-                                                                <span className="text-[10px] font-black uppercase tracking-wide text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                                                                    Partial
-                                                                </span>
-                                                            )}
                                                         </div>
-                                                        {/* Note if present */}
-                                                        {notePart && (
-                                                            <p className="text-[11.5px] text-emerald-700 dark:text-emerald-400 mt-0.5 italic">📝 {notePart}</p>
-                                                        )}
+                                                        {notePart && <p className="text-[11.5px] text-emerald-700 dark:text-emerald-400 mt-0.5 italic">📝 {notePart}</p>}
                                                         <p className="text-[11px] text-emerald-600/70 dark:text-emerald-500/70 mt-0.5">
                                                             {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · Settlement
                                                         </p>
                                                     </div>
-                                                    {/* Amount */}
                                                     <span className="text-[15px] font-black text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/50 px-3 py-1 rounded-full flex-shrink-0">
                                                         {formatCurrency(item.amount, user?.defaultCurrency || 'USD', item.currency || 'USD')}
                                                     </span>
+                                                    {((item.addedBy?._id || item.addedBy) === (user?.id || user?._id) || (item.paidBy?._id || item.paidBy) === (user?.id || user?._id)) && (
+                                                        <button
+                                                            onClick={() => deleteExpense(item._id, item.description)}
+                                                            className="ml-1 p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition flex-shrink-0"
+                                                            title="Delete this settlement"
+                                                        >
+                                                            <i className="pi pi-trash text-[12px]" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -538,27 +833,91 @@ export default function FriendDetails() {
                                     return (
                                         <div key={item._id || Math.random()}>
                                             {showHeader && (
-                                                <div className="px-5 py-3 bg-gray-50/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
+                                                <div className="px-5 py-3 bg-gray-50/50 dark:bg-emerald-600/50 backdrop-blur-sm sticky top-[72px] z-10 border-b border-gray-100/50 dark:border-slate-800/50">
                                                     <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-[0.2em]">{monthYear}</span>
                                                 </div>
                                             )}
+                                            {/* Loan Acceptance Banner */}
+                                            {!item.isGroupSummary && (() => {
+                                                const loanReq = loanRequests[item._id];
+                                                const myId = user?.id || user?._id;
+                                                const isLender = loanReq && (loanReq.lender?._id || loanReq.lender)?.toString() === myId?.toString();
+                                                if (!loanReq || loanReq.status !== 'pending') return null;
+                                                const requiresPass = loanReq.requiresPasswordConfirmation;
+                                                return (
+                                                    <div className={`px-4 py-3 border-l-4 flex flex-col gap-3 text-[13px] ${isLender ? 'bg-amber-50/80 border-amber-400' : 'bg-blue-50/80 border-blue-400'}`}>
+                                                        <div className="flex items-start gap-3">
+                                                            <span className="text-lg flex-shrink-0">{isLender ? '⏳' : '📬'}</span>
+                                                            <div className="flex-1">
+                                                                {isLender ? (
+                                                                    <>
+                                                                        <p className="font-bold text-amber-800 uppercase tracking-tight text-[11px]">Loan Pending</p>
+                                                                        <p className="text-amber-700 text-[13px] mt-0.5 leading-snug">Awaiting {friend?.username}&apos;s acceptance. Interest starts from that day.</p>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <p className="font-bold text-blue-800 uppercase tracking-tight text-[11px]">Loan Request</p>
+                                                                        <p className="text-blue-700 text-[13px] mt-0.5 leading-snug">
+                                                                            {friend?.username} sent you a loan request ({item.loanInterestRate}% APR). 
+                                                                            {requiresPass && <span className="block font-bold text-rose-600 mt-1">🔒 Requires your password (amount exceeds $100).</span>}
+                                                                        </p>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {!isLender && (
+                                                            <div className="flex gap-2.5 mt-1">
+                                                                <button 
+                                                                    onClick={() => handleAcceptLoan(loanReq)}
+                                                                    disabled={isSubmittingLoan}
+                                                                    className="flex-1 bg-emerald-600 text-white font-bold py-2 rounded-lg text-[12.5px] shadow-sm active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                                                                >
+                                                                    {isSubmittingLoan ? <i className="pi pi-spin pi-spinner text-[12px]" /> : <ShieldCheck className="w-4 h-4" />}
+                                                                    Accept
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleRejectLoan(loanReq._id)}
+                                                                    disabled={isSubmittingLoan}
+                                                                    className="flex-1 bg-white border border-rose-200 text-rose-600 font-bold py-2 rounded-lg text-[12.5px] shadow-sm active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                                                                >
+                                                                    <ShieldX className="w-4 h-4" />
+                                                                    Decline
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                            {/* "Settled" badge — shown when a [sid:] settle expense references this expense */}
+                                            {!item.isGroupSummary && (() => {
+                                                const isIndivSettled = expenses.some(e => e.description?.includes(`[sid:${item._id}]`));
+                                                if (!isIndivSettled) return null;
+                                                return (
+                                                    <div className="flex items-center gap-1.5 mx-5 mt-2 mb-0 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                                        <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                                                        </svg>
+                                                        <span className="text-[11.5px] font-bold text-emerald-700 uppercase tracking-wide">Individually Settled</span>
+                                                    </div>
+                                                );
+                                            })()}
                                             <ExpenseItem
-                                                description={item.isGroupSummary ? `Group Action: ${item.group.name}` : item.description}
-                                                amount={item.amount || Math.abs(item.balance)}
+                                                description={item.isGroupSummary ? `Group: ${item.description}` : item.description}
+                                                amount={Math.abs(userSplit)}
                                                 date={item.date}
-                                                payerName={item.isGroupSummary ? 'Multiple' : (isPaidByMe ? 'You' : (item.paidBy?.username || friend.username))}
+                                                payerName={item.isGroupSummary ? 'Group Activity' : (isPaidByMe ? 'You' : (item.paidBy?.username || friend?.username || 'Friend'))}
                                                 userSplit={userSplit}
                                                 targetCurrency={user?.defaultCurrency || 'USD'}
                                                 sourceCurrency={item.currency || 'USD'}
-                                                isGroup={!!item.group}
-                                                groupName={item.group?.name}
-                                                isLoan={item.isLoan}
-                                                parentLoan={item.parentLoan}
-                                                billImage={item.billImage}
+                                                isGroup={!!(item.group || item.isGroupSummary)}
+                                                groupName={item.group?.name || item.description}
+                                                isLoan={!item.isGroupSummary && item.isLoan}
+                                                parentLoan={!item.isGroupSummary && item.parentLoan}
+                                                billImage={!item.isGroupSummary && item.billImage}
                                                 onClick={() => {
                                                     if (item.isGroupSummary) {
-                                                        const groupUrl = `#/group/${item.group.id}`;
-                                                        window.location.href = groupUrl;
+                                                        const gId = item.group?._id || item.group?.id || item.group;
+                                                        navigate(`/group/${gId}`);
                                                     } else {
                                                         setSelectedExpense(item);
                                                         setIsEditingExpense(false);
@@ -567,7 +926,7 @@ export default function FriendDetails() {
                                                         setEditItems(item.items || []);
                                                         setEditIsLoan(item.isLoan || false);
                                                         setEditLoanInterestRate(item.loanInterestRate || 0);
-                                                        setSelectedMemberIdsForEdit([user.id]);
+                                                        setSelectedMemberIdsForEdit([user?.id || user?._id]);
                                                     }
                                                 }}
                                             />
@@ -580,75 +939,68 @@ export default function FriendDetails() {
                 </div>
             </main>
 
-            {/* Custom Green Floating Action Button */}
-            <div className="fixed bottom-6 right-5">
-                <Link
-                    to={`/friend/${id}/add`}
-                    className="bg-slate-900 text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-slate-950 transition transform hover:scale-105"
-                >
-                    <Receipt className="w-5 h-5" />
-                    Add expense
-                </Link>
-            </div>
 
-            {/* Camera Scan Optional Button Bottom Left */}
-            <div className="fixed bottom-6 left-5">
-                <Link
-                    to={`/friend/${id}/scan`}
-                    className="bg-white text-gray-600 rounded-full shadow-lg p-3 flex items-center justify-center font-bold hover:bg-gray-50 border border-gray-100 transition transform hover:scale-105"
-                >
-                    <Camera className="w-5 h-5" />
-                </Link>
-            </div>
 
-            {/* Expense Detail Modal */}
-            {
-                selectedExpense && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center animate-in fade-in p-0 sm:p-4">
-                        <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-bottom-8 shadow-2xl">
-                            {/* Modal Header */}
-                            <div className="bg-gray-50 px-5 py-4 flex justify-between items-center border-b border-gray-200">
-                                <h2 className="text-xl font-bold text-gray-900 line-clamp-1">{isEditingExpense ? 'Edit Expense' : 'Expense Details'}</h2>
-                                <div className="flex items-center gap-2">
-                                    {!isEditingExpense && (selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
-                                        <button onClick={() => setIsEditingExpense(true)} className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition">
-                                            <Edit2 className="w-5 h-5" />
-                                        </button>
-                                    )}
-                                    <button onClick={() => { setSelectedExpense(null); setIsEditingExpense(false); }} className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition">
-                                        <X className="w-6 h-6" />
-                                    </button>
-                                </div>
+            <Dialog 
+                visible={!!selectedExpense} 
+                onHide={() => { setSelectedExpense(null); setIsEditingExpense(false); }}
+                position="bottom"
+                draggable={false}
+                resizable={false}
+                className="w-full max-w-lg rounded-t-[32px] overflow-hidden"
+                contentClassName="p-0 bg-white dark:bg-slate-900 border-0"
+                headerClassName="p-0 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 border-0 rounded-t-[32px]"
+                header={
+                    <div className="flex justify-between items-center w-full px-5 py-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 line-clamp-1">
+                            {isEditingExpense ? 'Edit Expense' : 'Expense Details'}
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            {!isEditingExpense && (selectedExpense?.addedBy ? (selectedExpense.addedBy._id === (user?.id || user?._id)) : (selectedExpense?.paidBy?._id === (user?.id || user?._id))) && (
+                                <button
+                                    onClick={() => setIsEditingExpense(true)}
+                                    className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition"
+                                >
+                                    <i className="pi pi-pencil text-[1rem]"></i>
+                                </button>
+                            )}
+                            <button
+                                onClick={() => { setSelectedExpense(null); setIsEditingExpense(false); }}
+                                className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition"
+                            >
+                                <i className="pi pi-times text-[1.2rem]"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+                closable={false}
+            >
+                {selectedExpense && (
+                <div className="p-6">
+                    {isEditingExpense ? (
+                        <form onSubmit={handleUpdateExpense} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                                <InputText
+                                    value={editDescription}
+                                    onChange={e => setEditDescription(e.target.value)}
+                                    className="w-full py-3 px-4 rounded-xl border border-gray-300 outline-none"
+                                    required
+                                />
                             </div>
-
-                            {/* Modal Body */}
-                            <div className="p-6">
-                                {isEditingExpense ? (
-                                    <form onSubmit={handleUpdateExpense} className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
-                                            <input
-                                                type="text"
-                                                value={editDescription}
-                                                onChange={e => setEditDescription(e.target.value)}
-                                                className="w-full py-3 px-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Total Amount</label>
-                                            <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={editAmount}
-                                                    onChange={e => setEditAmount(e.target.value)}
-                                                    className="w-full py-3 pl-8 pr-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none shadow-sm font-bold"
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Total Amount</label>
+                                <InputNumber
+                                    value={parseFloat(editAmount)}
+                                    onValueChange={(e) => setEditAmount(e.value?.toString())}
+                                    mode="currency"
+                                    currency={selectedExpense?.currency || 'USD'}
+                                    locale="en-US"
+                                    className="w-full"
+                                    inputClassName="w-full py-3 px-4 rounded-xl border border-gray-300 outline-none shadow-sm font-bold"
+                                    required
+                                />
+                            </div>
                                         <p className="text-xs text-gray-500 font-medium leading-relaxed">Changing the total amount will instantly update and mathematically recalculate the splits.</p>
 
                                         {editItems.length > 0 && (
@@ -658,7 +1010,7 @@ export default function FriendDetails() {
                                                 {/* Member selection pills for editing */}
                                                 <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
                                                     {[
-                                                        { _id: user.id || user._id, username: 'Me' },
+                                                        { _id: user?.id || user?._id, username: 'Me' },
                                                         { _id: friend._id, username: friend.username }
                                                     ].map(member => {
                                                         const isSelected = selectedMemberIdsForEdit.includes(member._id);
@@ -668,7 +1020,7 @@ export default function FriendDetails() {
                                                                 type="button"
                                                                 onClick={() => toggleEditMemberSelection(member._id)}
                                                                 className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 transition-all font-semibold text-xs ${isSelected
-                                                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                                                    ? 'border-emerald-600 bg-emerald-600 text-white'
                                                                     : 'border-gray-200 bg-white text-gray-600'
                                                                     }`}
                                                             >
@@ -695,7 +1047,7 @@ export default function FriendDetails() {
                                                                         <div className="flex flex-wrap gap-1 mt-1">
                                                                             {item.assignedTo.map(u => (
                                                                                 <span key={u._id || u} className="text-[10px] bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded-full font-bold">
-                                                                                    {(u._id === (user.id || user._id) || u === (user.id || user._id)) ? 'Me' : friend.username}
+                                                                                    {(u._id === (user?.id || user?._id) || u === (user?.id || user?._id)) ? 'Me' : friend?.username}
                                                                                 </span>
                                                                             ))}
                                                                         </div>
@@ -711,18 +1063,12 @@ export default function FriendDetails() {
                                         <div>
                                             <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                                                 <div className="flex items-center gap-2">
-                                                    <Banknote className={`w-5 h-5 ${editIsLoan ? 'text-emerald-600' : 'text-gray-400'}`} />
+                                                    <i className={`pi pi-briefcase text-[18px] ${editIsLoan ? 'text-emerald-600' : 'text-gray-400'}`} />
                                                     <span className="text-sm font-bold text-gray-800">Treat as Loan?</span>
                                                 </div>
-                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={editIsLoan}
-                                                        onChange={(e) => setEditIsLoan(e.target.checked)}
-                                                        className="sr-only peer"
-                                                    />
-                                                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                                </label>
+                                                <div className="flex-shrink-0">
+                                                    <Toggle checked={editIsLoan} onChange={setEditIsLoan} />
+                                                </div>
                                             </div>
                                             {editIsLoan && (
                                                 <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -744,7 +1090,7 @@ export default function FriendDetails() {
                                         <button
                                             type="submit"
                                             disabled={isSavingEdit}
-                                            className="w-full font-bold bg-slate-900 text-white rounded-xl py-3.5 shadow-md hover:bg-slate-950 transition disabled:opacity-50 mt-4"
+                                            className="w-full font-bold bg-emerald-600 text-white rounded-xl py-3.5 shadow-md hover:bg-emerald-700 transition disabled:opacity-50 mt-4"
                                         >
                                             {isSavingEdit ? 'Saving...' : 'Save Changes'}
                                         </button>
@@ -752,13 +1098,13 @@ export default function FriendDetails() {
                                 ) : (
                                     <div>
                                         <div className="text-center mb-6">
-                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-900'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner overflow-hidden border-2 border-white`}>
+                                            <div className={`w-16 h-16 ${selectedExpense.isLoan ? 'bg-amber-50 text-amber-600' : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? 'bg-emerald-50 text-emerald-500' : 'bg-emerald-50 text-emerald-600'} rounded-2xl flex items-center justify-center font-bold mx-auto mb-3 shadow-inner overflow-hidden border-2 border-white`}>
                                                 {selectedExpense.billImage ? (
                                                     <a href={selectedExpense.billImage} target="_blank" rel="noopener noreferrer" className="w-full h-full"> 
                                                         <img src={selectedExpense.billImage} alt="Bill" className="w-full h-full object-cover" />
                                                     </a>
                                                 ) : (
-                                                    selectedExpense.isLoan ? <Banknote className="w-8 h-8" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? <Percent className="w-8 h-8" /> : (selectedExpense.group ? <Folder className="w-8 h-8" /> : <Receipt className="w-8 h-8" />)
+                                                    selectedExpense.isLoan ? <i className="pi pi-briefcase text-[1.5rem]" /> : (selectedExpense.parentLoan || selectedExpense.description?.toLowerCase().includes('interest') || selectedExpense.description?.toLowerCase().includes('intrest')) ? <i className="pi pi-percentage text-[1.5rem]" /> : (selectedExpense.group ? <i className="pi pi-folder text-[1.5rem]" /> : <i className="pi pi-receipt text-[1.5rem]" />)
                                                 )}
                                             </div>
                                             <div className="flex items-center justify-center gap-2 mb-1">
@@ -784,13 +1130,17 @@ export default function FriendDetails() {
                                                     )}
                                                 </div>
                                             )}
-                                            <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense.amount, user?.defaultCurrency, selectedExpense.currency)}</p>
-                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {selectedExpense.paidBy._id === user.id ? 'You' : selectedExpense.paidBy.username}</p>
-                                            {selectedExpense.addedBy && selectedExpense.addedBy._id !== selectedExpense.paidBy._id && (
-                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {selectedExpense.addedBy._id === user.id ? 'you' : selectedExpense.addedBy.username}</p>
+                                            <p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(selectedExpense?.amount || 0, user?.defaultCurrency, selectedExpense?.currency)}</p>
+                                            <p className="text-sm text-gray-500 font-medium mt-1">Paid by {(selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === (user?.id || user?._id) ? 'You' : (selectedExpense?.paidBy?.username || friend?.username || 'Someone')}</p>
+                                            {selectedExpense?.addedBy && (selectedExpense.addedBy._id || selectedExpense.addedBy) !== (selectedExpense.paidBy?._id || selectedExpense.paidBy) && (
+                                                <p className="text-[11px] text-gray-400 font-medium italic mt-0.5">Added by {(selectedExpense.addedBy?._id || selectedExpense.addedBy) === (user?.id || user?._id) ? 'you' : (selectedExpense.addedBy?.username || 'someone')}</p>
                                             )}
-                                            {selectedExpense.group && <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>}
-                                            <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+                                            {selectedExpense?.group && typeof selectedExpense.group === 'object' && selectedExpense.group.name && (
+                                                <p className="text-xs font-bold text-slate-800 mt-1 uppercase tracking-wider">Group: {selectedExpense.group.name}</p>
+                                            )}
+                                            <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">
+                                                {selectedExpense?.date ? new Date(selectedExpense.date).toLocaleDateString() : ''}
+                                            </p>
 
                                             {selectedExpense.billImage && (
                                                 <div className="mt-4 flex justify-center">
@@ -804,60 +1154,69 @@ export default function FriendDetails() {
                                         <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 max-h-48 overflow-y-auto">
                                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Split Details</h4>
                                             <div className="space-y-2">
-                                                {selectedExpense.splits.map(split => (
-                                                    <div key={split.user._id || split.user} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
+                                                {(selectedExpense?.splits || []).map((split, sIdx) => (
+                                                    <div key={split?.user?._id || split?.user || sIdx} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
                                                         <span className="font-semibold text-gray-700 text-sm">
-                                                            {split.user._id === user.id ? 'You' : (split.user.username || friend.username)}
+                                                            {(split?.user?._id || split?.user) === (user?.id || user?._id) ? 'You' : (split?.user?.username || friend?.username || 'Guest')}
                                                         </span>
-                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split.amount, user?.defaultCurrency, selectedExpense.currency)}</span>
+                                                        <span className="font-bold text-gray-900 border-l border-gray-100 pl-3">{formatCurrency(split?.amount || 0, user?.defaultCurrency || 'USD', selectedExpense?.currency || 'USD')}</span>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
 
                                         {(() => {
-                                            if (selectedExpense.isLoan || selectedExpense.description?.toLowerCase().includes('settle')) return null;
-                                            const isPaidByMe = (selectedExpense.paidBy?._id || selectedExpense.paidBy) === (user?.id || user?._id);
-                                            const mySplit = selectedExpense.splits?.find(s => (s.user?._id || s.user) === (user?.id || user?._id));
-                                            
-                                            // Ensure there's a valid amount owed
-                                            if (!isPaidByMe && mySplit && mySplit.amount > 0) {
-                                                return (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleSettleIndividualExpense(selectedExpense, mySplit.amount);
-                                                        }}
-                                                        className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
-                                                    >
-                                                        <Check className="w-5 h-5" />
-                                                        Settle my share ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense.currency)})
-                                                    </button>
-                                                );
-                                            }
-                                            return null;
+                                            if (!selectedExpense) return null;
+                                            if (selectedExpense?.description?.toLowerCase().includes('settle')) return null;
+                                            const isPaidByMe = (selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === (user?.id || user?._id);
+                                            const mySplit = selectedExpense?.splits?.find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
+                                            if (!mySplit || mySplit.amount <= 0 || isPaidByMe) return null;
+                                            // Hide if balance is already zero between the two
+                                            if (Math.abs(balance) < 0.01) return null;
+
+                                            return (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (window.confirm(`Settle and delete "${selectedExpense.description}"? This will remove it from the list and notify ${selectedExpense.paidBy?.username || 'the payer'}.`)) {
+                                                            handleSettleIndividualExpense(selectedExpense);
+                                                        }
+                                                    }}
+                                                    className="w-full mt-4 font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl py-3.5 shadow-sm hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                                                >
+                                                    <i className="pi pi-check text-[14px]"></i>
+                                                    Settle & delete ({formatCurrency(mySplit.amount, user?.defaultCurrency, selectedExpense?.currency)})
+                                                </button>
+                                            );
                                         })()}
 
-                                        {(selectedExpense.addedBy ? (selectedExpense.addedBy._id === user.id) : (selectedExpense.paidBy._id === user.id)) && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    deleteExpense(selectedExpense._id, selectedExpense.description);
-                                                    setSelectedExpense(null);
-                                                }}
-                                                className="w-full mt-4 font-bold bg-rose-50 text-rose-600 rounded-xl py-3.5 border border-rose-100 hover:bg-rose-100 transition flex items-center justify-center gap-2"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
-                                                Delete Entire Expense
-                                            </button>
-                                        )}
+                                        {(() => {
+                                            if (!selectedExpense) return null;
+                                            const hasEditPerm = selectedExpense?.addedBy 
+                                                ? ((selectedExpense.addedBy?._id || selectedExpense.addedBy) === (user?.id || user?._id)) 
+                                                : ((selectedExpense?.paidBy?._id || selectedExpense?.paidBy) === (user?.id || user?._id));
+                                            
+                                            if (!hasEditPerm) return null;
+
+                                            return (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteExpense(selectedExpense?._id, selectedExpense?.description);
+                                                        setSelectedExpense(null);
+                                                    }}
+                                                    className="w-full mt-4 font-bold bg-rose-50 text-rose-600 rounded-xl py-3.5 border border-rose-100 hover:bg-rose-100 transition flex items-center justify-center gap-2"
+                                                >
+                                                    <i className="pi pi-trash text-[14px]"></i>
+                                                    Delete Entire Expense
+                                                </button>
+                                            );
+                                        })()}
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    </div>
-                )
-            }
+                )}
+            </Dialog>
 
             {/* Friend Settings Full-Screen Modal */}
             {showSettings && (
@@ -865,7 +1224,7 @@ export default function FriendDetails() {
                     {/* Header */}
                     <div className="flex items-center p-4 border-b border-gray-100">
                         <button onClick={() => setShowSettings(false)} className="p-2 -ml-2 text-gray-800 hover:bg-gray-100 rounded-full transition">
-                            <X className="w-6 h-6" />
+                            <i className="pi pi-times text-[20px]" />
                         </button>
                         <h2 className="text-lg font-medium text-gray-900 ml-4">Friend settings</h2>
                     </div>
@@ -873,7 +1232,7 @@ export default function FriendDetails() {
                     <div className="flex-1 overflow-y-auto pb-10">
                         {/* Profile Info */}
                         <div className="p-6 flex items-center gap-4">
-                            <div className="w-16 h-16 bg-slate-950 text-white rounded-full flex items-center justify-center text-3xl font-black uppercase shadow-sm">
+                            <div className="w-16 h-16 bg-emerald-700 text-white rounded-full flex items-center justify-center text-3xl font-black uppercase shadow-sm">
                                 {friend.username?.charAt(0)}
                             </div>
                             <div>
@@ -924,7 +1283,7 @@ export default function FriendDetails() {
                                         <div key={g._id} onClick={() => navigate(`/group/${(g.group?._id || g.group || 'none')}`)} className="px-6 py-3.5 flex items-center justify-between hover:bg-gray-50 cursor-pointer border-t border-b border-gray-100 -mt-[1px]">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-12 h-12 bg-gray-800 text-white rounded-lg shadow-sm border border-gray-200 flex items-center justify-center flex-shrink-0">
-                                                    <Folder className="w-6 h-6 opacity-90" />
+                                                    <i className="pi pi-folder text-[24px] opacity-90" />
                                                 </div>
                                                 <span className="text-[16px] text-gray-800">{(g.group?.name || (typeof g.group === 'string' ? "Shared Group" : "Unnamed Group"))}</span>
                                             </div>
@@ -945,11 +1304,11 @@ export default function FriendDetails() {
                 <div className="fixed inset-0 bg-white z-[80] flex flex-col animate-in slide-in-from-bottom-2 duration-200">
                     <div className="flex items-center p-4 relative border-b border-gray-100">
                         <button onClick={() => setShowFriendTotals(false)} className="p-2 -ml-2 text-gray-800 hover:bg-gray-100 rounded-full transition absolute left-4 z-10">
-                            <X className="w-6 h-6" />
+                            <i className="pi pi-times text-[20px]" />
                         </button>
                         <h2 className="text-[17px] font-medium text-gray-900 w-full text-center">Charts</h2>
                         <button className="p-2 -mr-2 text-gray-800 hover:bg-gray-100 rounded-full transition absolute right-4">
-                            <HelpCircle className="w-[22px] h-[22px]" strokeWidth={1.5} />
+                            <i className="pi pi-question-circle text-[22px]" />
                         </button>
                     </div>
 
@@ -1009,7 +1368,7 @@ export default function FriendDetails() {
                                 <div>
                                     <div className="flex items-center gap-1">
                                         <p className="text-[14px] text-gray-800 font-bold">Total spent</p>
-                                        <HelpCircle className="w-[14px] h-[14px] text-gray-500" />
+                                        <i className="pi pi-question-circle text-[14px] text-gray-500" />
                                     </div>
                                     <div className="flex items-center gap-3 mt-1 relative">
                                         <div className="w-[6px] h-[20px] bg-[#5ab3ed] rounded-full" />
@@ -1022,7 +1381,7 @@ export default function FriendDetails() {
                                 <div>
                                     <div className="flex items-center gap-1">
                                         <p className="text-[14px] text-gray-800 font-bold">Your share</p>
-                                        <HelpCircle className="w-[14px] h-[14px] text-gray-500" />
+                                        <i className="pi pi-question-circle text-[14px] text-gray-500" />
                                     </div>
                                     <div className="flex flex-col mt-1 relative">
                                         <div className="flex items-center gap-3">
@@ -1077,7 +1436,7 @@ export default function FriendDetails() {
                                         {/* Insight Card 1 */}
                                         <div className="min-w-[160px] flex-1 bg-white border border-gray-200 rounded-[14px] p-4 shadow-sm">
                                             <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mb-3">
-                                                <TrendingUp className="w-4 h-4 text-slate-900" />
+                                                <i className="pi pi-chart-line text-[16px] text-slate-900" />
                                             </div>
                                             <p className="text-[13px] text-gray-500 font-medium tracking-wide uppercase mb-1">Top Payer</p>
                                             <p className="text-[16px] text-gray-900 font-medium leading-tight truncate">{topPayerString}</p>
@@ -1138,7 +1497,7 @@ export default function FriendDetails() {
                                         key={code}
                                         onClick={() => setTargetExportCurrency(code)}
                                         className={`flex-shrink-0 px-4 py-2 rounded-xl border-2 transition-all font-bold text-sm ${targetExportCurrency === code 
-                                            ? 'border-slate-900 bg-slate-900 text-white shadow-md' 
+                                            ? 'border-emerald-600 bg-emerald-600 text-white shadow-md' 
                                             : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
                                     >
                                         {code}
@@ -1252,7 +1611,7 @@ export default function FriendDetails() {
             {/* REMINDERS MODAL                            */}
             {/* ---------------------------------------- */}
             {showReminderModal && (() => {
-                const formattedAmt = formatCurrency(Math.abs(balance), user?.defaultCurrency);
+                const formattedAmt = formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency);
                 const shareText = balance > 0
                     ? `Hi ${friend?.username}! 👋\n\nThis is a friendly reminder from ${user.username} — you have an outstanding balance of ${formattedAmt} on Paywise.\n\nPlease settle up when you get a chance. You can pay directly in the Paywise app. 🙏\n\nThank you!`
                     : `Hi ${friend?.username}! 👋\n\nJust letting you know — I owe you ${formattedAmt} on Paywise and will take care of it soon!\n\nThanks for your patience,\n${user.username}`;
@@ -1294,8 +1653,8 @@ export default function FriendDetails() {
                                     <h3 className="text-[18px] font-bold text-gray-900">Send a Reminder</h3>
                                     <p className="text-[13px] text-gray-400 mt-0.5">
                                         {balance > 0
-                                            ? `${friend?.username} owes you ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}`
-                                            : `You owe ${friend?.username} ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}`}
+                                            ? `${friend?.username} owes you ${formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency)}`
+                                            : `You owe ${friend?.username} ${formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency)}`}
                                     </p>
                                 </div>
                                 <button onClick={() => setShowReminderModal(false)} className="ml-auto p-2 text-gray-400 hover:bg-gray-100 rounded-full transition">
@@ -1347,7 +1706,7 @@ export default function FriendDetails() {
                                     onClick={handleShare}
                                     className="w-full flex items-center gap-4 bg-slate-50 border-2 border-[#d1f0e7] hover:bg-[#e6f7f3] rounded-2xl px-4 py-4 transition text-left"
                                 >
-                                    <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center flex-shrink-0">
                                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                         </svg>
@@ -1396,12 +1755,19 @@ export default function FriendDetails() {
                                 </div>
                                 <div>
                                     <p className="text-[13px] text-gray-500 font-medium">Amount to settle</p>
-                                    <p className="text-[22px] font-bold text-gray-900">{formatCurrency(balance, user?.defaultCurrency)}</p>
-                                    <p className="text-[13px] text-gray-500 mt-0.5">
-                                        {balance < 0
-                                            ? `You owe ${friend.username}`
-                                            : `${friend.username} owes you`}
-                                    </p>
+                                    {(() => {
+                                        const balInDisplay = Math.round(Math.abs(balance) * 100) / 100;
+                                        return (
+                                            <>
+                                                <p className="text-[22px] font-bold text-gray-900">{formatCurrency(balInDisplay, balanceCurrency, balanceCurrency)}</p>
+                                                <p className="text-[13px] text-gray-500 mt-0.5">
+                                                    {balance < 0
+                                                        ? `You owe ${friend.username}`
+                                                        : `${friend.username} owes you`}
+                                                </p>
+                                            </>
+                                        );
+                                    })()}
                                 </div>
                             </div>
 
@@ -1423,7 +1789,7 @@ export default function FriendDetails() {
                                 {/* Cash option */}
                                 <button
                                     onClick={() => { setSettleMode('cash'); setCashStep(2); }}
-                                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-900 bg-slate-50 hover:bg-slate-200 transition text-left"
+                                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-emerald-600 bg-slate-50 hover:bg-slate-200 transition text-left"
                                 >
                                     <div className="w-12 h-12 rounded-xl bg-[#d1f0e7] flex items-center justify-center">
                                         <Banknote className="w-6 h-6 text-slate-900" />
@@ -1443,7 +1809,7 @@ export default function FriendDetails() {
                         <div className="flex flex-col flex-1 px-5 pt-8">
                             {/* Summary */}
                             <div className="flex items-center gap-3 mb-8">
-                                <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center">
                                     <Banknote className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
@@ -1456,7 +1822,7 @@ export default function FriendDetails() {
                             <button
                                 onClick={() => handleCashSettle(false)}
                                 disabled={isSettling}
-                                className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-slate-900 bg-slate-50 hover:bg-slate-200 transition mb-4 disabled:opacity-50"
+                                className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-emerald-600 bg-slate-50 hover:bg-slate-200 transition mb-4 disabled:opacity-50"
                             >
                                 <div className="flex items-center gap-3">
                                     <CheckCircle2 className="w-6 h-6 text-slate-900" />
@@ -1465,13 +1831,18 @@ export default function FriendDetails() {
                                         <p className="text-[13px] text-gray-500">Pay the entire balance</p>
                                     </div>
                                 </div>
-                                <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balance, user?.defaultCurrency)}</span>
+                                {(() => {
+                                    const balInDisplay = Math.round(Math.abs(viewerBalance) * 100) / 100;
+                                    return (
+                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balInDisplay, viewerBalanceCurrency, viewerBalanceCurrency)}</span>
+                                    );
+                                })()}
                             </button>
 
                             {/* Optional note — applies to both full and partial */}
                             <div className="mb-5">
                                 <label className="text-[13px] font-bold text-gray-500 mb-1.5 block">Add a note <span className="font-normal">(optional)</span></label>
-                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-slate-900 rounded-xl px-4 py-3 transition bg-white">
+                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-emerald-600 rounded-xl px-4 py-3 transition bg-white">
                                     <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h6m-6 4h10M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                     <input
                                         type="text"
@@ -1493,21 +1864,29 @@ export default function FriendDetails() {
 
                             {/* Partial input */}
                             <div className="mt-4">
-                                <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay</label>
-                                <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-slate-900 rounded-xl px-4 py-3 transition bg-white">
-                                    <DollarSign className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                                    <input
-                                        type="number"
-                                        min="0.01"
-                                        step="0.01"
-                                        max={Math.abs(balance)}
-                                        placeholder={`Max ${formatCurrency(Math.abs(balance), user?.defaultCurrency)}`}
-                                        value={partialAmount}
-                                        onChange={e => setPartialAmount(e.target.value)}
-                                        className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
-                                    />
-                                </div>
-                                <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(Math.abs(balance - (parseFloat(partialAmount) || 0)), user?.defaultCurrency)}</p>
+                                {(() => {
+                                    const balanceInDisplay = Math.round(Math.abs(viewerBalance) * 100) / 100;
+                                    const remaining = Math.max(0, balanceInDisplay - (parseFloat(partialAmount) || 0));
+                                    return (
+                                        <>
+                                            <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay ({viewerBalanceCurrency})</label>
+                                            <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-emerald-600 rounded-xl px-4 py-3 transition bg-white">
+                                                <span className="text-gray-500 font-bold text-[16px] flex-shrink-0">{CURRENCY_SYMBOLS[viewerBalanceCurrency] || '$'}</span>
+                                                <input
+                                                    type="number"
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    max={balanceInDisplay}
+                                                    placeholder={`Max ${formatCurrency(balanceInDisplay, viewerBalanceCurrency, viewerBalanceCurrency)}`}
+                                                    value={partialAmount}
+                                                    onChange={e => setPartialAmount(e.target.value)}
+                                                    className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
+                                                />
+                                            </div>
+                                            <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(remaining, viewerBalanceCurrency, viewerBalanceCurrency)}</p>
+                                        </>
+                                    );
+                                })()}
                             </div>
 
 
@@ -1515,7 +1894,7 @@ export default function FriendDetails() {
                             <button
                                 onClick={() => handleCashSettle(true)}
                                 disabled={isSettling || !partialAmount || parseFloat(partialAmount) <= 0}
-                                className="mt-6 w-full bg-slate-900 text-white py-4 rounded-2xl text-[16px] font-bold shadow-md hover:bg-slate-950 transition disabled:opacity-40"
+                                className="mt-6 w-full bg-emerald-600 text-white py-4 rounded-2xl text-[16px] font-bold shadow-md hover:bg-emerald-700 transition disabled:opacity-40"
                             >
                                 {isSettling ? 'Recording...' : 'Pay with Cash'}
                             </button>
@@ -1569,7 +1948,7 @@ export default function FriendDetails() {
                                 <button
                                     onClick={handleReportUser}
                                     disabled={isReporting}
-                                    className="flex-1 py-3.5 rounded-xl font-bold bg-slate-950 text-white hover:bg-slate-900 transition disabled:opacity-50"
+                                    className="flex-1 py-3.5 rounded-xl font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition disabled:opacity-50"
                                 >
                                     {isReporting ? 'Submitting...' : 'Submit'}
                                 </button>
@@ -1578,6 +1957,92 @@ export default function FriendDetails() {
                     </div>
                 </div>
             )}
+
+            <AdGate 
+                isOpen={showAdGate} 
+                onClose={() => setShowAdGate(false)} 
+                onFinish={handleAdFinish} 
+                type={adType} 
+            />
+
+            {/* Loan Password Modal */}
+            {showLoanPasswordModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] px-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center mb-4">
+                                <Lock className="w-6 h-6 text-rose-500" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Password Required</h3>
+                            <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                                This loan exceeds <strong>$100</strong>. For your security, please confirm your Paywise account password to accept.
+                            </p>
+
+                            <div className="relative mb-6">
+                                <input
+                                    type={showLoanPass ? 'text' : 'password'}
+                                    value={loanPassword}
+                                    onChange={e => setLoanPassword(e.target.value)}
+                                    placeholder="Confirm password"
+                                    className="w-full bg-gray-50 border-2 border-slate-200 focus:border-slate-800 rounded-2xl px-4 py-4 pr-12 text-[16px] outline-none transition-all"
+                                    autoFocus
+                                />
+                                <button
+                                    onClick={() => setShowLoanPass(!showLoanPass)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+                                >
+                                    {showLoanPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => { setShowLoanPasswordModal(false); setHandlingLoan(null); }}
+                                    className="flex-1 py-4 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleAcceptLoan(handlingLoan)}
+                                    disabled={!loanPassword || isSubmittingLoan}
+                                    className="flex-1 py-4 rounded-xl font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50 shadow-lg shadow-emerald-500/20"
+                                >
+                                    {isSubmittingLoan ? 'Verifying...' : 'Confirm'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
+
+            {/* ── Floating Action Buttons (always fixed to viewport) ── */}
+            {!favsHidden && (
+                <>
+                    {/* Add Expense FAB - bottom right */}
+                    <div className="fixed bottom-6 right-5 z-[55] pointer-events-auto">
+                        <Link
+                            to={`/friend/${id}/add`}
+                            onClick={handleAddExpenseClick}
+                            className="bg-emerald-600 text-white rounded-md shadow-lg px-4 py-2.5 flex items-center justify-center gap-2 font-bold hover:bg-emerald-700 transition transform hover:scale-105"
+                        >
+                            <i className="pi pi-receipt"></i>
+                            Add expense
+                        </Link>
+                    </div>
+
+                    {/* Scan Bill FAB - bottom left */}
+                    <div className="fixed bottom-6 left-5 z-[55] pointer-events-auto">
+                        <Link
+                            to={`/friend/${id}/scan`}
+                            onClick={handleScanBillClick}
+                            className="bg-white text-gray-600 rounded-full shadow-lg p-3 flex items-center justify-center font-bold hover:bg-gray-50 border border-gray-100 transition transform hover:scale-105"
+                        >
+                            <i className="pi pi-camera"></i>
+                        </Link>
+                    </div>
+                </>
+            )}
+        </>
     );
 }

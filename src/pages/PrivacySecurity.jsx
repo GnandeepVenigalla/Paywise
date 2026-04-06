@@ -76,19 +76,35 @@ export default function PrivacySecurity() {
                     </div>
                 </div>
 
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
+                    <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-slate-900" />
+                        4. Google AdSense & Third-Party Advertising
+                    </h3>
+                    <div className="space-y-4 text-[15px] text-gray-600 leading-relaxed">
+                        <p>
+                            Third-party vendors, including Google, use cookies to serve ads based on our users' prior visits to Paywise or other websites.
+                        </p>
+                        <ul className="list-disc pl-5 space-y-2">
+                            <li><strong className="text-gray-800 font-semibold">Personalized Advertising:</strong> Google's use of advertising cookies enables it and its partners to serve ads to our users based on their visit to Paywise and/or other sites on the Internet.</li>
+                            <li><strong className="text-gray-800 font-semibold">User Control:</strong> Users may opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank" className="text-emerald-700 underline">Google Ads Settings</a>. Alternatively, you can opt out of a third-party vendor's use of cookies for personalized advertising by visiting <a href="https://www.aboutads.info" target="_blank" className="text-emerald-700 underline">www.aboutads.info</a>.</li>
+                        </ul>
+                    </div>
+                </div>
+
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-8">
                     <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                         <FileText className="w-5 h-5 text-slate-900" />
-                        4. Does Paywise Share Your Information?
+                        5. Does Paywise Share Your Information?
                     </h3>
                     <div className="space-y-4 text-[15px] text-gray-600 leading-relaxed">
                         <p>
                             Information about our customers is an important part of our business, and we are not in the business of selling our customers' personal information to others.
                         </p>
                         <ul className="list-disc pl-5 space-y-2">
-                            <li><strong className="text-gray-800 font-semibold">Third-Party Service Providers:</strong> We employ other companies and individuals to perform functions on our behalf. Examples include sending email, analyzing data, providing marketing assistance, providing search results, and processing payments. They have access to personal information needed to perform their functions, but may not use it for other purposes.</li>
-                            <li><strong className="text-gray-800 font-semibold">Business Transfers:</strong> As we continue to develop our business, we might sell or buy other businesses or services. In such transactions, customer information generally is one of the transferred business assets but remains subject to the promises made in any pre-existing Privacy Notice.</li>
-                            <li><strong className="text-gray-800 font-semibold">Protection of Paywise and Others:</strong> We release account and other personal information when we believe release is appropriate to comply with the law; enforce or apply our Terms of Use and other agreements; or protect the rights, property, or safety of Paywise, our users, or others.</li>
+                            <li><strong className="text-gray-800 font-semibold">Third-Party Service Providers:</strong> We employ other companies and individuals to perform functions on our behalf. Examples include sending email, analyzing data, providing marketing assistance (including Google AdSense), providing search results, and processing payments. </li>
+                            <li><strong className="text-gray-800 font-semibold">Business Transfers:</strong> Customer information generally is one of the transferred business assets but remains subject to the promises made in any pre-existing Privacy Notice.</li>
+                            <li><strong className="text-gray-800 font-semibold">Protection of Paywise and Others:</strong> We release account information when we believe release is appropriate to comply with the law; enforce or apply our Terms of Use and other agreements; or protect the rights, property, or safety of Paywise, our users, or others.</li>
                         </ul>
                     </div>
                 </div>

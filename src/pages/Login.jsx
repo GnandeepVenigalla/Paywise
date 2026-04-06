@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock } from 'lucide-react';
@@ -12,8 +12,15 @@ export default function Login() {
     const [success, setSuccess] = useState('');
     const [isOtpMode, setIsOtpMode] = useState(false);
     const [otp, setOtp] = useState('');
-    const { login, verifyOtp, api } = useContext(AuthContext);
+    const { login, verifyOtp, api, user, loading } = useContext(AuthContext);
     const navigate = useNavigate();
+
+    // Auto-redirect if already logged in
+    useEffect(() => {
+        if (!loading && user) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [user, loading, navigate]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -167,13 +174,20 @@ export default function Login() {
                 )}
 
                 {!isOtpMode && (
-                    <p className="mt-6 text-center text-sm text-gray-600">
+                    <p className="mt-6 text-center text-sm text-gray-400">
                         Don't have an account?{' '}
                         <Link to="/register" className="font-semibold text-slate-900 hover:text-slate-800 transition-colors">
                             Sign up
                         </Link>
                     </p>
                 )}
+            </div>
+
+            {/* Public Legal Links for Google AdSense Bot */}
+            <div className="mt-10 flex gap-6 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 opacity-80 mb-4 transition-all">
+                <Link to="/terms" className="hover:text-slate-900 dark:hover:text-slate-300">Terms of Service</Link>
+                <div className="w-1 h-1 bg-gray-300 rounded-full my-auto" />
+                <Link to="/privacy" className="hover:text-slate-900 dark:hover:text-slate-300">Privacy Policy</Link>
             </div>
         </div>
     );

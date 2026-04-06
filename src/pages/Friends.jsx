@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, HeartHandshake, Search, Plus, ArrowRight, ArrowLeft, Contact, Share2, Sparkles, SlidersHorizontal, Check } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
+import NotificationBell from '../components/NotificationBell';
 import { formatCurrency } from '../utils/formatters';
 
 export default function Friends() {
@@ -17,6 +18,7 @@ export default function Friends() {
     const [isContactsSupported, setIsContactsSupported] = useState(false);
     const [filter, setFilter] = useState('none');
     const [showFilterModal, setShowFilterModal] = useState(false);
+    const [showSettled, setShowSettled] = useState(false);
     const navigate = useNavigate();
 
     const netBalance = friends.reduce((sum, friend) => sum + (friend.balance || 0), 0);
@@ -154,8 +156,69 @@ export default function Friends() {
         }
     };
 
+    const filteredFriends = friends.filter(friend => {
+        if (filter === 'none') return true;
+        const bal = Number(friend.balance || 0);
+        if (filter === 'outstanding') return bal !== 0;
+        if (filter === 'owe') return bal < 0;
+        if (filter === 'owed') return bal > 0;
+        return true;
+    });
+
+    const activeFriends = filteredFriends.filter(f => Math.abs(Number(f.balance || 0)) >= 0.01);
+    const settledFriends = filteredFriends.filter(f => Math.abs(Number(f.balance || 0)) < 0.01);
+
+    const renderFriend = (friend) => {
+        const bal = Number(friend.balance || 0);
+        const isSettled = Math.abs(bal) < 0.01;
+        return (
+            <Link
+                to={`/friend/${friend.id}`}
+                key={friend.id}
+                className={`block p-4 rounded-2xl transition-all group ${
+                    isSettled
+                    ? 'bg-gray-50/50 opacity-70 border border-transparent hover:border-gray-100 shadow-none'
+                    : 'bg-white shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100'
+                }`}
+            >
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg uppercase flex-shrink-0 transition-all ${
+                            isSettled ? 'bg-gray-100 text-gray-400' : 'bg-slate-50 text-slate-900 group-hover:scale-105'
+                        }`}>
+                            {friend.username.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className={`font-bold text-[16px] truncate leading-tight ${isSettled ? 'text-gray-500' : 'text-gray-900'}`}>{friend.username}</h3>
+                            <p className="text-[12px] text-gray-400 truncate mt-0.5">{friend.email}</p>
+                        </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                        {bal > 0.01 ? (
+                            <div className="flex flex-col items-end">
+                                <span className="text-[11px] font-black uppercase tracking-tight text-emerald-500/80 mb-0.5">owes you</span>
+                                <span className="text-[16px] font-black text-emerald-500 leading-none">
+                                    {formatCurrency(Math.abs(bal), user.defaultCurrency, friend.balanceCurrency || user.defaultCurrency)}
+                                </span>
+                            </div>
+                        ) : bal < -0.01 ? (
+                            <div className="flex flex-col items-end">
+                                <span className="text-[11px] font-black uppercase tracking-tight text-rose-500/80 mb-0.5">you owe</span>
+                                <span className="text-[16px] font-black text-rose-600 leading-none">
+                                    {formatCurrency(Math.abs(bal), user.defaultCurrency, friend.balanceCurrency || user.defaultCurrency)}
+                                </span>
+                            </div>
+                        ) : (
+                            <p className="text-[13px] font-bold text-gray-400 uppercase tracking-widest leading-none">settled</p>
+                        )}
+                    </div>
+                </div>
+            </Link>
+        );
+    };
+
     return (
-        <div className="min-h-screen bg-gray-50 pb-20">
+        <div className="min-h-screen bg-gray-50 pb-24">
             {/* Header */}
             <header className="bg-white shadow-sm pt-8 pb-4 px-4 sticky top-0 z-10 flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -163,14 +226,15 @@ export default function Friends() {
                     <h1 className="text-xl font-bold text-gray-900">Paywise</h1>
                 </div>
                 <div className="flex items-center gap-3">
+                    <NotificationBell />
                     <button
                         onClick={() => { setIsAddingMode(!isAddingMode); setScannedResults(null); setSearchQuery(''); setSearchResults([]); }}
-                        className="p-2 rounded-full bg-slate-50 text-slate-900 hover:bg-slate-100 transition shadow-sm"
+                        className="p-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                     >
-                        {isAddingMode ? <HeartHandshake className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
+                        {isAddingMode ? <HeartHandshake className="w-6 h-6" /> : <UserPlus className="w-6 h-6" />}
                     </button>
-                    <Link to="/ai" className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-950 transition-all hover:scale-105 active:scale-95 group ml-1">
-                        <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+                    <Link to="/ai" className="w-11 h-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-950 transition-all hover:scale-105 active:scale-95 group ml-1">
+                        <Sparkles className="w-6 h-6 group-hover:animate-pulse" />
                     </Link>
                 </div>
             </header>
@@ -342,68 +406,44 @@ export default function Friends() {
                                     </div>
                                     <button 
                                         onClick={() => setShowFilterModal(true)} 
-                                        className="p-1 rounded-full hover:bg-slate-100 transition-colors text-slate-800 cursor-pointer"
+                                        className="p-1.5 rounded-full hover:bg-slate-100 transition-colors text-slate-800 cursor-pointer"
                                     >
                                         <SlidersHorizontal className="w-[22px] h-[22px]" />
                                     </button>
                                 </div>
 
                                 <h2 className="text-lg font-bold text-gray-800 mb-2">Your Friends</h2>
-                                {friends.filter(friend => {
-                                    if (filter === 'none') return true;
-                                    const bal = friend.balance || 0;
-                                    if (filter === 'outstanding') return bal !== 0;
-                                    if (filter === 'owe') return bal < 0;
-                                    if (filter === 'owed') return bal > 0;
-                                    return true;
-                                }).length === 0 ? (
+                                {filteredFriends.length === 0 ? (
                                     <p className="text-gray-500 text-sm mt-4 text-center">No friends match this filter.</p>
                                 ) : (
-                                    friends.filter(friend => {
-                                        if (filter === 'none') return true;
-                                        const bal = friend.balance || 0;
-                                        if (filter === 'outstanding') return bal !== 0;
-                                        if (filter === 'owe') return bal < 0;
-                                        if (filter === 'owed') return bal > 0;
-                                        return true;
-                                    }).map(friend => (
-                                    <Link
-                                        to={`/friend/${friend.id}`}
-                                        key={friend.id}
-                                        className="block bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100 transition-all group"
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className="w-12 h-12 bg-slate-50 text-slate-900 rounded-full flex items-center justify-center font-bold text-lg uppercase flex-shrink-0 group-hover:scale-105 transition-all">
-                                                    {friend.username.charAt(0)}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <h3 className="font-bold text-gray-900 text-[16px] truncate leading-tight">{friend.username}</h3>
-                                                    <p className="text-[12px] text-gray-400 truncate mt-0.5">{friend.email}</p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right flex-shrink-0">
-                                                {friend.balance > 0 ? (
-                                                    <div className="flex flex-col items-end">
-                                                        <span className="text-[11px] font-black uppercase tracking-tight text-emerald-500/80 mb-0.5">owes you</span>
-                                                        <span className="text-[16px] font-black text-emerald-500 leading-none">
-                                                            {formatCurrency(friend.balance, user.defaultCurrency)}
-                                                        </span>
+                                    <div className="flex flex-col gap-3">
+                                        {activeFriends.map(renderFriend)}
+                                        
+                                        {settledFriends.length > 0 && (
+                                            <div className="pt-2">
+                                                <button
+                                                    onClick={() => setShowSettled(!showSettled)}
+                                                    className="w-full py-4 text-gray-400 font-bold text-[14px] hover:text-gray-600 transition flex items-center justify-center gap-2"
+                                                >
+                                                    {showSettled ? 'Hide settled up' : `Show settled up (${settledFriends.length})`}
+                                                    <i className={`pi ${showSettled ? 'pi-chevron-up' : 'pi-chevron-down'} text-xs`}></i>
+                                                </button>
+                                                
+                                                {showSettled && (
+                                                    <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
+                                                        {settledFriends.map(renderFriend)}
                                                     </div>
-                                                ) : friend.balance < 0 ? (
-                                                    <div className="flex flex-col items-end">
-                                                        <span className="text-[11px] font-black uppercase tracking-tight text-rose-500/80 mb-0.5">you owe</span>
-                                                        <span className="text-[16px] font-black text-rose-600 leading-none">
-                                                            {formatCurrency(Math.abs(friend.balance), user.defaultCurrency)}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-[13px] font-bold text-gray-400 uppercase tracking-widest">settled up</p>
                                                 )}
                                             </div>
-                                        </div>
-                                    </Link>
-                                )))}
+                                        )}
+                                        
+                                        {activeFriends.length === 0 && settledFriends.length > 0 && !showSettled && (
+                                            <div className="mt-4 p-4 text-center">
+                                                <p className="text-gray-400 text-sm font-medium">All your friends are currently settled up.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>
@@ -414,14 +454,14 @@ export default function Friends() {
 
             {/* Filter iOS-style Modal */}
             {showFilterModal && (
-                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowFilterModal(false)} />
                     
-                    <div className="w-full px-3 pb-6 max-h-[85vh] flex flex-col relative z-20 animate-in slide-in-from-bottom duration-300 gap-2">
+                    <div className="w-full px-3 pb-6 max-h-[85vh] flex flex-col relative z-[101] animate-in slide-in-from-bottom duration-300 gap-2">
                         {/* Options Block */}
                         <div className="bg-white rounded-[14px] flex flex-col overflow-hidden shadow-sm">
                             <div className="p-3 text-center border-b border-gray-100">
-                                <h3 className="text-[13px] font-semibold text-gray-500">Set filter</h3>
+                                <h3 className="text-[13px] font-semibold text-gray-500 uppercase tracking-tight">Set filter</h3>
                             </div>
                             
                             {[

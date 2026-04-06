@@ -1,20 +1,26 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useRef, useEffect } from 'react';
+import VERSION from '../version';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     LogOut, Camera, ChevronRight,
-    Bell, Shield, DollarSign, Settings, HelpCircle, UserX, Download, X, UserPlus
+    Bell, Shield, DollarSign, Settings, HelpCircle, UserX, Download, X, UserPlus, ShoppingCart, Banknote
 } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import Avatar from '../components/UI/Avatar';
 import Card from '../components/UI/Card';
 import Button from '../components/UI/Button';
 import { useInstallApp } from '../hooks/useInstallApp';
-import { useRef } from 'react';
 
+import NotificationBell from '../components/NotificationBell';
+import { useAppSettings } from '../hooks/useAppSettings';
+
+let memeCache = [];
 export default function Account() {
     const { user, logout, setUser, api } = useContext(AuthContext);
     const navigate = useNavigate();
+    // Apply theme whenever the Account tab is mounted
+    useAppSettings();
     const [kitties, setKitties] = useState([]);
     const { isInstallable, promptInstall, isIosPromptVisible, hideIosPrompt } = useInstallApp();
     const fileInputRef = useRef(null);
@@ -43,61 +49,82 @@ export default function Account() {
         }
     };
 
-    const kittyImages = [
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50534.png`,
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50541.png`,
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50525.png`,
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50480.png`,
-        `${import.meta.env.BASE_URL}assets/kitties/cat_PNG50433.png`
+    const cuteCatJokes = [
+        "I demand tuna!", "Sleep loading...", "Did someone say treats?", "I am the boss",
+        "It's 3AM, time to run", "If I fits, I sits", "Error 404: Cat not found", "Hooman, serve me",
+        "This box is mine", "Pet me. Now stop.", "I saw a ghost", "You're late for lunch",
+        "Target acquired", "Nap time = all the time", "I'm not fat, I'm fluffy", "Monday mood",
+        "Why is the bowl half empty?", "I regret nothing", "What personal space?", "Boop the snoot",
+        "Invisible bugs exist", "Catch the red dot!", "Too cute to care", "I knock things over",
+        "Sunbeam detected", "Waiting for pets", "Zero regrets", "Pawsitive vibes only",
+        "You may admire me", "Just 5 more minutes"
     ];
 
-    const spawnKitty = () => {
-        const id = Date.now();
-        const src = kittyImages[Math.floor(Math.random() * kittyImages.length)];
+    const spawnKitty = async () => {
+        let memeUrl = '';
+        
+        if (memeCache.length === 0) {
+            try {
+                // Use TheCatAPI for 100% clean, instantly generated adorable cats (100,000+ images)
+                const res = await fetch('https://api.thecatapi.com/v1/images/search?limit=15', { cache: 'no-store' });
+                const data = await res.json();
+                memeCache = data.map(m => m.url); 
+            } catch {
+                memeCache = [
+                    'https://cdn2.thecatapi.com/images/1.jpg',
+                    'https://cdn2.thecatapi.com/images/2.jpg'
+                ];
+            }
+        }
+        
+        memeUrl = memeCache.pop() || 'https://cdn2.thecatapi.com/images/3.jpg';
+        const randomJoke = cuteCatJokes[Math.floor(Math.random() * cuteCatJokes.length)];
+
+        const id = Date.now() + Math.random();
+        const src = memeUrl;
 
         const edges = ['bottom', 'top', 'left', 'right'];
         const edge = edges[Math.floor(Math.random() * edges.length)];
 
-        let style = { width: '180px', height: 'auto', zIndex: 60 };
+        let style = { height: 'auto', zIndex: 60 };
         let animationClass = '';
 
         const offset = Math.floor(Math.random() * 60) + 10;
+        
+        // Always keep memes relatively upright so text is readable
+        style.transform = `rotate(${Math.floor(Math.random() * 20) - 10}deg)`;
 
         switch (edge) {
             case 'bottom':
-                style.bottom = '-20px';
+                style.bottom = '20px';
                 style.left = `${offset}%`;
-                style.transform = `rotate(${Math.floor(Math.random() * 40) - 20}deg)`;
-                animationClass = 'animate-in slide-in-from-bottom-[100%] duration-700';
+                animationClass = 'animate-in slide-in-from-bottom-[100%] duration-1000';
                 break;
             case 'top':
-                style.top = '-20px';
+                style.top = '20px';
                 style.left = `${offset}%`;
-                style.transform = `rotate(${180 + Math.floor(Math.random() * 40) - 20}deg)`;
-                animationClass = 'animate-in slide-in-from-top-[100%] duration-700';
+                animationClass = 'animate-in slide-in-from-top-[100%] duration-1000';
                 break;
             case 'left':
-                style.left = '-20px';
+                style.left = '20px';
                 style.top = `${offset}%`;
-                style.transform = `rotate(${90 + Math.floor(Math.random() * 40) - 20}deg)`;
-                animationClass = 'animate-in slide-in-from-left-[100%] duration-700';
+                animationClass = 'animate-in slide-in-from-left-[100%] duration-1000';
                 break;
             case 'right':
-                style.right = '-20px';
+                style.right = '20px';
                 style.top = `${offset}%`;
-                style.transform = `rotate(${-90 + Math.floor(Math.random() * 40) - 20}deg)`;
-                animationClass = 'animate-in slide-in-from-right-[100%] duration-700';
+                animationClass = 'animate-in slide-in-from-right-[100%] duration-1000';
                 break;
             default:
                 break;
         }
 
-        const newKitty = { id, src, style, animationClass };
+        const newKitty = { id, src, joke: randomJoke, style, animationClass };
         setKitties((prev) => [...prev, newKitty]);
 
         setTimeout(() => {
             setKitties((prev) => prev.filter(k => k.id !== id));
-        }, 3500);
+        }, 5000);
     };
 
     const CURRENCY_SYMBOLS = {
@@ -185,17 +212,29 @@ export default function Account() {
                     bg: 'bg-gray-50 dark:bg-slate-800',
                     label: 'Help & Support',
                     sub: 'FAQ, contact us',
-                    to: null,
-                    onClick: () => alert('Help & Support coming soon!'),
+                    to: '/account/help',
+                },
+            ],
+        },
+        {
+            label: 'Partner',
+            items: [
+                {
+                    icon: <ShoppingCart className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+                    bg: 'bg-amber-50 dark:bg-amber-950/30',
+                    label: 'Merchant Portal',
+                    sub: 'Manage your store and payments',
+                    onClick: () => window.location.href = 'https://merchant.paywiseapp.com',
                 },
             ],
         },
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-28 font-sans text-gray-800 dark:text-gray-200 transition-colors">
-            <header className="bg-white dark:bg-slate-900 pt-10 pb-5 px-6 sticky top-0 z-10 border-b border-gray-100 dark:border-slate-800">
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-24 font-sans text-gray-800 dark:text-gray-200 transition-colors">
+            <header className="bg-white dark:bg-slate-900 pt-10 pb-5 px-6 sticky top-0 z-10 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
                 <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Account</h1>
+                <NotificationBell />
             </header>
 
             <main className="px-5 mt-6 max-w-lg mx-auto">
@@ -244,7 +283,7 @@ export default function Account() {
                         <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] px-1 mb-3">
                             {group.label}
                         </p>
-                        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                             {group.items.map((item, idx) => {
                                 const isLast = idx === group.items.length - 1;
                                 const content = (
@@ -259,7 +298,13 @@ export default function Account() {
                                             <p className="text-[16px] font-bold text-gray-900 dark:text-slate-100 leading-tight">{item.label}</p>
                                             <p className="text-[13px] text-gray-400 dark:text-gray-500 mt-1 truncate">{item.sub}</p>
                                         </div>
-                                        <ChevronRight className="w-5 h-5 text-gray-300 dark:text-slate-700 flex-shrink-0" />
+                                        {item.badge ? (
+                                            <span className="bg-rose-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full flex-shrink-0 mr-1">
+                                                {item.badge}
+                                            </span>
+                                        ) : (
+                                            <ChevronRight className="w-5 h-5 text-gray-300 dark:text-slate-700 flex-shrink-0" />
+                                        )}
                                     </div>
                                 );
 
@@ -285,29 +330,39 @@ export default function Account() {
                 </Button>
             </main>
 
-            <div className="text-center mt-12 mb-6">
+            <div className="text-center mt-8 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
                     <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
-                    <p className="mt-1.5 opacity-60">Paywise V1.4.0 · © 2026</p>
+                    <p className="mt-1.5 opacity-60">Paywise {VERSION} · © 2026</p>
+                    <div className="mt-3 flex items-center justify-center gap-4 text-[10px] font-black uppercase tracking-widest text-[#19876e] dark:text-emerald-400">
+                        <Link to="/terms" className="hover:underline">Terms</Link>
+                        <span className="w-1 h-1 bg-gray-300 dark:bg-slate-700 rounded-full" />
+                        <Link to="/privacy" className="hover:underline">Privacy</Link>
+                    </div>
                 </div>
                 <div
                     onClick={spawnKitty}
                     className="mt-3 text-emerald-600 font-medium text-[14px] cursor-pointer hover:underline inline-block select-none"
                 >
-                    GD Kitties!
+                    GD Kitty Memes!
                 </div>
             </div>
 
             {/* Render Kitties */}
             <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
                 {kitties.map((kitty) => (
-                    <img
+                    <div
                         key={kitty.id}
-                        src={kitty.src}
-                        alt="kitten"
-                        className={`absolute ${kitty.animationClass} object-contain transition-all`}
+                        className={`absolute ${kitty.animationClass} w-48 sm:w-64 bg-white dark:bg-slate-900 shadow-2xl rounded-xl border-[6px] border-white dark:border-slate-800 transition-all flex flex-col`}
                         style={kitty.style}
-                    />
+                    >
+                        <img src={kitty.src} alt="kitten" className="w-full h-40 sm:h-56 object-cover rounded-t-lg bg-gray-100 dark:bg-slate-950" />
+                        <div className="py-4 px-3 text-center bg-white dark:bg-slate-900 flex-1 flex items-center justify-center">
+                            <p className="font-extrabold text-[13px] sm:text-[16px] text-gray-800 dark:text-slate-100 tracking-tight leading-snug">
+                                {kitty.joke} <span className="text-[12px] sm:text-[14px]">😺</span>
+                            </p>
+                        </div>
+                    </div>
                 ))}
             </div>
 

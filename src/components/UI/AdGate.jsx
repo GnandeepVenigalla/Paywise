@@ -10,16 +10,32 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
         if (!isOpen) {
             setStatus('ready');
             setTimeLeft(5);
+        } else {
+            // Auto-bypass ads on beta and dev environments
+            const isProd = window.location.hostname === 'www.paywiseapp.com' || window.location.hostname === 'paywiseapp.com';
+            if (!isProd) {
+                // Instantly finish if not in prod
+                setStatus('finished');
+            }
         }
     }, [isOpen]);
 
     useEffect(() => {
         if (status === 'playing') {
+            // Attempt to push a Google Ad if the system is available
+            try {
+                if (window.adsbygoogle) {
+                    (window.adsbygoogle = window.adsbygoogle || []).push({});
+                }
+            } catch (adErr) {
+                console.error('Google Ad Request failed:', adErr);
+            }
+
             const timer = setInterval(() => {
                 setTimeLeft(prev => {
                     if (prev <= 1) {
                         clearInterval(timer);
-                        setStatus('finished');
+                        onFinish(); 
                         return 0;
                     }
                     return prev - 1;
@@ -27,11 +43,11 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
             }, 1000);
             return () => clearInterval(timer);
         }
-    }, [status]);
-
-    if (!isOpen) return null;
+    }, [status, onFinish]);
 
     const { api } = useContext(AuthContext);
+
+    if (!isOpen) return null;
 
     const trackAdEvent = async (type) => {
         try {
@@ -44,15 +60,23 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
     const startAd = () => {
         setStatus('loading');
         trackAdEvent('adRequests');
-        // Simulate ad loading from AdSense
+        
+        // Check for Google AdSense presence as a sign of successful load
+        const isGoogleActive = window.adsbygoogle && window.adsbygoogle.loaded;
+
+        // Priotise Google, with a quick fallback trigger
         setTimeout(() => {
-            setStatus('playing');
-            trackAdEvent('adImpressions');
-            // Try to push AdSense ad
-            try {
-                (window.adsbygoogle = window.adsbygoogle || []).push({});
-            } catch (e) {}
-        }, 1500);
+            if (isGoogleActive) {
+                // If Google is detected, we still show our playing state but 
+                // Google might actually pop its own overlay on top of us.
+                setStatus('playing');
+                trackAdEvent('adImpressions_google');
+            } else {
+                // Fallback to our internal simulated ad state
+                setStatus('playing');
+                trackAdEvent('adImpressions_fallback');
+            }
+        }, 800);
     };
 
     const getContent = () => {
@@ -63,11 +87,20 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                         <div className="w-20 h-20 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-3xl flex items-center justify-center mb-8 shadow-xl shadow-indigo-500/5">
                             {type === 'ai' ? <Sparkles className="w-10 h-10 text-indigo-500" /> : type === 'camera' ? <AlertTriangle className="w-10 h-10 text-amber-500" /> : <PlayCircle className="w-10 h-10 text-emerald-500" />}
                         </div>
-                        <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Unlock Premium</h2>
+                        <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 tracking-tight">Unlock Premium</h2>
+                        <div className="mb-8 flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 px-4 py-2 rounded-full border border-amber-100 dark:border-amber-900/30">
+                             <AlertTriangle className="w-4 h-4 text-amber-500" />
+                             <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide">Security & Safety Notice</span>
+                        </div>
                         <p className="text-base text-gray-500 dark:text-gray-400 mb-10 font-medium max-w-[280px] leading-relaxed">
-                            Support Paywise by watching a short ad and gain instant access to our advanced {type === 'ai' ? 'AI Assistant' : type === 'camera' ? 'Camera Scanner' : 'features'}.
+                            Support Paywise by viewing a brief <span className="text-indigo-500 font-bold underline">sponsored message</span>. Access our advanced {type === 'ai' ? 'AI Assistant' : type === 'camera' ? 'Camera Scanner' : 'features'} immediately after.
                         </p>
+                        
+                        <div className="mb-4 text-[10px] text-gray-400 font-bold uppercase tracking-widest text-center max-w-[250px] mx-auto opacity-70">
+                            Paywise never promotes third-party downloads. Only proceed if you trust the content.
+                        </div>
                         <button 
+                            type="button"
                             onClick={startAd}
                             className="w-full bg-slate-900 dark:bg-indigo-600 text-white h-16 rounded-[24px] font-black text-lg flex items-center justify-center gap-3 active:scale-95 transition-all shadow-2xl shadow-indigo-500/20"
                         >
@@ -90,23 +123,43 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                 );
             case 'playing':
                 return (
-                    <div className="flex flex-col items-center justify-center w-full h-full min-h-[450px] relative">
-                         {/* Seamless Ad Integration - No visible box unless ad fills */}
-                         <div className="w-full h-full flex items-center justify-center bg-slate-50/50 dark:bg-black/20">
-                            <ins className="adsbygoogle"
-                                style={{ display: 'block', width: '100%', height: '100%', minHeight: '350px' }}
-                                data-ad-client="ca-pub-7749956119820849"
-                                data-ad-slot="8452361092"
-                                data-ad-format="auto"
-                                data-full-width-responsive="true"></ins>
+                    <div className="flex flex-col items-center justify-center w-full h-full min-h-[450px] relative px-4">
+                         {/* Priority 1: Real Google AdSense Unit or Internal Image */}
+                         <div className="google-ad-container w-full h-[320px] bg-slate-50/10 dark:bg-slate-800/10 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-100 dark:border-white/10 shadow-inner relative">
+                             <div className="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded text-[8px] font-black text-white/80 uppercase tracking-widest border border-white/10">ADS</div>
+                             
+                             {/* Internal Internal Ad Image (Always visible while Google loads) */}
+                             <img 
+                                src="/ads.png" 
+                                alt="Sponsored Content" 
+                                className="absolute inset-0 w-full h-full object-cover opacity-60 animate-in fade-in duration-1000"
+                             />
+
+                             {/* The actual Google Ad slot */}
+                             <ins className="adsbygoogle relative z-10"
+                                  style={{ display: 'block', width: '100%', height: '320px' }}
+                                  data-ad-client="ca-pub-7749956119820849"
+                                  data-ad-slot="auto"
+                                  data-full-width-responsive="true"></ins>
                          </div>
 
-                         <div className="absolute top-8 right-8 z-30 bg-white dark:bg-slate-900 shadow-2xl px-6 py-2.5 rounded-full border border-indigo-500/30">
-                            <span className="text-slate-900 dark:text-white font-black text-sm tabular-nums">Unlocking in {timeLeft}s</span>
+                         <div className="mt-6 flex flex-col items-center text-center">
+                            <div className="mb-4 flex items-center gap-2 bg-gray-200/50 dark:bg-slate-700/50 px-3 py-1 rounded-full border border-gray-300 dark:border-slate-600">
+                                 <AlertTriangle className="w-3 h-3 text-gray-500" />
+                                 <span className="text-[9px] font-black tracking-widest text-gray-600 dark:text-gray-400 uppercase">Verification Hub</span>
+                            </div>
+                            <p className="text-gray-500 dark:text-gray-400 text-xs px-4 max-w-[280px] leading-relaxed">
+                                Content from independent sponsors is being verified. <span className="font-bold text-red-500 underline">Ignore</span> any VPN, Antivirus or Download prompts to stay safe.
+                            </p>
+                         </div>
+
+                         <div className="absolute top-6 right-6 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-lg px-5 py-2.5 rounded-full border border-emerald-500">
+                            <span className="text-slate-900 dark:text-white font-black text-xs tabular-nums">Ready in {timeLeft}s</span>
                          </div>
                     </div>
                 );
             case 'finished':
+                // Auto-continues due to the useEffect above, but keep fallback just in case
                 return (
                     <div className="flex flex-col items-center text-center p-10 py-16">
                         <div className="w-24 h-24 bg-emerald-500 rounded-[32px] flex items-center justify-center mb-8 shadow-2xl shadow-emerald-500/30 animate-in zoom-in-50 duration-500">
@@ -137,7 +190,29 @@ export default function AdGate({ isOpen, onClose, onFinish, type = 'ai' }) {
                         />
                     </div>
                 )}
-                <div className="w-full h-full overflow-y-auto custom-scrollbar">
+                <div className="w-full h-full overflow-y-auto custom-scrollbar relative">
+                    {/* Security Disclaimer Header */}
+                    <div className="sticky top-0 left-0 right-0 h-14 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-md flex items-center justify-between px-6 z-[60] border-b border-gray-100 dark:border-white/10">
+                        <div className="flex items-center gap-3">
+                             <div className="flex items-center gap-2 bg-slate-900 dark:bg-black px-3 py-1.5 rounded-full shadow-lg border border-white/10">
+                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]" />
+                                <span className="text-[11px] font-black tracking-[0.15em] text-white uppercase">ADS</span>
+                             </div>
+                             <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase leading-none tracking-wider">Independent Provider</span>
+                                <span className="text-[9px] font-bold text-amber-500 uppercase leading-none mt-1">External Sponsored Media</span>
+                             </div>
+                        </div>
+                        {timeLeft < 4 && (
+                            <button 
+                                onClick={onFinish}
+                                className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-900/30 animate-in fade-in slide-in-from-right-2"
+                            >
+                                Skip Ad
+                            </button>
+                        )}
+                    </div>
+
                     {getContent()}
                 </div>
             </div>
