@@ -612,7 +612,7 @@ export default function FriendDetails() {
                 <div className="px-4 py-5 shadow-[0_4px_10px_rgb(0,0,0,0.03)] border-b border-gray-100 mb-2">
                     <div className="mb-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                         <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-3">
-                            <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Current Standing</span>
+                            <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Direct Balance</span>
                             {Math.abs(viewerBalance) >= 0.50 ? (
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-gray-500">
@@ -659,7 +659,7 @@ export default function FriendDetails() {
                             </div>
                         )}
 
-                        {/* Breakdown */}
+                        {/* Breakdown — Direct rows are settleable here; group rows must be settled inside the group */}
                                 <div className="space-y-3 pt-2">
                                     {(() => {
                                         const breakdowns = {};
@@ -682,7 +682,12 @@ export default function FriendDetails() {
 
                                             if (b !== 0) {
                                                 const gid = (exp.group?._id || exp.group || 'none').toString();
-                                                if (!breakdowns[gid]) breakdowns[gid] = { name: exp.group?.name || (typeof exp.group === 'string' ? 'Shared Group' : 'non-group expenses'), balance: 0 };
+                                                const isGroup = !!(exp.group?._id || exp.group);
+                                                if (!breakdowns[gid]) breakdowns[gid] = {
+                                                    name: exp.group?.name || (typeof exp.group === 'string' ? 'Shared Group' : 'Direct'),
+                                                    balance: 0,
+                                                    isGroup
+                                                };
                                                 breakdowns[gid].balance += b;
                                                 breakdowns[gid].balance = Math.round(breakdowns[gid].balance * 100) / 100;
                                             }
@@ -690,11 +695,23 @@ export default function FriendDetails() {
 
                                         // Snap tiny residuals & filter — same 0.50 guard as the header
                                         return Object.values(breakdowns).filter(item => Math.abs(item.balance) >= 0.50).map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center text-[13.5px] bg-white/50 p-2 rounded-lg border border-gray-100">
-                                                <span className="text-gray-600 font-medium truncate pr-4">
-                                                    {(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes' : 'gets back'} in <span className="font-bold text-gray-800">{item.name === 'non-group expenses' ? 'Direct' : `"${item.name}"`}</span>
-                                                </span>
-                                                <span className={`font-black whitespace-nowrap ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            <div key={idx} className={`flex justify-between items-center text-[13.5px] p-2 rounded-lg border ${
+                                                item.isGroup
+                                                    ? 'bg-amber-50/60 border-amber-100'
+                                                    : 'bg-white/50 border-gray-100'
+                                            }`}>
+                                                <div className="flex flex-col min-w-0 pr-3">
+                                                    <span className="text-gray-600 font-medium truncate">
+                                                        {(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes' : 'gets back'} in{' '}
+                                                        <span className="font-bold text-gray-800">{item.isGroup ? `"${item.name}"` : 'Direct'}</span>
+                                                    </span>
+                                                    {item.isGroup && (
+                                                        <span className="text-[10.5px] text-amber-600 font-semibold mt-0.5">
+                                                            🏷 Settle inside the group
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className={`font-black whitespace-nowrap flex-shrink-0 ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                     {formatCurrency(Math.abs(item.balance), viewerBalanceCurrency, viewerBalanceCurrency)}
                                                 </span>
                                             </div>
