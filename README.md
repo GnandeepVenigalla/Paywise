@@ -1,112 +1,219 @@
-# <img src="src/assets/logo.png" width="40" height="40" /> Paywise - Effortless Expense Splitting
+# <img src="src/assets/logo.png" width="40" height="40" /> Paywise — Effortless Expense Splitting
+
+> **Current Release: V1.5.0** — *The "Settlement Precision" Update*
+> Available at: [www.paywiseapp.com](https://www.paywiseapp.com)
 
 ![Paywise Hero Banner](docs/images/hero_banner.png)
 
 ## 🚀 Overview
-**Paywise** is a next-generation expense management and bill-splitting application designed to take the stress out of group finances. Whether you're sharing a meal, splitting rent with roommates, or managing travel expenses, Paywise provides a sleek, AI-powered platform to track, split, and settle up with precision.
 
-Available at: [www.paywiseapp.com](https://www.paywiseapp.com)
+**Paywise** is a next-generation expense management and bill-splitting application built by [GD Enterprises](https://gdenterprises.gnandeep.com), founded by **Gnandeep Venigalla** with **Sai Sujitha** serving as CEO of Paywise.
+
+Whether you're sharing a meal, splitting rent with roommates, or managing travel expenses, Paywise provides a sleek, AI-powered platform to track, split, and settle up with precision — in any currency, across any device.
 
 ---
 
 ## ✨ Core Features
 
 ### 📸 AI-Powered Bill Scanning
-Stop manual entry. Upload a photo of your receipt, and our AI instantly extracts items, prices, and taxes, allowing you to assign them to friends with a single tap.
-![Scan Bill Feature](docs/images/scan_bill.png)
+Upload a photo of your receipt and our AI (Google Gemini) instantly extracts every item, price, and tax. Assign items to friends with a single tap.
 
-### 👥 Group & Friend Management
-Organize your life into groups (Home, Trip, Dinner) or track one-on-one debts with ease. View clear "who owes who" summaries at a glance.
+### 👥 Groups & Friends
+Organize shared expenses into **Groups** (Home, Trip, Dinner) or track one-on-one debts directly. View crystal-clear "who owes who" summaries at a glance.
 
-### 🔄 Splitwise Migration
-Moving from Splitwise? Our one-click migration tool imports your entire history, groups, and balances so you never lose track of your records.
+### 💸 Settle Up
+Record full or partial cash/bank settlements. Paywise automatically clears the expense history on full settlement, leaving a clean `$0 / ₹0` balance.
 
-### 🔐 Advanced Security
-Stay protected with **Email OTP verification**, **Biometric Authentication (FaceID/TouchID)**, and end-to-end secure transactions.
+### 🌍 Multi-Currency (No Phantom Balances)
+- Pure INR-INR pairs stay in ₹ — no USD conversion involved
+- Pure USD-USD pairs stay in $ — no conversion involved
+- Mixed pairs normalise through USD with a smart phantom-balance guard that eliminates tiny rounding residuals after settle-up
+
+### 📅 Daily Ad Frequency Cap
+Users get **3 free expense entries per day** before an ad is shown. The counter resets every midnight. Scan-to-split always shows a sponsored message (premium feature).
+
+### 🤖 Paywise AI Assistant (Powered by Gemini)
+Conversational expense management — add expenses, check balances ("Who owes me?"), or settle up using plain English.
+
+### 🏦 Community Groups (Rotation Cycle)
+Track who pays next in a rotating payment cycle — perfect for regular group dinners or club contributions.
+
+### 🔐 Security
+- Email OTP Verification
+- Biometric Authentication (FaceID / TouchID / Fingerprint)
+- Secure PIN Fallback
+- End-to-end encrypted sessions
 
 ### 📱 Progressive Web App (PWA)
-Install Paywise on your home screen for a native app experience on iOS and Android without needing the App Store.
+Install Paywise on your home screen for a native app experience on iOS and Android — no App Store required.
 
-### 🌍 Multi-Currency Support
-Travel the world with confidence. Paywise handles multiple currencies with real-time conversion and historical tracking.
+### 📊 Financial Exports
+Export detailed group or friend summaries as PDF or CSV for record-keeping.
 
 ---
 
 ## 🛠 Tech Stack (Frontend)
-- **Framework:** React 19 (Vite)
-- **Styling:** Tailwind CSS 4
-- **Icons:** Lucide React
-- **OCR & AI Engine:** Tesseract.js & Google Gemini AI (1.5 Flash)
-- **Monetization:** Google AdSense (AdGate Integration)
-- **State Management:** React Context API
-- **Routing:** React Router 7
-- **Exports:** jsPDF (AutoTable) for financial reporting
+
+| Layer | Technology |
+|---|---|
+| Framework | React 19 (Vite) |
+| Styling | Tailwind CSS 4 + Custom CSS |
+| Icons | Lucide React · PrimeIcons |
+| AI & OCR | Google Gemini 2.5 Flash · Tesseract.js |
+| Monetization | Google AdSense · Internal AdGate |
+| State | React Context API |
+| Routing | React Router 7 |
+| PDF Exports | jsPDF + AutoTable |
+| Auth | JWT + Google OAuth |
+| Notifications | Custom WebSocket push system |
 
 ---
+
+## 🗂 Project Structure
+
+```
+src/
+├── assets/           # Static images, logo
+├── components/
+│   ├── BottomNav.jsx
+│   ├── UI/
+│   │   ├── AdGate.jsx        # Monetization gate
+│   │   ├── Avatar.jsx
+│   │   └── ...
+│   └── ...
+├── context/
+│   └── AuthContext.jsx       # Global user state + daily expense counter
+├── hooks/                    # Custom React hooks
+├── pages/
+│   ├── Account.jsx           # Profile & settings
+│   ├── AddExpense.jsx        # Group expense entry
+│   ├── AddFriendExpense.jsx  # 1-on-1 expense entry
+│   ├── Dashboard.jsx         # Groups overview
+│   ├── Friends.jsx           # Friends list + balances
+│   ├── FriendDetails.jsx     # Friend ledger + settle-up
+│   ├── GroupDetails.jsx      # Group ledger + settle-up
+│   ├── ScanBill.jsx          # Camera OCR flow
+│   ├── AiAssistant.jsx       # Gemini AI chat
+│   └── ...
+├── utils/
+│   ├── formatters.js         # formatCurrency, convertAmount, EXCHANGE_RATES
+│   └── ...
+└── version.js                # ← Edit this to update app version everywhere
+```
+
 
 ## 📜 Version History & Release Log
 
-### v1.4.0 - The "Intelligence & Precision" Update
-*Released: March 24, 2026*
+### v1.5.0 — "Settlement Precision" Update
+*Released: April 2026*
+*Founded by Gnandeep Venigalla (GD Enterprises) · CEO: Sai Sujitha*
 
-#### 🤖 Paywise AI (Powered by Gemini)
-- **Conversational Expenses:** Add expenses, check balances ("Who owes me?"), or delete records using natural language.
-- **Floating AI Assistant:** Access the AI from any page with the new floating spark button.
-- **Action Confirmation:** AI proposes actions (Add, Delete, Settle) which you can confirm with one tap.
-- **Smart Suggestions:** Get personalized prompt suggestions based on your recent activity.
+#### ⚖️ Settlement Fixes
+- **Full INR⇄INR settle-up** now works correctly — balance and breakdown rows use the backend's `balanceCurrency`, not the user's display preference
+- **Friends list** now calculates per-pair dominant currency (INR-INR stays ₹, USD-USD stays $) matching the FriendDetails view — no more "$0.04 phantom" after settling
+- **Full settle clears all history** — old code kept the settle expense causing a phantom residual balance; now all history is deleted after a full settlement, leaving a clean $0
 
-#### 💰 Advanced Financial Features
-- **Partial Settlements:** Ability to record partial payments instead of just full balance clears.
-- **Individual Expense Settlement:** Settle specific bills within a group rather than just the total balance.
-- **Monthly Budgets:** Set spending limits and get visual warnings (orange balance) when approaching them.
-- **Default Split Methods:** Set your preferred split logic (Equal, Percentage, etc.) in settings.
-- **Privacy Mode:** "Hide Balance" feature to blur sensitive totals when using the app in public.
+#### 🛡️ Phantom Balance Guard
+- Backend now detects cross-currency pairs and snaps any residual < $0.50 to zero after full settlement
+- Backend static exchange rates synced between `currency.js` (backend) and `formatters.js` (frontend) — previously INR was 83.12 on backend vs 92.01 on frontend causing ~10% discrepancy
 
-#### 🔐 Security & Personalization
-- **Next-Gen Biometrics:** Secure your app with FaceID, TouchID, or Fingerprint (WebAuthn).
-- **Secure PIN Fallback:** Custom PIN lock for devices without biometric hardware.
-- **Profile Visibility:** Control whether people can find you via email discovery.
-- **Auto-Accept Friends:** Option to automatically approve friend requests from known contacts.
-- **Comprehensive Account Management:** Secure, verified account deletion flow.
+#### 📅 Daily Ad Frequency Cap
+- Users get **3 free expense additions per day** before the AdGate triggers
+- Counter resets every midnight (client local time) via `localStorage`
+- Scan receipt always shows an ad (premium AI feature — no daily cap)
 
-#### 🌍 Experience & Accessibility
-- **Multi-Language Support:** Now available in 10+ languages including Spanish, French, Hindi, and more.
-- **High Contrast Mode:** Enhanced UI visibility for better readability.
-- **Custom Localization:** Personalize date (MM/DD/YYYY vs DD/MM/YYYY) and time (12h/24h) formats.
-- **Payment Reminders:** Quick-share reminder templates for friends with outstanding balances.
+#### 🖼️ Internal Ad Image
+- `public/ads.png` now displays immediately inside AdGate while Google AdSense loads
+- Ensures users always see a visual during the sponsored wait period
 
-#### 🛠 Stability & Performance
-- **Global Error Boundary:** Improved app resilience with automated crash recovery and reporting.
-- **Cache Management:** Tools to clear local storage and fix sluggish behavior.
-- **Ad-Supported Access:** Integrated Google AdSense (AdGate) to unlock premium features for free.
-- **Refined Refactor:** Optimized 35+ core components for faster transitions and lower memory usage.
+#### ⚙️ Version System
+- New `src/version.js` central config — edit one file to update version across the entire app
 
-### v1.3.0 - The "Migration & Mobility" Update
-*Released: March 10, 2026*
-- **Splitwise Migration:** Full import support for Splitwise data.
-- **PWA Enhancement:** Custom install prompts for Android and iOS.
-- **Improved PDF Reporting:** Export detailed group settlement reports.
-- **Multi-Currency Fixes:** Enhanced historical data representation for non-USD accounts.
-
-### v1.2.0 - The "Security First" Update
-*Released: March 5, 2026*
-- **Biometric Lock:** Secure your app with FaceID/Fingerprint integration.
-- **Email OTP:** Two-factor authentication for registration and sensitive actions.
-- **Activity Feed:** Real-time notifications for expense additions and settlements.
-
-### v1.1.0 - The "Intelligence" Update
-*Released: February 25, 2026*
-- **AI Scan Bill:** Integrated Tesseract + Gemini for high-accuracy receipt parsing.
-- **itemized Splitting:** Ability to split specific items on a bill rather than just the total.
-- **Image Cloud Storage:** profile pictures and receipt images now stored securely via Oracle Cloud Infrastructure (OCI).
-
-### v1.0.0 - Initial Launch
-*Released: February 1, 2026*
-- **Core Groups:** Creation and management of expense groups.
-- **Friend System:** Add and invite friends via email.
-- **Expense Engine:** Percentage, exact amount, and equal split logic.
-- **Dashboard:** Real-time balance tracking.
+#### 🌙 Landing Page
+- Dark mode support added to landing page
+- Founder credits: Gnandeep Venigalla (GD Enterprises) & Sai Sujitha (CEO, Paywise)
 
 ---
 
-© 2026 Paywise App and Gd Enterprises. All rights reserved. Visit us at [www.paywiseapp.com](https://www.paywiseapp.com).
+### v1.4.0 — "Intelligence & Precision" Update
+*Released: March 24, 2026*
+
+#### 🤖 Paywise AI (Powered by Gemini)
+- Conversational expense addition, balance query, and deletion via natural language
+- Floating AI Assistant accessible from any page
+- Action confirmation UI before applying any AI-proposed change
+- Smart prompt suggestions based on recent activity
+
+#### 💰 Advanced Financial Features
+- Partial settlements for recording incremental payments
+- Individual expense settlement within a group
+- Monthly budget tracker with visual overage warnings
+- Default split method preferences in Settings
+- Privacy Mode (hide balances in public)
+
+#### 🔐 Security & Personalization
+- WebAuthn biometric lock (FaceID, TouchID, Fingerprint)
+- Secure PIN fallback for non-biometric devices
+- Profile visibility controls (email discovery toggle)
+- Auto-accept friends from known contacts
+- Verified account deletion flow
+
+#### 🌍 Accessibility
+- 10+ language support (Spanish, French, Hindi, and more)
+- High Contrast Mode
+- Custom date (MM/DD vs DD/MM) and time (12h/24h) formats
+- Payment reminder quick-share templates
+
+#### 🛠 Stability
+- Global Error Boundary with crash recovery
+- Cache management tools
+- AdSense + AdGate integration
+- 35+ component refactor for performance
+
+---
+
+### v1.3.0 — "Migration & Mobility" Update
+*Released: March 10, 2026*
+- Full Splitwise data import support
+- PWA install prompts for Android and iOS
+- Improved PDF settlement reports
+- Multi-currency historical data fixes
+
+### v1.2.0 — "Security First" Update
+*Released: March 5, 2026*
+- Biometric lock (FaceID / Fingerprint)
+- Email OTP two-factor authentication
+- Real-time activity feed and notifications
+
+### v1.1.0 — "Intelligence" Update
+*Released: February 25, 2026*
+- AI receipt scanning (Tesseract + Gemini)
+- Itemized splitting (assign specific items to specific people)
+- Profile pictures and receipt images on Oracle Cloud (OCI)
+
+### v1.0.0 — Initial Launch
+*Released: February 1, 2026*
+- Core group expense management
+- Friend system with email invites
+- Equal / percentage / exact split logic
+- Real-time balance dashboard
+
+---
+
+## 🚧 Running Locally
+
+```bash
+# Install dependencies
+npm install
+
+# Start the dev server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+---
+
+© 2026 Paywise App & GD Enterprises. All rights reserved.  
+Visit: [www.paywiseapp.com](https://www.paywiseapp.com) · Founded by Gnandeep Venigalla
