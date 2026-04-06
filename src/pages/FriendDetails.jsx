@@ -403,34 +403,44 @@ export default function FriendDetails() {
                 ? `Partial cash payment of ${formatCurrency(amt, displayCurrency)}`
                 : 'Cash settle up';
             const fullDesc = settleNote?.trim() ? `${baseDesc} — ${settleNote.trim()}` : baseDesc;
-            // POST the settle expense and capture its _id
-            const settleRes = await api.post('/expenses', {
-                description: fullDesc,
-                amount: amt,
-                currency: balanceCurrency,   // use exact balance currency, not displayCurrency
-                group: null,
-                paidBy: balance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
-                splits: [{
-                    user: balance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
-                    amount: amt
-                }]
-            });
-            const settleExpId = settleRes.data?._id;
 
             setShowSettleUp(false);
             setSettleNote('');
 
             if (!isPartial) {
-                // Full settle — clear the history but KEEP the settle expense so balance stays at $0
-                try {
-                    const keepParam = settleExpId ? `?keepId=${settleExpId}` : '';
-                    await api.delete(`/expenses/friends/${friend?._id || friend}/all${keepParam}`);
-                } catch (clearErr) {
-                    console.warn('[SettleClear] History clear failed (non-fatal):', clearErr.message);
-                }
-                // Navigate back — only the settle banner will remain, balance = $0
-                navigate(-1);
+                // Full settle — delete ALL history between the two users. The settlement itself
+                // cancels out the debt mathematically, so deleting everything leaves balance = $0.
+                // We post the settle expense first so the email/notification fires, then delete all.
+                await api.post('/expenses', {
+                    description: fullDesc,
+                    amount: amt,
+                    currency: balanceCurrency,
+                    group: null,
+                    paidBy: balance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
+                    splits: [{
+                        user: balance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
+                        amount: amt
+                    }]
+                });
+
+                // Delete ALL history (no keepId) — balance will be $0, no leftover entry
+                await api.delete(`/expenses/friends/${friend?._id || friend}/all`);
+
+                // Navigate back — history is clean, balance = $0
+                navigate('/friends');
             } else {
+                // Partial settle — just record the expense and refresh
+                await api.post('/expenses', {
+                    description: fullDesc,
+                    amount: amt,
+                    currency: balanceCurrency,
+                    group: null,
+                    paidBy: balance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
+                    splits: [{
+                        user: balance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
+                        amount: amt
+                    }]
+                });
                 fetchFriendDetails();
             }
         } catch (err) {
@@ -651,16 +661,18 @@ export default function FriendDetails() {
                                             if (!exp) return;
                                             const myId = user?.id || user?._id;
                                             const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
-                                            // Accumulate directly in displayCurrency to avoid double-conversion
+                                            // Use balanceCurrency (backend truth) so breakdown always matches the header.
+                                            // This ensures INR-INR pairs show ₹, USD-USD show $, etc.
                                             const sourceCurr = exp.currency || 'USD';
+                                            const targetCurr = balanceCurrency; // ← was displayCurrency (user pref), which caused mismatch
                                             let b = 0;
                                             
                                             if (isPaidByMe) {
                                                 const fSplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (friend?._id || friend?.id || friend));
-                                                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, displayCurrency) * 100) / 100;
+                                                if (fSplit) b = Math.round(convertAmount(fSplit.amount, sourceCurr, targetCurr) * 100) / 100;
                                             } else if ((exp.paidBy?._id || exp.paidBy) === (friend?._id || friend?.id || friend)) {
                                                 const mySplit = (exp.splits || []).find(s => (s?.user?._id || s?.user) === (user?.id || user?._id));
-                                                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, displayCurrency) * 100) / 100;
+                                                if (mySplit) b = -Math.round(convertAmount(mySplit.amount, sourceCurr, targetCurr) * 100) / 100;
                                             }
 
                                             if (b !== 0) {
@@ -677,8 +689,8 @@ export default function FriendDetails() {
                                                     {(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes' : 'gets back'} in <span className="font-bold text-gray-800">{item.name === 'non-group expenses' ? 'Direct' : `"${item.name}"`}</span>
                                                 </span>
                                                 <span className={`font-black whitespace-nowrap ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                    {/* Amount is already in displayCurrency — pass it as source to avoid re-conversion */}
-                                                    {formatCurrency(Math.abs(item.balance), displayCurrency, displayCurrency)}
+                                                    {/* Amount is in balanceCurrency — render directly, no re-conversion */}
+                                                    {formatCurrency(Math.abs(item.balance), balanceCurrency, balanceCurrency)}
                                                 </span>
                                             </div>
                                         ));
@@ -1835,21 +1847,21 @@ export default function FriendDetails() {
                                     const remaining = Math.max(0, balanceInDisplay - (parseFloat(partialAmount) || 0));
                                     return (
                                         <>
-                                            <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay ({displayCurrency})</label>
+                                            <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay ({balanceCurrency})</label>
                                             <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-emerald-600 rounded-xl px-4 py-3 transition bg-white">
-                                                <span className="text-gray-500 font-bold text-[16px] flex-shrink-0">{CURRENCY_SYMBOLS[displayCurrency] || '$'}</span>
+                                                <span className="text-gray-500 font-bold text-[16px] flex-shrink-0">{CURRENCY_SYMBOLS[balanceCurrency] || '$'}</span>
                                                 <input
                                                     type="number"
                                                     min="0.01"
                                                     step="0.01"
                                                     max={balanceInDisplay}
-                                                    placeholder={`Max ${formatCurrency(balanceInDisplay, displayCurrency)}`}
+                                                    placeholder={`Max ${formatCurrency(balanceInDisplay, balanceCurrency, balanceCurrency)}`}
                                                     value={partialAmount}
                                                     onChange={e => setPartialAmount(e.target.value)}
                                                     className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
                                                 />
                                             </div>
-                                            <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(remaining, displayCurrency)}</p>
+                                            <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(remaining, balanceCurrency, balanceCurrency)}</p>
                                         </>
                                     );
                                 })()}
