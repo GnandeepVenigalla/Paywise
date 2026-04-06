@@ -198,14 +198,14 @@ export default function Friends() {
                             <div className="flex flex-col items-end">
                                 <span className="text-[11px] font-black uppercase tracking-tight text-emerald-500/80 mb-0.5">owes you</span>
                                 <span className="text-[16px] font-black text-emerald-500 leading-none">
-                                    {formatCurrency(Math.abs(bal), user.defaultCurrency)}
+                                    {formatCurrency(Math.abs(bal), friend.balanceCurrency || user.defaultCurrency, friend.balanceCurrency || user.defaultCurrency)}
                                 </span>
                             </div>
                         ) : bal < -0.01 ? (
                             <div className="flex flex-col items-end">
                                 <span className="text-[11px] font-black uppercase tracking-tight text-rose-500/80 mb-0.5">you owe</span>
                                 <span className="text-[16px] font-black text-rose-600 leading-none">
-                                    {formatCurrency(Math.abs(bal), user.defaultCurrency)}
+                                    {formatCurrency(Math.abs(bal), friend.balanceCurrency || user.defaultCurrency, friend.balanceCurrency || user.defaultCurrency)}
                                 </span>
                             </div>
                         ) : (
