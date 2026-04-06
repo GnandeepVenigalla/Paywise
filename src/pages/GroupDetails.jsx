@@ -113,6 +113,21 @@ export default function GroupDetails() {
         }
     }, [monthlySpending]);
 
+    // Detect the dominant currency from actual expenses.
+    // If all expenses share one currency (e.g. all INR) → balances stay in that currency, zero conversion.
+    // If expenses are mixed (some INR, some USD) → normalise through USD as a common base.
+    const groupCurrency = useMemo(() => {
+        if (!expenses || expenses.length === 0) return 'USD';
+        const totals = {};
+        expenses.forEach(exp => {
+            if (!exp.currency) return;
+            const c = exp.currency.toUpperCase();
+            totals[c] = (totals[c] || 0) + (exp.amount || 0);
+        });
+        const currencies = Object.keys(totals);
+        return currencies.length === 1 ? currencies[0] : 'USD';
+    }, [expenses]);
+
     const pairwiseBalances = useMemo(() => {
         if (!group?.members || !expenses || !user) return {};
         let pairwise = {};
@@ -130,12 +145,11 @@ export default function GroupDetails() {
         expenses.forEach(exp => {
             if (exp.amount < 0.005) return;
             const creditorId = String(exp.paidBy?._id || exp.paidBy);
-            const sourceCurr = exp.currency || 'USD';
-            const targetCurr = 'USD';
+            const sourceCurr = (exp.currency || groupCurrency).toUpperCase();
             exp.splits.forEach(split => {
                 const debtorId = String(split.user?._id || split.user);
                 if (debtorId !== creditorId && pairwise[debtorId] && pairwise[debtorId][creditorId] !== undefined) {
-                    const convertedAmount = Math.round(convertAmount(split.amount, sourceCurr, targetCurr) * 100) / 100;
+                    const convertedAmount = Math.round(convertAmount(split.amount, sourceCurr, groupCurrency) * 100) / 100;
                     pairwise[debtorId][creditorId] += convertedAmount;
                     pairwise[debtorId][creditorId] = Math.round(pairwise[debtorId][creditorId] * 100) / 100;
                 }
@@ -148,7 +162,6 @@ export default function GroupDetails() {
             let netBalances = {};
             memberIds.forEach(id => netBalances[id] = 0);
 
-            // Calculate exact net balance for each person
             memberIds.forEach(a => {
                 memberIds.forEach(b => {
                     if (a !== b) {
@@ -160,7 +173,6 @@ export default function GroupDetails() {
                 });
             });
 
-            // Reset pairwise to 0
             memberIds.forEach(a => {
                 memberIds.forEach(b => {
                     if (a !== b) pairwise[a][b] = 0;
@@ -183,14 +195,9 @@ export default function GroupDetails() {
                 const debtor = debtors[i];
                 const creditor = creditors[j];
                 const amount = Math.min(debtor.amount, creditor.amount);
-
-                if (amount > 0.005) {
-                    pairwise[debtor.id][creditor.id] = amount;
-                }
-
+                if (amount > 0.005) pairwise[debtor.id][creditor.id] = amount;
                 debtor.amount -= amount;
                 creditor.amount -= amount;
-
                 if (debtor.amount < 0.005) i++;
                 if (creditor.amount < 0.005) j++;
             }
@@ -212,7 +219,7 @@ export default function GroupDetails() {
             }
         }
         return pairwise;
-    }, [group, expenses, user, simplifyDebts]);
+    }, [group, expenses, user, simplifyDebts, groupCurrency]);
 
     const formatName = (username) => {
         if (!username) return 'Unknown';
@@ -467,7 +474,7 @@ export default function GroupDetails() {
             !item.parentLoan &&
             !item.isLoan &&
             !(item.description?.toLowerCase().includes('interest') || item.description?.toLowerCase().includes('intrest')) &&
-            item.amount >= 0.005
+            item.amount >= 0.50
         )
         .sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -724,7 +731,7 @@ export default function GroupDetails() {
                         /* Overall balance summary — clean like Splitwise */
                         <>
                             <div className="mb-3">
-                                {myBalance === 0 ? (
+                                {Math.abs(myBalance) < 0.50 ? (
                                     <div className="flex items-center gap-3 flex-wrap">
                                         <p className="text-[17px] font-bold text-gray-700">You are all settled up</p>
                                         {expenses?.length > 0 && (
@@ -748,7 +755,7 @@ export default function GroupDetails() {
                                     <p className="text-[17px] font-bold text-gray-800">
                                         You are owed{' '}
                                         <span className={`text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                            {formatCurrency(myBalance, displayCurrency)}
+                                            {formatCurrency(myBalance, displayCurrency, groupCurrency)}
                                         </span>
                                         {' '}overall
                                     </p>
@@ -756,7 +763,7 @@ export default function GroupDetails() {
                                     <p className="text-[17px] font-bold text-gray-800">
                                         You owe{' '}
                                         <span className={`text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>
-                                            {formatCurrency(myBalance, displayCurrency)}
+                                            {formatCurrency(Math.abs(myBalance), displayCurrency, groupCurrency)}
                                         </span>
                                         {' '}overall
                                     </p>
@@ -768,7 +775,7 @@ export default function GroupDetails() {
                                         let othersBalances = [];
                                         [...(group.members || []), ...(group.pastMembers || [])].filter(m => m._id !== user.id).forEach(member => {
                                             const b = (pairwiseBalances[member._id]?.[user.id] || 0) - (pairwiseBalances[user.id]?.[member._id] || 0);
-                                            if (Math.abs(b) > 0.001) othersBalances.push({ member, b });
+                                            if (Math.abs(b) >= 0.50) othersBalances.push({ member, b });
                                         });
                                         if (othersBalances.length === 0) return null;
                                         const [first, second, ...rest] = othersBalances;
@@ -777,18 +784,18 @@ export default function GroupDetails() {
                                                 {first && (
                                                     <p className="text-[14px] text-gray-500">
                                                         {first.b > 0 ? (
-                                                            <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency)}</span></>
+                                                            <>{first.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency, groupCurrency)}</span></>
                                                         ) : (
-                                                            <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency)}</span></>
+                                                            <>You owe {first.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(first.b), displayCurrency, groupCurrency)}</span></>
                                                         )}
                                                     </p>
                                                 )}
                                                 {second && (
                                                     <p className="text-[14px] text-gray-500">
                                                         {second.b > 0 ? (
-                                                            <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency)}</span></>
+                                                            <>{second.member.username} owes you <span className={`font-semibold text-emerald-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency, groupCurrency)}</span></>
                                                         ) : (
-                                                            <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency)}</span></>
+                                                            <>You owe {second.member.username} <span className={`font-semibold text-rose-500 ${hideBalance ? 'privacy-blur' : ''}`}>{formatCurrency(Math.abs(second.b), displayCurrency, groupCurrency)}</span></>
                                                         )}
                                                     </p>
                                                 )}
@@ -1174,7 +1181,7 @@ export default function GroupDetails() {
                                 const iOwe = pairwiseBalances[myId]?.[otherMemberId] || 0;
                                 const theyOwe = pairwiseBalances[otherMemberId]?.[myId] || 0;
                                 const netUSD = Math.abs(theyOwe - iOwe);
-                                if (netUSD < 0.01) return null;
+                                if (netUSD < 0.50) return null;
 
                                 return (
                                     <button
@@ -1282,12 +1289,12 @@ export default function GroupDetails() {
                                             {b < 0 ? (
                                                 <>
                                                     <p className="text-[11px] font-medium text-rose-600 uppercase tracking-wide">owes</p>
-                                                    <p className="text-[19px] font-medium text-rose-600 leading-tight">{formatCurrency(b, displayCurrency)}</p>
+                                                    <p className="text-[19px] font-medium text-rose-600 leading-tight">{formatCurrency(Math.abs(b), displayCurrency, groupCurrency)}</p>
                                                 </>
                                             ) : b > 0 ? (
                                                 <>
                                                     <p className="text-[11px] font-medium text-emerald-700 uppercase tracking-wide">gets back</p>
-                                                    <p className="text-[19px] font-medium text-emerald-800 leading-tight">{formatCurrency(b, displayCurrency)}</p>
+                                                    <p className="text-[19px] font-medium text-emerald-800 leading-tight">{formatCurrency(b, displayCurrency, groupCurrency)}</p>
                                                 </>
                                             ) : (
                                                 <p className="text-[15px] font-medium text-gray-400 mt-2">settled up</p>
@@ -1499,12 +1506,12 @@ export default function GroupDetails() {
                             {getMemberNetBalance(selectedMemberModal._id) < 0 ? (
                                 <>
                                     <p className="text-[11px] font-medium text-rose-600 uppercase tracking-wide">owes</p>
-                                    <p className="text-[20px] font-medium text-rose-600 leading-none mt-0.5">{formatCurrency(Math.abs(getMemberNetBalance(selectedMemberModal._id)), user?.defaultCurrency)}</p>
+                                    <p className="text-[20px] font-medium text-rose-600 leading-none mt-0.5">{formatCurrency(Math.abs(getMemberNetBalance(selectedMemberModal._id)), displayCurrency, groupCurrency)}</p>
                                 </>
                             ) : getMemberNetBalance(selectedMemberModal._id) > 0 ? (
                                 <>
                                     <p className="text-[11px] font-medium text-slate-900 uppercase tracking-wide">gets back</p>
-                                    <p className="text-[20px] font-medium text-slate-900 leading-none mt-0.5">{formatCurrency(getMemberNetBalance(selectedMemberModal._id), user?.defaultCurrency)}</p>
+                                    <p className="text-[20px] font-medium text-slate-900 leading-none mt-0.5">{formatCurrency(getMemberNetBalance(selectedMemberModal._id), displayCurrency, groupCurrency)}</p>
                                 </>
                             ) : (
                                 <p className="text-[16px] font-medium text-gray-400">settled up</p>
@@ -1687,9 +1694,9 @@ export default function GroupDetails() {
                                                 </p>
                                                 <p className="text-[14px] font-medium leading-snug mt-0.5">
                                                     {b < 0 ? (
-                                                        <span className="text-rose-600">owes {formatCurrency(Math.abs(b), displayCurrency)}</span>
+                                                        <span className="text-rose-600">owes {formatCurrency(Math.abs(b), displayCurrency, groupCurrency)}</span>
                                                     ) : b > 0 ? (
-                                                        <span className="text-emerald-500">gets back {formatCurrency(b, displayCurrency)}</span>
+                                                        <span className="text-emerald-500">gets back {formatCurrency(b, displayCurrency, groupCurrency)}</span>
                                                     ) : (
                                                         <span className="text-gray-400">is settled up</span>
                                                     )}
@@ -2135,17 +2142,16 @@ export default function GroupDetails() {
                     const settleList = allMembers
                         .filter(m => m._id !== myId)
                         .map(m => {
-                            const iOwe = (pairwiseBalances[myId]?.[m._id] || 0);   // USD
-                            const theyOwe = (pairwiseBalances[m._id]?.[myId] || 0); // USD
-                            const netUSD = theyOwe - iOwe;
-                            // Convert the USD net to the display currency so full settle
-                            // posts the correct amount in the correct currency
+                            const iOwe = (pairwiseBalances[myId]?.[m._id] || 0);   // in groupCurrency
+                            const theyOwe = (pairwiseBalances[m._id]?.[myId] || 0); // in groupCurrency
+                            const netGroupCurr = theyOwe - iOwe;
+                            // Convert from group's native currency to viewer's displayCurrency
                             const netInDisplay = Math.round(
-                                convertAmount(Math.abs(netUSD), 'USD', displayCurrency) * 100
+                                convertAmount(Math.abs(netGroupCurr), groupCurrency, displayCurrency) * 100
                             ) / 100;
-                            return { member: m, amount: netInDisplay, iOwe: netUSD < 0 };
+                            return { member: m, amount: netInDisplay, iOwe: netGroupCurr < 0 };
                         })
-                        .filter(r => r.amount > 0.005);
+                        .filter(r => r.amount >= 0.50);
 
                     const handleGroupCashSettle = async (isPartial) => {
                         if (!settleUpTarget) return;

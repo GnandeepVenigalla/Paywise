@@ -123,10 +123,19 @@ export default function FriendDetails() {
         }
     };
 
-    // Extract monthly spending aggregation logic to custom hook
-    // Pass user.defaultCurrency so chart amounts are consistently converted
     const displayCurrency = user?.defaultCurrency || 'USD';
     const monthlySpending = useMonthlySpending(expenses, user, displayCurrency);
+
+    // Balance in the viewer's own currency.
+    // For same-currency pairs (INR↔INR, USD↔USD) this is identical to the raw balance — no conversion.
+    // For cross-currency pairs (INR↔USD) the backend returns USD; we convert to the viewer's currency here.
+    const viewerBalanceCurrency = (balanceCurrency && balanceCurrency !== displayCurrency)
+        ? displayCurrency
+        : (balanceCurrency || displayCurrency);
+    const viewerBalance = useMemo(() => {
+        if (!balance || !balanceCurrency || balanceCurrency === displayCurrency) return balance;
+        return Math.round(convertAmount(balance, balanceCurrency, displayCurrency) * 100) / 100;
+    }, [balance, balanceCurrency, displayCurrency]);
 
     useEffect(() => {
         if (monthlySpending.length > 0) {
@@ -385,22 +394,24 @@ export default function FriendDetails() {
     };
 
     const handleCashSettle = async (isPartial) => {
-        // balance is already in balanceCurrency (native currency — no conversion needed)
-        const balanceInDisplay = Math.round(Math.abs(balance) * 100) / 100;
-        const maxBalanceInDisplay = Math.round((Math.abs(balance) + 0.005) * 100) / 100;
+        // Use viewerBalance (already in viewer's own currency) for all settle logic.
+        // For pure INR-INR or USD-USD: viewerBalance === balance, viewerBalanceCurrency === balanceCurrency.
+        // For mixed pairs (Case 3): viewerBalance is converted to viewer's own currency.
+        const balanceInDisplay = Math.round(Math.abs(viewerBalance) * 100) / 100;
+        const maxBalanceInDisplay = Math.round((Math.abs(viewerBalance) + 0.005) * 100) / 100;
         const amt = Math.round((isPartial ? parseFloat(partialAmount) : balanceInDisplay) * 100) / 100;
         if (isNaN(amt) || amt <= 0) {
             alert('Please enter a valid amount.');
             return;
         }
         if (amt > maxBalanceInDisplay) {
-            alert(`Amount cannot exceed ${formatCurrency(balanceInDisplay, balanceCurrency, balanceCurrency)}.`);
+            alert(`Amount cannot exceed ${formatCurrency(balanceInDisplay, viewerBalanceCurrency, viewerBalanceCurrency)}.`);
             return;
         }
         setIsSettling(true);
         try {
             const baseDesc = isPartial
-                ? `Partial cash payment of ${formatCurrency(amt, balanceCurrency, balanceCurrency)}`
+                ? `Partial cash payment of ${formatCurrency(amt, viewerBalanceCurrency, viewerBalanceCurrency)}`
                 : 'Cash settle up';
             const fullDesc = settleNote?.trim() ? `${baseDesc} — ${settleNote.trim()}` : baseDesc;
 
@@ -408,36 +419,31 @@ export default function FriendDetails() {
             setSettleNote('');
 
             if (!isPartial) {
-                // Full settle — delete ALL history between the two users. The settlement itself
-                // cancels out the debt mathematically, so deleting everything leaves balance = $0.
-                // We post the settle expense first so the email/notification fires, then delete all.
+                // Full settle — post in viewer's currency, then delete all history
                 await api.post('/expenses', {
                     description: fullDesc,
                     amount: amt,
-                    currency: balanceCurrency,
+                    currency: viewerBalanceCurrency,
                     group: null,
-                    paidBy: balance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
+                    paidBy: viewerBalance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
                     splits: [{
-                        user: balance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
+                        user: viewerBalance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
                         amount: amt
                     }]
                 });
 
-                // Delete ALL history (no keepId) — balance will be $0, no leftover entry
                 await api.delete(`/expenses/friends/${friend?._id || friend}/all`);
-
-                // Navigate back — history is clean, balance = $0
                 navigate('/friends');
             } else {
-                // Partial settle — just record the expense and refresh
+                // Partial settle — record in viewer's currency and refresh
                 await api.post('/expenses', {
                     description: fullDesc,
                     amount: amt,
-                    currency: balanceCurrency,
+                    currency: viewerBalanceCurrency,
                     group: null,
-                    paidBy: balance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
+                    paidBy: viewerBalance > 0 ? (friend?._id || friend) : (user?.id || user?._id),
                     splits: [{
-                        user: balance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
+                        user: viewerBalance > 0 ? (user?.id || user?._id) : (friend?._id || friend),
                         amount: amt
                     }]
                 });
@@ -607,13 +613,13 @@ export default function FriendDetails() {
                     <div className="mb-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                         <div className="flex items-center justify-between mb-3 border-b border-gray-200 pb-3">
                             <span className="text-[13px] font-bold text-gray-500 uppercase tracking-widest">Current Standing</span>
-                            {Math.abs(balance) >= 0.01 ? (
+                            {Math.abs(viewerBalance) >= 0.50 ? (
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium text-gray-500">
-                                        {balance > 0 ? 'owes you' : 'you owe'}
+                                        {viewerBalance > 0 ? 'owes you' : 'you owe'}
                                     </span>
-                                    <span className={`text-2xl font-black tracking-tight ${balance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
-                                        {formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency)}
+                                    <span className={`text-2xl font-black tracking-tight ${viewerBalance > 0 ? 'text-emerald-500' : 'text-rose-500'} ${hideBalance ? 'privacy-blur' : ''}`}>
+                                        {formatCurrency(Math.abs(viewerBalance), viewerBalanceCurrency, viewerBalanceCurrency)}
                                     </span>
                                 </div>
                             ) : (
@@ -630,13 +636,13 @@ export default function FriendDetails() {
                                             <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70">Next Month Interest</p>
                                         </div>
                                         <p className="text-[18px] font-black text-emerald-900 leading-none">
-                                            {formatCurrency(interestStats.projectedMonthly, user?.defaultCurrency)}
+                                            {formatCurrency(interestStats.projectedMonthly, viewerBalanceCurrency)}
                                         </p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700/70 mb-1">Projected Bill</p>
                                         <p className="text-[20px] font-black text-emerald-950 leading-none">
-                                            {formatCurrency(Math.abs(balance) + interestStats.projectedMonthly, balanceCurrency, balanceCurrency)}
+                                            {formatCurrency(Math.abs(viewerBalance) + interestStats.projectedMonthly, viewerBalanceCurrency, viewerBalanceCurrency)}
                                         </p>
                                     </div>
                                 </div>
@@ -646,7 +652,7 @@ export default function FriendDetails() {
                                             <i className="pi pi-sparkles text-[10px]"></i> Total Interest Added
                                         </span>
                                         <span className="text-[13px] font-black text-emerald-800">
-                                            {formatCurrency(interestStats.totalAccrued, user?.defaultCurrency)}
+                                            {formatCurrency(interestStats.totalAccrued, viewerBalanceCurrency)}
                                         </span>
                                     </div>
                                 )}
@@ -661,10 +667,9 @@ export default function FriendDetails() {
                                             if (!exp) return;
                                             const myId = user?.id || user?._id;
                                             const isPaidByMe = exp.paidBy?._id === myId || exp.paidBy === myId;
-                                            // Use balanceCurrency (backend truth) so breakdown always matches the header.
-                                            // This ensures INR-INR pairs show ₹, USD-USD show $, etc.
-                                            const sourceCurr = exp.currency || 'USD';
-                                            const targetCurr = balanceCurrency; // ← was displayCurrency (user pref), which caused mismatch
+                                            // Always convert to viewerBalanceCurrency so breakdown matches the header
+                                            const sourceCurr = exp.currency || viewerBalanceCurrency;
+                                            const targetCurr = viewerBalanceCurrency;
                                             let b = 0;
                                             
                                             if (isPaidByMe) {
@@ -683,14 +688,14 @@ export default function FriendDetails() {
                                             }
                                         });
 
-                                        return Object.values(breakdowns).filter(item => Math.abs(item.balance) > 0.01).map((item, idx) => (
+                                        // Snap tiny residuals & filter — same 0.50 guard as the header
+                                        return Object.values(breakdowns).filter(item => Math.abs(item.balance) >= 0.50).map((item, idx) => (
                                             <div key={idx} className="flex justify-between items-center text-[13.5px] bg-white/50 p-2 rounded-lg border border-gray-100">
                                                 <span className="text-gray-600 font-medium truncate pr-4">
                                                     {(friend?.username || 'Friend').split(' ')[0]} {item.balance > 0 ? 'owes' : 'gets back'} in <span className="font-bold text-gray-800">{item.name === 'non-group expenses' ? 'Direct' : `"${item.name}"`}</span>
                                                 </span>
                                                 <span className={`font-black whitespace-nowrap ${item.balance > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                    {/* Amount is in balanceCurrency — render directly, no re-conversion */}
-                                                    {formatCurrency(Math.abs(item.balance), balanceCurrency, balanceCurrency)}
+                                                    {formatCurrency(Math.abs(item.balance), viewerBalanceCurrency, viewerBalanceCurrency)}
                                                 </span>
                                             </div>
                                         ));
@@ -699,7 +704,7 @@ export default function FriendDetails() {
                     </div>
 
                     <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide items-center">
-                        {Math.abs(balance) >= 0.01 && (
+                        {Math.abs(viewerBalance) >= 0.50 && (
                         <button onClick={openSettleUp} className="bg-[#e11d48] text-white px-5 py-2 rounded-lg hover:bg-[#be123c] font-bold shadow-sm whitespace-nowrap transition">
                             Settle up
                         </button>
@@ -708,8 +713,8 @@ export default function FriendDetails() {
                             onClick={() => {
                                 if (!friend) return;
                                 // Build a professional pre-filled email draft
-                                const absAmtFormatted = formatCurrency(Math.abs(balance), balanceCurrency, balanceCurrency);
-                                const draft = balance > 0
+                                const absAmtFormatted = formatCurrency(Math.abs(viewerBalance), viewerBalanceCurrency, viewerBalanceCurrency);
+                                const draft = viewerBalance > 0
                                     ? `Hi ${friend.username},\n\nI hope you're doing well! I just wanted to send a quick, friendly reminder that you have an outstanding balance of ${absAmtFormatted} on Paywise.\n\nWhenever you get a chance, please settle up — you can do it directly in the app.\n\nThanks so much! 😊\n\n${user.username}`
                                     : `Hi ${friend.username},\n\nJust a heads-up — I have a balance of ${absAmtFormatted} that I owe you on Paywise. I'll take care of it soon!\n\nThanks,\n${user.username}`;
                                 setReminderEmailBody(draft);
@@ -1810,9 +1815,9 @@ export default function FriendDetails() {
                                     </div>
                                 </div>
                                 {(() => {
-                                    const balInDisplay = Math.round(Math.abs(balance) * 100) / 100;
+                                    const balInDisplay = Math.round(Math.abs(viewerBalance) * 100) / 100;
                                     return (
-                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balInDisplay, balanceCurrency, balanceCurrency)}</span>
+                                        <span className="text-[17px] font-bold text-slate-900">{formatCurrency(balInDisplay, viewerBalanceCurrency, viewerBalanceCurrency)}</span>
                                     );
                                 })()}
                             </button>
@@ -1843,25 +1848,25 @@ export default function FriendDetails() {
                             {/* Partial input */}
                             <div className="mt-4">
                                 {(() => {
-                                    const balanceInDisplay = Math.round(Math.abs(balance) * 100) / 100;
+                                    const balanceInDisplay = Math.round(Math.abs(viewerBalance) * 100) / 100;
                                     const remaining = Math.max(0, balanceInDisplay - (parseFloat(partialAmount) || 0));
                                     return (
                                         <>
-                                            <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay ({balanceCurrency})</label>
+                                            <label className="text-[14px] font-bold text-gray-600 mb-2 block">Amount to pay ({viewerBalanceCurrency})</label>
                                             <div className="flex items-center gap-2 border-2 border-gray-200 focus-within:border-emerald-600 rounded-xl px-4 py-3 transition bg-white">
-                                                <span className="text-gray-500 font-bold text-[16px] flex-shrink-0">{CURRENCY_SYMBOLS[balanceCurrency] || '$'}</span>
+                                                <span className="text-gray-500 font-bold text-[16px] flex-shrink-0">{CURRENCY_SYMBOLS[viewerBalanceCurrency] || '$'}</span>
                                                 <input
                                                     type="number"
                                                     min="0.01"
                                                     step="0.01"
                                                     max={balanceInDisplay}
-                                                    placeholder={`Max ${formatCurrency(balanceInDisplay, balanceCurrency, balanceCurrency)}`}
+                                                    placeholder={`Max ${formatCurrency(balanceInDisplay, viewerBalanceCurrency, viewerBalanceCurrency)}`}
                                                     value={partialAmount}
                                                     onChange={e => setPartialAmount(e.target.value)}
                                                     className="flex-1 outline-none text-[18px] font-bold text-gray-900 bg-transparent placeholder-gray-300"
                                                 />
                                             </div>
-                                            <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(remaining, balanceCurrency, balanceCurrency)}</p>
+                                            <p className="text-[12px] text-gray-400 mt-1.5 ml-1">Balance remaining: {formatCurrency(remaining, viewerBalanceCurrency, viewerBalanceCurrency)}</p>
                                         </>
                                     );
                                 })()}
