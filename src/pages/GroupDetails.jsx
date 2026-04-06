@@ -725,7 +725,25 @@ export default function GroupDetails() {
                         <>
                             <div className="mb-3">
                                 {myBalance === 0 ? (
-                                    <p className="text-[17px] font-bold text-gray-700">You are all settled up</p>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <p className="text-[17px] font-bold text-gray-700">You are all settled up</p>
+                                        {expenses?.length > 0 && (
+                                            <button
+                                                onClick={async () => {
+                                                    if (!window.confirm('Clear all expense history for this group? This cannot be undone.')) return;
+                                                    try {
+                                                        await api.delete(`/expenses/group/${id}/all`);
+                                                        fetchGroup();
+                                                    } catch (e) {
+                                                        alert('Failed to clear history.');
+                                                    }
+                                                }}
+                                                className="text-[12px] font-bold text-rose-500 border border-rose-200 bg-rose-50 px-3 py-1 rounded-full hover:bg-rose-100 transition whitespace-nowrap"
+                                            >
+                                                🗑 Clear history
+                                            </button>
+                                        )}
+                                    </div>
                                 ) : myBalance > 0 ? (
                                     <p className="text-[17px] font-bold text-gray-800">
                                         You are owed{' '}
@@ -2145,7 +2163,9 @@ export default function GroupDetails() {
                             const payerId = settleUpTarget.iOwe ? myId : settleUpTarget.member._id;
                             const receiverId = settleUpTarget.iOwe ? settleUpTarget.member._id : myId;
                             await api.post('/expenses', {
-                                description: isPartial ? `Partial cash payment of ${formatCurrency(amt, displayCurrency)}` : 'Cash settle up',
+                                description: isPartial
+                                    ? `Partial cash payment of ${formatCurrency(amt, displayCurrency, displayCurrency)}`
+                                    : 'Cash settle up',
                                 // Post in displayCurrency so backend stores the correct amount
                                 amount: amt,
                                 currency: displayCurrency,
@@ -2153,8 +2173,15 @@ export default function GroupDetails() {
                                 paidBy: payerId,
                                 splits: [{ user: receiverId, amount: amt }]
                             });
+
+                            if (!isPartial) {
+                                // Full settlement — wipe entire group history for a clean $0 state
+                                await api.delete(`/expenses/group/${id}/all`);
+                            }
+
                             setShowGroupSettleUp(false);
                             setSettleUpTarget(null);
+                            setGroupPartialAmount('');
                             fetchGroup();
                         } catch (err) {
                             alert('Failed to record settlement.');

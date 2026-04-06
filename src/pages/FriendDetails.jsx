@@ -394,13 +394,13 @@ export default function FriendDetails() {
             return;
         }
         if (amt > maxBalanceInDisplay) {
-            alert(`Amount cannot exceed ${formatCurrency(balanceInDisplay, displayCurrency)}.`);
+            alert(`Amount cannot exceed ${formatCurrency(balanceInDisplay, balanceCurrency, balanceCurrency)}.`);
             return;
         }
         setIsSettling(true);
         try {
             const baseDesc = isPartial
-                ? `Partial cash payment of ${formatCurrency(amt, displayCurrency)}`
+                ? `Partial cash payment of ${formatCurrency(amt, balanceCurrency, balanceCurrency)}`
                 : 'Cash settle up';
             const fullDesc = settleNote?.trim() ? `${baseDesc} — ${settleNote.trim()}` : baseDesc;
 
