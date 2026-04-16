@@ -32,6 +32,11 @@ export default function AddFriendExpense() {
     const [currency, setCurrency] = useState(user?.defaultCurrency || 'USD');
     const [showCurrencyModal, setShowCurrencyModal] = useState(false);
 
+    // Recurring bill state
+    const [isRecurring, setIsRecurring] = useState(false);
+    const [recurrenceFrequency, setRecurrenceFrequency] = useState('monthly');
+    const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+
     // UI State
     const [showSplitModal, setShowSplitModal] = useState(false);
 
@@ -66,7 +71,11 @@ export default function AddFriendExpense() {
         try {
             let splitsArray;
             const total = parseFloat(amount);
-            if (splitMethod === 'full') {
+            const isSelfExpense = id === user?.id || id === user?._id;
+
+            if (isSelfExpense) {
+                splitsArray = [{ user: user?.id || user?._id, amount: total }];
+            } else if (splitMethod === 'full') {
                 const other = paidBy === user.id ? friend?._id : user.id;
                 splitsArray = [{ user: other, amount: total }];
             } else {
@@ -85,7 +94,10 @@ export default function AddFriendExpense() {
                 paidBy: paidBy,
                 splits: splitsArray,
                 isLoan: isLoan,
-                loanInterestRate: isLoan ? loanInterestRate : 0
+                loanInterestRate: isLoan ? loanInterestRate : 0,
+                isRecurring: isSelfExpense ? false : isRecurring,
+                recurrenceFrequency: (!isSelfExpense && isRecurring) ? recurrenceFrequency : undefined,
+                recurrenceEndDate: (!isSelfExpense && isRecurring && recurrenceEndDate) ? recurrenceEndDate : undefined
             });
 
             if (billImage) {
@@ -116,6 +128,7 @@ export default function AddFriendExpense() {
     const friendName = friend?.username || 'Friend';
 
     const getSummaryText = () => {
+        if (id === user?.id || id === user?._id) return 'Personal Expense';
         const payer = paidBy === user.id ? 'you' : friendName;
         if (splitMethod === 'equally') return `Paid by ${payer} and split equally`;
         if (splitMethod === 'full') return paidBy === user.id ? `You are owed the full amount` : `${friendName} is owed the full amount`;
@@ -243,11 +256,11 @@ export default function AddFriendExpense() {
 
                     {/* Split Action Pill */}
                     <button
-                        onClick={() => parsedAmount > 0 && setShowSplitModal(true)}
+                        onClick={() => parsedAmount > 0 && id !== user?.id && id !== user?._id && setShowSplitModal(true)}
                         className={`mt-4 px-4 py-2 border rounded-[6px] text-[14px] shadow-sm transition ${parsedAmount > 0
                             ? 'bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer active:bg-gray-100 dark:active:bg-slate-600'
                             : 'bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
-                            }`}
+                            } ${(id === user?.id || id === user?._id) && parsedAmount > 0 ? 'pointer-events-none' : ''}`}
                         title={parsedAmount <= 0 ? "Please enter an amount first" : ""}
                     >
                         {getSummaryText()}
@@ -302,39 +315,86 @@ export default function AddFriendExpense() {
                 </div>
 
                 {/* Loan Option */}
-                <div className="w-full max-w-[280px] mt-8 p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/50">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <i className={`pi pi-briefcase text-[18px] ${isLoan ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`} />
-                            <span className="text-[15px] font-bold text-gray-800 dark:text-gray-100">Treat as Loan?</span>
-                        </div>
-                        <div className="flex-shrink-0">
-                            <Toggle checked={isLoan} onChange={setIsLoan} />
-                        </div>
-                    </div>
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug">
-                        Loans can have custom interest rates applied automatically.
-                    </p>
-
-                    {isLoan && (
-                        <div className="mt-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <label className="text-[11px] font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest mb-1.5 block">Annual Interest Rate (%)</label>
-                            <div className="relative">
-                                <InputNumber
-                                    value={loanInterestRate === 0 ? null : loanInterestRate}
-                                    onValueChange={(e) => setLoanInterestRate(e.value || 0)}
-                                    mode="decimal"
-                                    minFractionDigits={1}
-                                    maxFractionDigits={1}
-                                    suffix=" %"
-                                    className="w-full"
-                                    inputClassName="w-full bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-900/50 rounded-xl py-2 px-3 text-[18px] font-bold text-emerald-900 dark:text-emerald-300 outline-none"
-                                    placeholder="0.0"
-                                />
+                {id !== user?.id && id !== user?._id && (
+                    <div className="w-full max-w-[280px] mt-8 p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/50">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <i className={`pi pi-briefcase text-[18px] ${isLoan ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`} />
+                                <span className="text-[15px] font-bold text-gray-800 dark:text-gray-100">Treat as Loan?</span>
+                            </div>
+                            <div className="flex-shrink-0">
+                                <Toggle checked={isLoan} onChange={setIsLoan} />
                             </div>
                         </div>
-                    )}
-                </div>
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug">
+                            Loans can have custom interest rates applied automatically.
+                        </p>
+
+                        {isLoan && (
+                            <div className="mt-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <label className="text-[11px] font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest mb-1.5 block">Annual Interest Rate (%)</label>
+                                <div className="relative">
+                                    <InputNumber
+                                        value={loanInterestRate === 0 ? null : loanInterestRate}
+                                        onValueChange={(e) => setLoanInterestRate(e.value || 0)}
+                                        mode="decimal"
+                                        minFractionDigits={1}
+                                        maxFractionDigits={1}
+                                        suffix=" %"
+                                        className="w-full"
+                                        inputClassName="w-full bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-900/50 rounded-xl py-2 px-3 text-[18px] font-bold text-emerald-900 dark:text-emerald-300 outline-none"
+                                        placeholder="0.0"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── Repeat this expense ── */}
+                {id !== user?.id && id !== user?._id && (
+                    <div className="w-full max-w-[280px] mt-5 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl border border-blue-100 dark:border-blue-900/50">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <i className={`pi pi-refresh text-[18px] ${isRecurring ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`} />
+                                <span className="text-[15px] font-bold text-gray-800 dark:text-gray-100">Repeat this expense?</span>
+                            </div>
+                            <div
+                                className={`relative w-11 h-6 rounded-full cursor-pointer transition-colors ${isRecurring ? 'bg-blue-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                                onClick={() => setIsRecurring(p => !p)}
+                            >
+                                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isRecurring ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </div>
+                        </div>
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug">
+                            Auto-post this bill on a schedule without manual entry.
+                        </p>
+                        {isRecurring && (
+                            <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div>
+                                    <label className="text-[11px] font-black text-blue-800 dark:text-blue-400 uppercase tracking-widest mb-1.5 block">Repeat every</label>
+                                    <div className="grid grid-cols-4 gap-1.5">
+                                        {[['weekly','Weekly'],['biweekly','Bi‑wkly'],['monthly','Monthly'],['yearly','Yearly']].map(([val,label]) => (
+                                            <button key={val} type="button" onClick={() => setRecurrenceFrequency(val)}
+                                                className={`py-1.5 rounded-lg text-[11px] font-bold border transition ${recurrenceFrequency === val ? 'bg-blue-500 text-white border-blue-500' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-600'}`}>
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-black text-blue-800 dark:text-blue-400 uppercase tracking-widest mb-1.5 block">End date (optional)</label>
+                                    <input type="date" value={recurrenceEndDate}
+                                        min={new Date().toISOString().split('T')[0]}
+                                        onChange={e => setRecurrenceEndDate(e.target.value)}
+                                        className="w-full bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-900/50 rounded-xl py-2 px-3 text-[14px] font-semibold text-gray-900 dark:text-gray-100 outline-none"
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1">Leave blank to repeat until cancelled.</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </main>
 
             <Dialog 

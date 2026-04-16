@@ -66,7 +66,7 @@ const Home = () => {
 
   // If loading and we likely have a session, show splash to prevent flicker
   if (loading && token) return <SplashScreen />;
-  
+
   // For everyone else (new users/bots), show landing
   return <Landing />;
 };

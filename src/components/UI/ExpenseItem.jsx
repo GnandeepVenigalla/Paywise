@@ -15,7 +15,9 @@ const ExpenseItem = ({
     isLoan = false,
     parentLoan,
     billImage,
-    isCommunity = false
+    isCommunity = false,
+    isSelfLog = false,
+    isRecurring = false
 }) => {
     const formattedDate = new Date(date).toLocaleDateString('en-US', {
         month: 'short',
@@ -55,6 +57,9 @@ const ExpenseItem = ({
                         {isInterest && (
                             <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">Interest</span>
                         )}
+                        {isRecurring && (
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-0.5">🔁 Auto</span>
+                        )}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1 text-[13px] text-gray-400">
                         <span className="font-medium text-gray-500 uppercase tracking-wider">{formattedDate}</span>
@@ -81,11 +86,17 @@ const ExpenseItem = ({
                     <p className="text-[17px] font-black text-gray-900 leading-none mb-1">
                         {formatCurrency(amount, targetCurrency, sourceCurrency)}
                     </p>
-                    <p className={`text-[12px] font-bold uppercase tracking-tight ${userSplit > 0 ? 'text-emerald-500' : userSplit < 0 ? 'text-rose-500' : 'text-gray-400'}`}>
-                        {userSplit > 0 ? 'You are owed' : userSplit < 0 ? 'You owe' : 'Settled'}
-                        <span className="ml-1 font-black">
-                            {formatCurrency(Math.abs(userSplit), targetCurrency, sourceCurrency)}
-                        </span>
+                    <p className={`text-[12px] font-bold uppercase tracking-tight ${isSelfLog ? 'text-gray-400' : (userSplit > 0 ? 'text-emerald-500' : userSplit < 0 ? 'text-rose-500' : 'text-gray-400')}`}>
+                        {isSelfLog ? (
+                            'Personal Expense'
+                        ) : (
+                            <>
+                                {userSplit > 0 ? 'You are owed' : userSplit < 0 ? 'You owe' : 'Settled'}
+                                <span className="ml-1 font-black">
+                                    {formatCurrency(Math.abs(userSplit), targetCurrency, sourceCurrency)}
+                                </span>
+                            </>
+                        )}
                     </p>
                 </div>
             )}

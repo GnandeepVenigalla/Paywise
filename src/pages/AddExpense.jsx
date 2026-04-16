@@ -32,6 +32,11 @@ export default function AddExpense() {
     const [currency, setCurrency] = useState(user?.defaultCurrency || 'USD');
     const [showCurrencyModal, setShowCurrencyModal] = useState(false);
 
+    // Recurring bill state
+    const [isRecurring, setIsRecurring] = useState(false);
+    const [recurrenceFrequency, setRecurrenceFrequency] = useState('monthly');
+    const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+
     const currSym = CURRENCY_SYMBOLS[currency] || '$';
 
     // Split State Modals
@@ -171,7 +176,10 @@ export default function AddExpense() {
                 paidBy: payerMode === 'multiple' ? 'multiple' : paidBy,
                 splits: group?.groupType === 'community' ? [] : buildSplits(),
                 isLoan: isLoan,
-                loanInterestRate: isLoan ? loanInterestRate : 0
+                loanInterestRate: isLoan ? loanInterestRate : 0,
+                isRecurring,
+                recurrenceFrequency: isRecurring ? recurrenceFrequency : undefined,
+                recurrenceEndDate: isRecurring && recurrenceEndDate ? recurrenceEndDate : undefined
             });
 
             if (billImage) {
@@ -469,6 +477,56 @@ export default function AddExpense() {
                     )}
                 </div>
 
+                {/* ── Repeat this expense ── */}
+                {group?.groupType !== 'community' && (
+                    <div className="w-full max-w-[280px] mt-5 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl border border-blue-100 dark:border-blue-900/50">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <i className={`pi pi-refresh text-[18px] ${isRecurring ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`} />
+                                <span className="text-[15px] font-bold text-gray-800 dark:text-gray-100">Repeat this expense?</span>
+                            </div>
+                            <div
+                                className={`relative w-11 h-6 rounded-full cursor-pointer transition-colors ${isRecurring ? 'bg-blue-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                                onClick={() => setIsRecurring(p => !p)}
+                            >
+                                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isRecurring ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </div>
+                        </div>
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug">
+                            Auto-post this bill every month without manual entry.
+                        </p>
+                        {isRecurring && (
+                            <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div>
+                                    <label className="text-[11px] font-black text-blue-800 dark:text-blue-400 uppercase tracking-widest mb-1.5 block">Repeat every</label>
+                                    <div className="grid grid-cols-4 gap-1.5">
+                                        {[['weekly','Weekly'],['biweekly','Bi‑wkly'],['monthly','Monthly'],['yearly','Yearly']].map(([val,label]) => (
+                                            <button
+                                                key={val}
+                                                type="button"
+                                                onClick={() => setRecurrenceFrequency(val)}
+                                                className={`py-1.5 rounded-lg text-[11px] font-bold border transition ${recurrenceFrequency === val ? 'bg-blue-500 text-white border-blue-500' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-600'}`}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-black text-blue-800 dark:text-blue-400 uppercase tracking-widest mb-1.5 block">End date (optional)</label>
+                                    <input
+                                        type="date"
+                                        value={recurrenceEndDate}
+                                        min={new Date().toISOString().split('T')[0]}
+                                        onChange={e => setRecurrenceEndDate(e.target.value)}
+                                        className="w-full bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-900/50 rounded-xl py-2 px-3 text-[14px] font-semibold text-gray-900 dark:text-gray-100 outline-none"
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1">Leave blank to repeat until cancelled.</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </main>
 
             <Dialog 

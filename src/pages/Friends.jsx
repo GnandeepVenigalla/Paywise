@@ -171,12 +171,14 @@ export default function Friends() {
     const renderFriend = (friend) => {
         const bal = Number(friend.balance || 0);
         const isSettled = Math.abs(bal) < 0.01;
+        const isSelf = friend.id === user?.id || friend._id === user?.id;
+
         return (
             <Link
                 to={`/friend/${friend.id}`}
                 key={friend.id}
                 className={`block p-4 rounded-2xl transition-all group ${
-                    isSettled
+                    isSettled && !isSelf
                     ? 'bg-gray-50/50 opacity-70 border border-transparent hover:border-gray-100 shadow-none'
                     : 'bg-white shadow-sm border border-gray-100 hover:shadow-md hover:border-slate-100'
                 }`}
@@ -184,17 +186,21 @@ export default function Friends() {
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg uppercase flex-shrink-0 transition-all ${
-                            isSettled ? 'bg-gray-100 text-gray-400' : 'bg-slate-50 text-slate-900 group-hover:scale-105'
+                            isSelf ? 'bg-indigo-100 text-indigo-600' : (isSettled ? 'bg-gray-100 text-gray-400' : 'bg-slate-50 text-slate-900 group-hover:scale-105')
                         }`}>
-                            {friend.username.charAt(0)}
+                            {isSelf ? <i className="pi pi-user text-xl"></i> : friend.username.charAt(0)}
                         </div>
                         <div className="min-w-0">
-                            <h3 className={`font-bold text-[16px] truncate leading-tight ${isSettled ? 'text-gray-500' : 'text-gray-900'}`}>{friend.username}</h3>
-                            <p className="text-[12px] text-gray-400 truncate mt-0.5">{friend.email}</p>
+                            <h3 className={`font-bold text-[16px] truncate leading-tight ${isSettled && !isSelf ? 'text-gray-500' : 'text-gray-900'}`}>
+                                {isSelf ? `${friend.username} (You)` : friend.username}
+                            </h3>
+                            <p className="text-[12px] text-gray-400 truncate mt-0.5">{isSelf ? 'Personal Khata' : friend.email}</p>
                         </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                        {bal > 0.01 ? (
+                        {isSelf ? (
+                            <p className="text-[13px] font-bold text-indigo-400 uppercase tracking-widest leading-none">Self</p>
+                        ) : bal > 0.01 ? (
                             <div className="flex flex-col items-end">
                                 <span className="text-[11px] font-black uppercase tracking-tight text-emerald-500/80 mb-0.5">owes you</span>
                                 <span className="text-[16px] font-black text-emerald-500 leading-none">
@@ -413,10 +419,19 @@ export default function Friends() {
                                 </div>
 
                                 <h2 className="text-lg font-bold text-gray-800 mb-2">Your Friends</h2>
-                                {filteredFriends.length === 0 ? (
+                                {filteredFriends.length === 0 && filter !== 'none' ? (
                                     <p className="text-gray-500 text-sm mt-4 text-center">No friends match this filter.</p>
                                 ) : (
                                     <div className="flex flex-col gap-3">
+                                        {/* Always inject personal khata at the top if no filter or if we want it visible */}
+                                        {filter === 'none' && user && renderFriend({
+                                            _id: user.id || user._id,
+                                            id: user.id || user._id,
+                                            username: user.username,
+                                            email: user.email,
+                                            balance: 0
+                                        })}
+
                                         {activeFriends.map(renderFriend)}
                                         
                                         {settledFriends.length > 0 && (
