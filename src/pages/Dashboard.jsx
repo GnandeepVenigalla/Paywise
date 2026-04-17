@@ -82,6 +82,8 @@ export default function Dashboard() {
             let owedToMe = 0;   // positive
             let iOwe = 0;       // absolute value of negative
 
+            // ── Dashboard "Overall" = Groups + Friends combined ──────────────────
+            // This will be HIGHER than the Friends page total (friends-only).
             // Groups contribution
             groupsRes.data.forEach(g => {
                 const myBal = (g.balances || {})[user.id] || 0;
@@ -90,9 +92,10 @@ export default function Dashboard() {
                 else if (converted <= -0.01) iOwe += Math.abs(converted);
             });
 
-            // Friends contribution
+            // Friends contribution — use each friend's actual balanceCurrency, not a hardcoded 'USD'
             friendsRes.data.forEach(f => {
-                const converted = Math.round(convertAmount(f.balance || 0, 'USD', displayCurr) * 100) / 100;
+                const balCurr = f.balanceCurrency || displayCurr;
+                const converted = Math.round(convertAmount(f.balance || 0, balCurr, displayCurr) * 100) / 100;
                 if (converted >= 0.01) owedToMe += converted;
                 else if (converted <= -0.01) iOwe += Math.abs(converted);
             });

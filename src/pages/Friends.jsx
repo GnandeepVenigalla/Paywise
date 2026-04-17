@@ -5,7 +5,7 @@ import { UserPlus, HeartHandshake, Search, Plus, ArrowRight, ArrowLeft, Contact,
 import BottomNav from '../components/BottomNav';
 import logoImg from '../assets/logo.png';
 import NotificationBell from '../components/NotificationBell';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, convertAmount } from '../utils/formatters';
 
 export default function Friends() {
     const { api, user } = useContext(AuthContext);
@@ -21,8 +21,15 @@ export default function Friends() {
     const [showSettled, setShowSettled] = useState(false);
     const navigate = useNavigate();
 
-    const netBalance = friends.reduce((sum, friend) => sum + (friend.balance || 0), 0);
     const displayCurr = user?.defaultCurrency || 'USD';
+
+    // Convert each friend's balance from its own currency to the user's display currency before summing.
+    // Without this, mixing INR and USD balances produces wildly wrong totals.
+    const netBalance = friends.reduce((sum, friend) => {
+        const bal = friend.balance || 0;
+        const balCurr = friend.balanceCurrency || displayCurr;
+        return sum + convertAmount(bal, balCurr, displayCurr);
+    }, 0);
 
     useEffect(() => {
         if ('contacts' in navigator && 'ContactsManager' in window) {
