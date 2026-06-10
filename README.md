@@ -1,6 +1,6 @@
 # <img src="src/assets/logo.png" width="40" height="40" /> Paywise — Effortless Expense Splitting
 
-> **Current Release: V1.5.0** — *The "Settlement Precision" Update*
+> **Current Release: V1.6.0** — *The "Smart Automation" Update*
 > Available at: [www.paywiseapp.com](https://www.paywiseapp.com)
 
 ![Paywise Hero Banner](docs/images/hero_banner.png)
@@ -103,6 +103,40 @@ src/
 
 
 ## 📜 Version History & Release Log
+
+### v1.6.0 — "Smart Automation" Update
+*Released: April 2026*
+*Founded by Gnandeep Venigalla (GD Enterprises) · CEO: Sai Sujitha*
+
+#### 👤 Personal Khata (Self Ledger)
+- New **"Self" profile** accessible from the Friends screen — acts as a private personal expense notebook
+- Log expenses exclusively for yourself (no friend splits, no group context)
+- Fully isolated from friend/group feeds — only personal entries appear here
+- Monthly budget tracking with visual spending chart in the Self view
+- Expenses display a clean **"PERSONAL EXPENSE"** tag instead of split debt labels
+- Friend settings gear icon hidden on Self view (can't block or report yourself!)
+
+#### 🔁 Recurring Expenses (Inline)
+- **"Repeat this expense?"** toggle embedded directly inside the Add Expense screen (group & friend)
+- Select repeat interval: **Weekly, Bi-Weekly, Monthly, Yearly**
+- Optional end date — leave blank to repeat until cancelled
+- The first saved expense becomes the **template** and appears immediately in history with a **🔁 AUTO** badge
+- Daily CRON job at **00:01 AM** silently clones the expense into transaction history on schedule
+- All instances share a `recurrenceId` linking them as a series
+- Push notification sent to all split participants each time a bill is auto-posted
+- **Cancel recurring** from inside the expense detail sheet:
+  - **"Stop Recurring (keep history)"** — stops all future auto-posts; existing history untouched
+  - **"Delete Entire Expense"** — removes the record completely
+- Recurring info shown in expense detail: next auto-post date, frequency, end date
+- Month-end safe scheduling: a bill set for the 31st correctly fires on Feb 28/29
+
+#### 🛡️ UX & Bug Fixes
+- Fixed crash (`TypeError`) in `useMonthlySpending` hook on null/legacy split data
+- Fixed `isLoan` accidentally removed from `ExpenseItem` props causing app-wide crash
+- Settlement delete button now correctly visible for the **receiver** of a settlement, not just the payer
+- Settle-up records excluded from personal spending chart to prevent inflated monthly totals
+
+---
 
 ### v1.5.0 — "Settlement Precision" Update
 *Released: April 2026*

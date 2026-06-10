@@ -332,7 +332,7 @@ export default function Account() {
 
             <div className="text-center mt-8 mb-6">
                 <div className="text-[11px] text-gray-400 uppercase tracking-widest pointer-events-none">
-                    <p>Crafted with love by <a href="https://gdenterprises.gnandeep.com" target="_blank" rel="noopener noreferrer" className="text-slate-900 dark:text-slate-300 font-bold hover:underline pointer-events-auto">GD Enterprises</a></p>
+                    <p>Crafted with love</p>
                     <p className="mt-1.5 opacity-60">Paywise {VERSION} · © 2026</p>
                     <div className="mt-3 flex items-center justify-center gap-4 text-[10px] font-black uppercase tracking-widest text-[#19876e] dark:text-emerald-400">
                         <Link to="/terms" className="hover:underline">Terms</Link>

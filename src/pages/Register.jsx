@@ -83,7 +83,7 @@ export default function Register() {
                             <GoogleSignInButton 
                                 onError={msg => setError(msg)} 
                                 onRequireOtp={(googleEmail, msg) => {
-                                    setFormData({ ...formData, email: googleEmail });
+                                    setEmail(googleEmail);
                                     setIsOtpMode(true);
                                     setSuccess('A verification code was sent to your email.');
                                 }} 

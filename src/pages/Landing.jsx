@@ -314,19 +314,13 @@ export default function Landing() {
                 <div className="max-w-7xl mx-auto text-center">
                     <h2 className="text-[13px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-500 mb-4">From the Founders</h2>
                     <p className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight max-w-2xl mx-auto mb-8">
-                        Built for the community, <br className="hidden md:block"/>by GD Enterprises.
+                        Built for the community, <br className="hidden md:block"/>by the Paywise team.
                     </p>
                     <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400 max-w-3xl mx-auto mb-16 leading-relaxed">
                         "We are so excited to have you in our Paywise economy! Our goal is to eliminate the awkwardness in sharing finances so you can focus entirely on the experiences that matter most."
                     </p>
                     <div className="flex flex-col md:flex-row justify-center items-center gap-12">
-                        <div className="text-center">
-                            <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-emerald-50 dark:border-emerald-900/30 flex items-center justify-center font-bold text-3xl text-emerald-600 dark:text-emerald-400 shadow-xl shadow-emerald-500/10">
-                                GV
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Gnandeep Venigalla</h3>
-                            <p className="text-emerald-600 dark:text-emerald-500 font-black text-[11px] uppercase tracking-widest mt-1">Founder, GD Enterprises</p>
-                        </div>
+
                         <div className="text-center">
                             <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-blue-50 dark:border-blue-900/30 flex items-center justify-center font-bold text-3xl text-blue-600 dark:text-blue-400 shadow-xl shadow-blue-500/10">
                                 SS
@@ -423,7 +417,7 @@ export default function Landing() {
                         </div>
 
                         <div className="mt-12 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 text-center">
-                            A GD Enterprises Product
+                            A Paywise Product
                         </div>
                     </div>
                 </div>
@@ -439,7 +433,7 @@ export default function Landing() {
                             <span className="text-[20px] font-black tracking-tighter text-slate-900 dark:text-white">Paywise</span>
                         </div>
                         <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-6">
-                            Paywise is a premium social expense-sharing platform designed for transparency and trust. Part of the GD Enterprises family.
+                            Paywise is a premium social expense-sharing platform designed for transparency and trust.
                         </p>
                         <div className="flex gap-4">
                             <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer transition-colors shadow-sm">
@@ -494,7 +488,7 @@ export default function Landing() {
                     <div className="flex items-center gap-6 text-xs font-bold text-slate-400 tracking-wide uppercase">
                         <span className="hover:text-slate-900 dark:text-white cursor-pointer transition-colors">English</span>
                         <span className="hover:text-slate-900 dark:text-white cursor-pointer transition-colors">Security</span>
-                        <span className="hover:text-slate-900 dark:text-white cursor-pointer transition-colors">GD Enterprises</span>
+                        <span className="hover:text-slate-900 dark:text-white cursor-pointer transition-colors">Paywise Team</span>
                     </div>
                 </div>
             </footer>
