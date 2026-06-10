@@ -1,187 +1,192 @@
-import { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import BottomNav from '../components/BottomNav';
-import {
-    BookOpen, Store, TrendingUp, TrendingDown, ChevronRight,
-    AlertCircle, CheckCircle, RefreshCw, MessageCircle
-} from 'lucide-react';
-import logoImg from '../assets/logo.png';
-
-const fmt = (n, abs = true) => '₹' + (abs ? Math.abs(n) : n).toLocaleString('en-IN');
-const ago = (d) => {
-    const diff = Date.now() - new Date(d);
-    const days = Math.floor(diff / 86400000);
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return `${days}d ago`;
-    return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-};
-
-const CATEGORY_ICONS = {
-    'Grocery': '🛒', 'Clothing': '👕', 'Restaurant & Food': '🍱', 'Restaurant': '🍱',
-    'Pharmacy': '💊', 'Electronics': '📱', 'Hardware': '🔧', 'Services': '🛠', 'General': '🏢'
-};
+import React, { useState } from 'react'
+import './Katha.css'
+import StoreCard from './StoreCard'
+import { fetchUserKathaList, initiatePayment, raiseDisputeUser } from '../utils/kathaModules'
 
 export default function Katha() {
-    const { api, user } = useContext(AuthContext);
-    const navigate = useNavigate();
-    const [stores, setStores] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+  // Mock user data - in real app this would come from auth context
+  const currentUserId = 'user_123'
 
-    const fetchStores = async () => {
-        setLoading(true);
-        setError('');
-        try {
-            const res = await api.get('/merchant/my-stores');
-            setStores(res.data || []);
-        } catch (err) {
-            setError('Could not load your Katha. Please try again.');
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  // Mock stores with balances - would come from backend API
+  const [stores] = useState([
+    {
+      id: 'store_1',
+      merchant_id: 'm_001',
+      storeName: 'Rajesh Grocery Store',
+      category: 'Grocery',
+      logo: '🛒',
+      balances: { user_123: 1250 }, // user owes
+      lastTransactionDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      trustScore: '98%',
+      whatsappNumber: '9999999999',
+      upi: 'rajesh@upi',
+    },
+    {
+      id: 'store_2',
+      merchant_id: 'm_002',
+      storeName: 'Priya Clothing Boutique',
+      category: 'Clothing',
+      logo: '👕',
+      balances: { user_123: -580 }, // user has advance
+      lastTransactionDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      trustScore: '95%',
+      whatsappNumber: '8888888888',
+      upi: 'priya@upi',
+    },
+    {
+      id: 'store_3',
+      merchant_id: 'm_003',
+      storeName: 'Amit Restaurant',
+      category: 'Food & Beverage',
+      logo: '🍱',
+      balances: { user_123: 320 }, // user owes
+      lastTransactionDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      trustScore: '92%',
+      whatsappNumber: '7777777777',
+      upi: 'amit@upi',
+    },
+    {
+      id: 'store_4',
+      merchant_id: 'm_004',
+      storeName: 'No Balance Store',
+      category: 'General',
+      logo: '🏢',
+      balances: { user_123: 0 }, // no balance - should not appear
+      lastTransactionDate: new Date(),
+      trustScore: '0%',
+      whatsappNumber: '6666666666',
+      upi: 'store4@upi',
+    },
+  ])
 
-    useEffect(() => { 
-        const host = window.location.hostname;
-        const isLocalOrBeta = host === 'localhost' || host === '127.0.0.1' || host === 'beta.paywiseapp.com';
-        if (!isLocalOrBeta) {
-            navigate('/dashboard', { replace: true });
-            return;
-        }
-        fetchStores(); 
-    }, []);
+  const [disputes, setDisputes] = useState([])
+  const [selectedDispute, setSelectedDispute] = useState(null)
+  const [paymentLink, setPaymentLink] = useState(null)
 
-    const totalOwed = stores.filter(s => s.balance > 0).reduce((sum, s) => sum + s.balance, 0);
-    const totalAdvance = stores.filter(s => s.balance < 0).reduce((sum, s) => sum + Math.abs(s.balance), 0);
+  // Fetch user's Katha list (stores with non-zero balance)
+  const kathaList = fetchUserKathaList(stores, currentUserId)
 
-    return (
-        <div className="min-h-screen bg-gray-50 pb-20">
-            {/* Header */}
-            <header className="bg-white shadow-sm pt-8 pb-4 px-4 sticky top-0 z-10 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                    <img src={logoImg} alt="Paywise" className="w-8 h-8 object-contain" />
-                    <h1 className="text-xl font-bold text-gray-900">Paywise <span className="text-amber-600">Katha</span></h1>
-                </div>
-                <button onClick={fetchStores} className="p-2 rounded-full bg-slate-50 hover:bg-slate-100 transition text-slate-500">
-                    <RefreshCw className="w-4 h-4" />
-                </button>
-            </header>
+  function handlePay(store) {
+    const amountOwed = Math.abs(store.userBalance)
+    const result = initiatePayment(store, amountOwed)
 
-            <main className="px-4 pt-5 max-w-md mx-auto">
-                {/* Summary Cards */}
-                {!loading && stores.length > 0 && (
-                    <div className="grid grid-cols-3 gap-3 mb-5">
-                        <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm text-center">
-                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-wider mb-1">You Owe</p>
-                            <p className="text-[17px] font-black text-rose-600 leading-none">{fmt(totalOwed)}</p>
-                        </div>
-                        <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm text-center">
-                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider mb-1">Advance</p>
-                            <p className="text-[17px] font-black text-emerald-600 leading-none">{fmt(totalAdvance)}</p>
-                        </div>
-                        <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm text-center">
-                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-wider mb-1">Stores</p>
-                            <p className="text-[17px] font-black text-blue-600 leading-none">{stores.length}</p>
-                        </div>
-                    </div>
-                )}
+    // In real app, open UPI app or show QR
+    setPaymentLink(result)
+    alert(`Open UPI to pay ₹${amountOwed} to ${store.storeName}\nUPI: ${result.upiLink}`)
+  }
 
-                {/* Loading skeleton */}
-                {loading && (
-                    <div className="space-y-3">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="bg-white rounded-2xl p-4 border border-gray-100 animate-pulse">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-gray-100 rounded-full" />
-                                    <div className="flex-1">
-                                        <div className="h-3 bg-gray-100 rounded-full w-2/3 mb-2" />
-                                        <div className="h-2 bg-gray-100 rounded-full w-1/3" />
-                                    </div>
-                                    <div className="h-5 w-16 bg-gray-100 rounded-full" />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+  function handleDispute(store) {
+    const reason = prompt(`Raise dispute with ${store.storeName}.\n\nReason (required):`)
+    if (!reason) return
 
-                {/* Error */}
-                {error && !loading && (
-                    <div className="flex items-center gap-3 bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-4">
-                        <AlertCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
-                        <p className="text-sm text-rose-700 font-medium">{error}</p>
-                    </div>
-                )}
+    const transactionId = `txn_${Date.now()}`
+    const dispute = raiseDisputeUser(store, transactionId, reason)
 
-                {/* Empty state */}
-                {!loading && !error && stores.length === 0 && (
-                    <div className="flex flex-col items-center justify-center mt-20 px-4">
-                        <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-5 text-4xl">
-                            📕
-                        </div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">No Katha Yet</h2>
-                        <p className="text-gray-500 text-sm text-center leading-relaxed max-w-xs">
-                            When a merchant adds you to their Katha book, it will appear here. Your balance with each store is tracked automatically.
-                        </p>
-                        <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 w-full max-w-xs">
-                            <p className="text-xs text-amber-800 font-semibold text-center">
-                                💡 Your phone number must match what the merchant enters.
-                                Make sure your Paywise account uses the same number.
-                            </p>
-                        </div>
-                    </div>
-                )}
+    setDisputes([dispute, ...disputes])
+    setSelectedDispute(dispute)
+    alert(`📢 Dispute raised!\n${dispute.message}`)
+  }
 
-                {/* Store list */}
-                {!loading && stores.length > 0 && (
-                    <div className="space-y-3">
-                        <h2 className="text-sm font-black text-gray-500 uppercase tracking-wider mb-3">Your Stores</h2>
-                        {stores.map(store => {
-                            const owes = store.balance > 0;
-                            const icon = CATEGORY_ICONS[store.category] || '🏪';
-                            return (
-                                <button
-                                    key={store.merchantId}
-                                    onClick={() => navigate(`/katha/${store.merchantId}`)}
-                                    className="w-full bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3 text-left hover:border-amber-200 hover:shadow-md transition-all group"
-                                >
-                                    {/* Icon */}
-                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0 ${owes ? 'bg-rose-50' : 'bg-emerald-50'}`}>
-                                        {icon}
-                                    </div>
+  const owedTotal = kathaList
+    .filter(s => s.userBalance > 0)
+    .reduce((sum, s) => sum + s.userBalance, 0)
 
-                                    {/* Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-gray-900 text-[15px] truncate leading-tight">{store.shopName}</h3>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <span className="text-[11px] text-gray-400">{store.category}</span>
-                                            <span className="text-gray-200">·</span>
-                                            <span className="text-[11px] text-gray-400">{ago(store.lastTransaction)}</span>
-                                            {store.trustScore < 90 && <span className="text-[10px] font-bold text-orange-500">⚠ {store.trustScore}%</span>}
-                                        </div>
-                                    </div>
+  const advanceTotal = kathaList
+    .filter(s => s.userBalance < 0)
+    .reduce((sum, s) => sum + Math.abs(s.userBalance), 0)
 
-                                    {/* Balance */}
-                                    <div className="text-right flex-shrink-0">
-                                        <div className={`text-[16px] font-black leading-none ${owes ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                            {fmt(store.balance)}
-                                        </div>
-                                        <div className={`text-[10px] font-black uppercase tracking-tight mt-0.5 ${owes ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                            {owes ? 'you owe' : 'advance'}
-                                        </div>
-                                    </div>
+  return (
+    <div className="katha-page">
+      <h1>📕 Katha - Your Debt Tracker</h1>
+      <p className="subtitle">Track your balance with all your stores in one place</p>
 
-                                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-amber-600 transition-colors" />
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-            </main>
-
-            <BottomNav />
+      <div className="summary-section">
+        <div className="summary-card owed">
+          <h3>Total Owed</h3>
+          <p className="amount">₹{owedTotal.toLocaleString()}</p>
         </div>
-    );
+        <div className="summary-card advance">
+          <h3>Total Advance</h3>
+          <p className="amount">₹{advanceTotal.toLocaleString()}</p>
+        </div>
+        <div className="summary-card stores">
+          <h3>Stores</h3>
+          <p className="amount">{kathaList.length}</p>
+        </div>
+      </div>
+
+      {kathaList.length === 0 ? (
+        <div className="empty-state">
+          <p>✨ No pending balances. You're all set!</p>
+        </div>
+      ) : (
+        <div className="stores-grid">
+          {kathaList.map(store => (
+            <StoreCard
+              key={store.id}
+              store={store}
+              onPay={handlePay}
+              onDispute={handleDispute}
+            />
+          ))}
+        </div>
+      )}
+
+      {disputes.length > 0 && (
+        <div className="disputes-section">
+          <h2>Disputes ({disputes.length})</h2>
+          <div className="disputes-list">
+            {disputes.map(disp => (
+              <div
+                key={disp.id}
+                className={`dispute-item ${disp.status}`}
+                onClick={() => setSelectedDispute(disp)}
+              >
+                <div className="dispute-header">
+                  <strong>{disp.id}</strong>
+                  <span className="status-badge">{disp.status}</span>
+                </div>
+                <p>{disp.reason}</p>
+                <small>{new Date(disp.createdAt).toLocaleDateString()}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedDispute && (
+        <div className="dispute-modal">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Dispute Details</h3>
+              <button className="btn-close" onClick={() => setSelectedDispute(null)}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>
+                <strong>ID:</strong> {selectedDispute.id}
+              </p>
+              <p>
+                <strong>Status:</strong> {selectedDispute.status}
+              </p>
+              <p>
+                <strong>Reason:</strong> {selectedDispute.reason}
+              </p>
+              <p>
+                <strong>Message:</strong> {selectedDispute.message}
+              </p>
+              <p className="note">
+                📝 <em>Merchant will respond to this dispute within 48 hours.</em>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer className="katha-footer">
+        <p>💡 Tip: Always keep your payments on time to maintain good merchant relationships!</p>
+      </footer>
+    </div>
+  )
 }
